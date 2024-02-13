@@ -43,6 +43,7 @@ let rec prop_s env s =
       S_set(x,prop env a)
   | S_buffer_set _
   | S_setptr _
+  | S_ptr_take _
   | S_setptr_write _ -> s
   | S_seq(s1,s2) -> S_seq(prop_s env s1,prop_s env s2)
   | S_letIn(x,a1,s1) ->

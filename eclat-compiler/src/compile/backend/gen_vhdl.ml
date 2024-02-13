@@ -170,6 +170,8 @@ and pp_a fmt = function
     fprintf fmt "@[%a(to_integer(unsigned(%s&\"000\")) to to_integer(unsigned(%s&\"000\"))+7)@]" pp_ident s i i
 | A_buffer_get(xb) ->
     pp_ident fmt ("$"^xb^"_value")
+| A_ptr_taken(x) ->
+    pp_ident fmt ("$"^x^"_ptr_take")
 | A_buffer_length(x,tz) ->
     fprintf fmt  "std_logic_vector(to_unsigned(%a'length,%d))" pp_ident x (size_ty tz)
 | A_encode(y,ty,n) ->
@@ -201,6 +203,9 @@ let rec pp_s ~st fmt = function
     | _ ->
        fprintf fmt
          "@[%a <= to_integer(unsigned(%a));@]" pp_ident ("$"^x^"_ptr") pp_a idx)
+| S_ptr_take(x,b) ->
+    fprintf fmt
+      "@[%a(0) := '%d';@]" pp_ident ("$"^x^"_ptr_take") (if b then 1 else 0)
 | S_setptr_write(x,idx,a) ->
     (match idx with
     | A_const(Int{value=n}) ->
@@ -430,8 +435,12 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
 
   declare_variable ~argument ~statics typing_env fmt;
 
-  fprintf fmt "@]@,@[<v 2>begin@,";
 
+  List.iter (fun (x,Static_array(c,n)) ->
+      fprintf fmt "variable %a : value(0 to 0) := \"0\";@," pp_ident ("$"^x^"_ptr_take");
+  ) statics;
+
+  fprintf fmt "@]@,@[<v 2>begin@,";
 
   fprintf fmt "@,@[<v 2>if rising_edge(clk) then@,";
 

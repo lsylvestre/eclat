@@ -36,6 +36,7 @@ type a = A_letIn of x * a * a
   | A_var of x
   | A_call of op * a
   | A_string_get of x * x
+  | A_ptr_taken of x
   | A_buffer_get of x
   | A_buffer_length of x * ty (* [ty] is the size of the resulting integer *)
   | A_decode of x * ty
@@ -52,6 +53,7 @@ type s = (* all instructions terminates in one clock cycle *)
   | S_case of x * (c * s) list * s option
   | S_set of x * a
   | S_setptr of x * a
+  | S_ptr_take of x * bool
   | S_setptr_write of x * a * a
   | S_buffer_set of x
   | S_seq of s * s
@@ -117,6 +119,7 @@ let pp_tuple = Ast_pprint.pp_tuple
   | A_tuple aas ->
       pp_tuple fmt pp_a aas
   | A_string_get(sx,ix) -> fprintf fmt "%s[%s]" sx ix
+  | A_ptr_taken(x) -> fprintf fmt "ptr_taken<%s>" x
   | A_buffer_get(x) -> fprintf fmt "static_get_value(%s)" x
   | A_buffer_length(x,_) -> fprintf fmt "%s.length" x
   | A_decode(x,_) -> fprintf fmt "decode(%s)" x
@@ -140,6 +143,8 @@ let pp_tuple = Ast_pprint.pp_tuple
       fprintf fmt "@[<v>%s := %a;@]" x pp_a a
   | S_setptr(x,idx) ->
       fprintf fmt "@[<v>setptr<%s>[%a];@]" x pp_a idx
+  | S_ptr_take(x,b) ->
+      fprintf fmt "@[<v>setptr_take<%s> := %b;@]" x b
   | S_setptr_write(x,idx,a) ->
       fprintf fmt "@[<v>(%s[%a] <- %a;@]" x pp_a idx pp_a a
   | S_buffer_set(x) ->

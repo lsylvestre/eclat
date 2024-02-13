@@ -92,7 +92,7 @@ let compute_tag_size cs =
   max 4 n
 
 let rec translate_ty =
-  let hvar = Hashtbl.create 10 in 
+  let hvar = Hashtbl.create 10 in
   function
   | Types.T_const(TInt tz) -> TInt (translate_ty tz)
   | Types.T_const(TBool) -> TBool
@@ -185,6 +185,11 @@ let rec typing_a h a =
       add_typing_env h ix (TInt (TSize 32));
       TInt(TSize 8)
 
+  | A_ptr_taken(x) ->
+      let telem = new_tvar () in
+      let tz = new_tvar () in
+      add_typing_env h x (TStatic{elem=telem;size=tz});
+      TBool
 
   | A_buffer_get(xb) ->
       let telem = new_tvar () in
@@ -212,6 +217,10 @@ let rec typing_s ~result h = function
       let t = typing_a h a in
       (* (Format.fprintf Format.std_formatter "======> (%s : %a)\n" x Fsm_syntax.Debug.pp_ty (canon t)); *)
       add_typing_env h x t
+  | S_ptr_take(x,_) ->
+      let telem = new_tvar () in
+      let tz = new_tvar () in
+      add_typing_env h x (TStatic{elem=telem;size=tz})
   | S_setptr(x,idx) ->
       let telem = new_tvar () in
       let tz = new_tvar () in
