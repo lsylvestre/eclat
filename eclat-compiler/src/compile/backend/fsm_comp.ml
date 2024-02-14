@@ -56,6 +56,7 @@ let contain_return s =
   | S_skip
   | S_setptr _
   | S_ptr_take _
+  | S_ptr_write_take _
   | S_setptr_write _
   | S_buffer_set _
   | S_call _
@@ -101,6 +102,7 @@ let rec insert_kont w ~compute ~x (q,s) =
     | S_skip
     | S_setptr _
     | S_ptr_take _
+    | S_ptr_write_take _
     | S_setptr_write _
     | S_buffer_set _
     | S_call _
@@ -281,13 +283,13 @@ let rec to_s ~statics ~sums g e x k =
       let a = to_a ~sums idx in
       let a_upd = to_a ~sums e_upd in
       let q = Ast.gensym ~prefix:"pause_setI" () in
-      let ts = SMap.add q (seq_ (S_ptr_take(y,false)) @@
+      let ts = SMap.add q (seq_ (S_ptr_write_take(y,false)) @@
                            seq_ (S_buffer_set(y))
                                 (return_ @@ (set_ x (A_const Unit)))) SMap.empty  in
       let q_wait = Ast.gensym ~prefix:"q_wait" () in
-      let s' = let_plug_s (A_ptr_taken(y)) @@ fun z ->
+      let s' = let_plug_s (A_ptr_write_taken(y)) @@ fun z ->
                  S_if(z, (S_continue q_wait),
-                           Some (seq_ (S_ptr_take(y,true)) @@
+                           Some (seq_ (S_ptr_write_take(y,true)) @@
                                  seq_ (S_setptr_write(y,a,a_upd)) @@
                                  (S_continue q))) in
       (SMap.empty, SMap.add q_wait s' ts, s')

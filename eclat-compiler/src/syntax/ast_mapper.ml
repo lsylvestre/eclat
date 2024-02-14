@@ -39,7 +39,10 @@ let rec map f e =
       E_reg((p,f e1),f e0,l)
   | E_exec(e1,e2,k) ->
       E_exec(f e1,f e2,k)
-
+  | E_absLabel(l,e1) ->
+      E_absLabel(l, f e1)
+  | E_appLabel(e1,l) ->
+      E_appLabel(f e1,l)
 
 (** traversal order of sub-expressions is unspecified *)
 
@@ -81,6 +84,10 @@ let rec iter f (e:e) : unit =
       f e1
   | E_static_array_set(_,e1,e2) ->
       f e1; f e2
+  | E_absLabel(_,e1) ->
+      f e1
+  | E_appLabel(e1,_) ->
+      f e1
 
 
 let map_pi f pi =

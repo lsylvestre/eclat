@@ -65,6 +65,8 @@ type e =                      (** expression     [e]                       *)
   | E_set of x * e            (** assignment     [x <- e]
                                   type checking must ensure that [x]
                                   is bound using the var/in construct    *)
+  | E_absLabel of l * e       (** big lambda for binding labels *)
+  | E_appLabel of e * l       (** label application *)
 
 type static =                 (* static toplevel data *)
   | Static_array of c * int   (** static global array [c^n] *)
@@ -171,7 +173,7 @@ let as_variable (e:e) : x =
 (** [evaluated e] returns [true] iff [e] is a value *)
 let rec evaluated (e:e) : bool =
   match un_annot e with
-  | E_const _ | E_fun _ | E_fix _ -> true
+  | E_const _ | E_fun _ | E_fix _ | E_appLabel _ -> true
   | E_tuple es -> List.for_all evaluated es
   | E_app(E_const(Op(TyConstr _)),e) -> evaluated e
   | _ -> false

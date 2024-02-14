@@ -23,6 +23,8 @@ let rec prop env a =
       A_tuple(List.map (prop env) aas)
   | A_call(op,a1) ->
      A_call(op,prop env a1)
+  | A_ptr_taken _
+  | A_ptr_write_taken _
   | A_string_get _
   | A_buffer_get _
   | A_buffer_length _
@@ -44,6 +46,7 @@ let rec prop_s env s =
   | S_buffer_set _
   | S_setptr _
   | S_ptr_take _
+  | S_ptr_write_take _
   | S_setptr_write _ -> s
   | S_seq(s1,s2) -> S_seq(prop_s env s1,prop_s env s2)
   | S_letIn(x,a1,s1) ->

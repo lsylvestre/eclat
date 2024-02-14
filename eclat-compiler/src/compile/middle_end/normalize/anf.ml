@@ -114,7 +114,10 @@ let rec anf (e:e) : e =
       E_static_array_set(x,xc1,xc2)
   | E_par(e1,e2) ->
       E_par(anf e1, anf e2)
-
+  | E_absLabel(l,e1) ->
+      E_absLabel(l,anf e1)
+  | E_appLabel(e1,l) ->
+      E_appLabel(anf e1,l)
 
 (** [in_anf e] check if expression [e] is in ANF-form *)
 let rec in_anf (e:e) : bool =
@@ -157,7 +160,10 @@ let rec in_anf (e:e) : bool =
       is_xc e1 && is_xc e2
   | E_par(e1,e2) ->
       in_anf e1 && in_anf e2
-
+  | E_absLabel(_,e1) ->
+      in_anf e1
+  | E_appLabel(e1,_) ->
+      in_anf e1
 
 (** [anf e] puts program [pi] in ANF-form *)
 let anf_pi (pi:pi) : pi =

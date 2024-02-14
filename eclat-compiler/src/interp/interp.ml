@@ -144,7 +144,7 @@ let rec red (e,r) =
              fprintf fmt "@,");*)
   match e with
   | E_deco(e1,_) -> red (e1,r)
-  | E_const _ | E_fun (_, _) | E_fix (_, _) ->
+  | E_const _ | E_fun (_, _) | E_fix (_, _) | E_absLabel _ ->
       assert (evaluated e);
       (e,r)
   | E_var x -> (match SMap.find x r.mu with
@@ -265,6 +265,14 @@ let rec red (e,r) =
       let e1',r1 = red (e1,r) in
       let e2',r2 = red (e2,r1) in
       E_static_array_set (x,e1',e2'),r2
+  | E_appLabel(e1,l) -> 
+      let e1',r' = red (e1,r) in
+      if not (evaluated e1')
+      then (E_appLabel(e1',l), r')
+      else (match e1' with
+            | E_absLabel(l2,e2) -> red (subst_label l2 l e2,r')
+            | _ -> assert false) (* error *)
+
 
 let rec reduce_until (e_init,r) args =
   let rec aux (e,r) args =

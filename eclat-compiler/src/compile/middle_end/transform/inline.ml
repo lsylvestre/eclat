@@ -19,6 +19,8 @@ let rec inline e =
   | E_lastIn(x,e1,e2) ->
       let y = gensym () in
       E_lastIn(y,inline e1,subst_e x (E_var y) (inline e2))
+  | E_appLabel(e1,l2) ->
+      inline (app_label e1 l2)
   | e -> Ast_mapper.map inline e
 
 

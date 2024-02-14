@@ -172,6 +172,8 @@ and pp_a fmt = function
     pp_ident fmt ("$"^xb^"_value")
 | A_ptr_taken(x) ->
     pp_ident fmt ("$"^x^"_ptr_take")
+| A_ptr_write_taken(x) ->
+    pp_ident fmt ("$"^x^"_ptr_write_take")
 | A_buffer_length(x,tz) ->
     fprintf fmt  "std_logic_vector(to_unsigned(%a'length,%d))" pp_ident x (size_ty tz)
 | A_encode(y,ty,n) ->
@@ -206,6 +208,9 @@ let rec pp_s ~st fmt = function
 | S_ptr_take(x,b) ->
     fprintf fmt
       "@[%a(0) := '%d';@]" pp_ident ("$"^x^"_ptr_take") (if b then 1 else 0)
+| S_ptr_write_take(x,b) ->
+    fprintf fmt
+      "@[%a(0) := '%d';@]" pp_ident ("$"^x^"_ptr_write_take") (if b then 1 else 0)
 | S_setptr_write(x,idx,a) ->
     (match idx with
     | A_const(Int{value=n}) ->
@@ -438,6 +443,7 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
 
   List.iter (fun (x,Static_array(c,n)) ->
       fprintf fmt "variable %a : value(0 to 0) := \"0\";@," pp_ident ("$"^x^"_ptr_take");
+      fprintf fmt "variable %a : value(0 to 0) := \"0\";@," pp_ident ("$"^x^"_ptr_write_take");
   ) statics;
 
   fprintf fmt "@]@,@[<v 2>begin@,";

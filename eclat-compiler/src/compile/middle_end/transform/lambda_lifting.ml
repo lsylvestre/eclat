@@ -214,6 +214,12 @@ let globalize_e (e:e) : ((x * e) list * e) =
         let ds1,e1' = glob e1 in
         let ds0,e0' = glob e0 in
         ds0,E_exec(declare ds1 e1',e0',l)
+    | E_absLabel (l, e1) ->
+        let ds1,e1' = glob e1 in
+        ds1,E_absLabel (l, e1')   (* scope is ok ? *)
+    | E_appLabel (e1, l) ->
+        let ds1,e1' = glob e1 in
+        ds1,E_appLabel (e1',l)   (* scope is ok ? *)
   in glob e
 
 

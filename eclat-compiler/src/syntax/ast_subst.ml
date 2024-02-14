@@ -19,7 +19,7 @@ let as_ident ex =
   | E_var z -> z
   | _ -> assert false (* todo: better error message *)
 
-let rec subst_e x ex e =
+let subst_e x ex e =
   let rec ss e =
     match e with
     | E_var y ->
@@ -44,15 +44,6 @@ let rec subst_e x ex e =
     | E_set(y,e1) ->
         let z = if x <> y then y else as_ident ex in
         E_set(z,ss e1)
-    | E_static_array_get(y,e1) ->
-        let z = if x <> y then y else as_ident ex in
-        E_static_array_get(z,ss e1)
-    | E_static_array_length(y) ->
-        let z = if x <> y then y else as_ident ex in
-        E_static_array_length(z)
-    | E_static_array_set(y,e1,e2) ->
-        let z = if x <> y then y else as_ident ex in
-        E_static_array_set(z,ss e1,ss e2)
     | e -> Ast_mapper.map ss e
   in
   ss e
@@ -110,15 +101,6 @@ module OtherVersion = struct
       | E_set(y,e1) ->
           let z = as_ident_env y env in
           E_set(z,ss env e1)
-      | E_static_array_get(y,e1) ->
-          let z = as_ident_env y env in
-          E_static_array_get(z,ss env e1)
-      | E_static_array_length(y) ->
-          let z = as_ident_env y env in
-          E_static_array_length(z)
-      | E_static_array_set(y,e1,e2) ->
-          let z = as_ident_env y env in
-          E_static_array_set(z,ss env e1,ss env e2)
       | e -> Ast_mapper.map (ss env) e
     in
     ss env e
@@ -126,3 +108,31 @@ module OtherVersion = struct
   let subst_p_e p ep e =
     subst_e_env (bindings p ep) e
 end
+
+
+let subst_label l1 l2 e =
+  let subst_l l = if l = l1 then l2 else l in
+  let rec ss e =
+    match e with
+    (* 
+       E_reg _ | E_exec _ | E_set -> ? *)
+    | E_static_array_get(l,e1) ->
+        
+        E_static_array_get(subst_l l,ss e1)
+    | E_static_array_length(l) ->
+        E_static_array_length(subst_l l)
+    | E_static_array_set(l,e1,e2) ->
+        E_static_array_set(subst_l l,ss e1,ss e2)
+    | E_absLabel(l,e1) -> if l = l1 then e else E_absLabel(l,ss e1)
+    | E_appLabel(e1,l) -> E_appLabel(ss e1,subst_l l)
+    | e -> Ast_mapper.map ss e
+  in
+  ss e
+
+
+let rec app_label e l =
+  match e with
+  | E_letIn(p,e1,e2) -> E_letIn(p,e1,app_label e2 l)
+  | E_if(e,e1,e2) -> E_if(e,app_label e1 l,app_label e2 l)
+  | E_absLabel(l2,e1) -> subst_label l2 l e1
+  | e -> Ast_mapper.map (fun e -> app_label e l) e

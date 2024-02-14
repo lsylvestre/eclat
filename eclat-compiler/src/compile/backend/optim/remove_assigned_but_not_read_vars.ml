@@ -19,6 +19,7 @@ let clean_fsm ~rdy ~result (ts,s) typing_env =
      Hashtbl.add vs_read y ()
   | A_buffer_get(x)
   | A_ptr_taken(x)
+  | A_ptr_write_taken(x)
   | A_buffer_length(x,_)
   | A_encode(x,_,_)
   | A_decode(x,_) ->
@@ -42,7 +43,8 @@ let clean_fsm ~rdy ~result (ts,s) typing_env =
   | S_buffer_set _ -> ()
   | S_setptr(_,a) ->
       collect_read_a a
-  | S_ptr_take _ -> ()
+  | S_ptr_take _
+  | S_ptr_write_take _ -> ()
   | S_setptr_write(_,a,a_upd) ->
       collect_read_a a;
       collect_read_a a_upd
@@ -83,6 +85,7 @@ let clean_fsm ~rdy ~result (ts,s) typing_env =
   | S_buffer_set _
   | S_setptr _
   | S_ptr_take _
+  | S_ptr_write_take _
   | S_setptr_write _ -> s
   | S_seq(s1,s2) -> S_seq(clean s1,clean s2)
   | S_letIn(x,a,s) ->

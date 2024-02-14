@@ -290,7 +290,7 @@ let rec non_expansive = function
       List.for_all non_expansive es
   | E_letIn(_,e1,e2) ->
       non_expansive e1 && non_expansive e2
-  | _ -> true
+  | _ -> true (* ok ? *)
 
 exception Functional
 
@@ -498,11 +498,10 @@ let rec typ_exp ~sums ~toplevel ~loc (g:env) e =
   | E_static_array_get(x,e1) ->
      let t1,n = typ_exp ~sums ~toplevel:false ~loc g e1 in
      unify ~loc t1 (tint (unknown()));
-     unify ~loc n Response_time.zero;
      let tx = typ_ident g x loc in
      let t3 = unknown() in
      unify ~loc (T_static{elem=t3;size=(unknown())}) tx;
-     (t3, Response_time.zero)
+     (t3, n)
   | E_static_array_length(x) ->
      let tx = typ_ident g x loc in
      unify ~loc (T_static{elem=unknown();size=unknown()}) tx;
@@ -511,11 +510,9 @@ let rec typ_exp ~sums ~toplevel ~loc (g:env) e =
      let t1,n = typ_exp ~sums ~toplevel:false ~loc g e1 in
      let t2,m = typ_exp ~sums ~toplevel:false ~loc g e2 in
      unify ~loc t1 (tint (unknown()));
-     unify ~loc n Response_time.zero;
-     unify ~loc m Response_time.zero;
      let t3 = typ_ident g x loc in
      unify ~loc (T_static{elem=t2;size=(unknown())}) t3;
-     (T_const TUnit, Response_time.zero)
+     (T_const TUnit, T_add(n,m))
  | E_lastIn(x,e1,e2) ->
       let t1,n1 = typ_exp ~sums ~toplevel:false ~loc g e1 in
       let g' = env_extend ~loc g (P_var x) t1 in
@@ -523,7 +520,15 @@ let rec typ_exp ~sums ~toplevel ~loc (g:env) e =
       let t2,n2 = typ_exp ~sums ~toplevel:false ~loc g' e2 in
       unify ~loc n2 Response_time.zero;
       (t2, Response_time.zero)
-
+  | E_absLabel(l,e1) ->
+      let t = T_static{elem=unknown();size=unknown()} in
+      let g' = env_extend ~loc g (P_var l) t in
+      typ_exp ~sums ~toplevel:false ~loc g' e1
+  | E_appLabel(e1,l) ->
+      let t = T_static{elem=unknown();size=unknown()} in
+      let tx = typ_ident g l loc in
+      unify ~loc tx t;
+      typ_exp ~sums ~toplevel:false ~loc g e1
 
 let typing_handler ?(msg="") f () =
   let open Prelude.Errors in

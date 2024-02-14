@@ -185,7 +185,8 @@ let rec typing_a h a =
       add_typing_env h ix (TInt (TSize 32));
       TInt(TSize 8)
 
-  | A_ptr_taken(x) ->
+  | A_ptr_taken(x) 
+  | A_ptr_write_taken(x) ->
       let telem = new_tvar () in
       let tz = new_tvar () in
       add_typing_env h x (TStatic{elem=telem;size=tz});
@@ -217,7 +218,8 @@ let rec typing_s ~result h = function
       let t = typing_a h a in
       (* (Format.fprintf Format.std_formatter "======> (%s : %a)\n" x Fsm_syntax.Debug.pp_ty (canon t)); *)
       add_typing_env h x t
-  | S_ptr_take(x,_) ->
+  | S_ptr_take(x,_)
+  | S_ptr_write_take(x,_) ->
       let telem = new_tvar () in
       let tz = new_tvar () in
       add_typing_env h x (TStatic{elem=telem;size=tz})

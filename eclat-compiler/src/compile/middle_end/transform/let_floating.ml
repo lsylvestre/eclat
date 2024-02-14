@@ -87,7 +87,10 @@ and glob (e:e) : ((p * e) list * e) =
       ds1@ds2,E_static_array_set(x,e1',e2')
   | E_par(e1,e2) ->
       [],E_par(let_floating e1,let_floating e2)
-
+  | E_absLabel(l,e1) ->
+      [],E_absLabel(l,let_floating e1)
+  | E_appLabel(e1,l) ->
+      [],E_appLabel(let_floating e1,l)
 
 (** [let_floating_pi pi] perform let floating on program [pi] *)
 let let_floating_pi pi =

@@ -55,14 +55,18 @@ let applyed e =
       aux xs e1 ++ aux xs' e2
   | E_set(x,e1) ->
       SMap.add x () @@ aux xs e1
-  | E_static_array_get(x,e1) ->
-      SMap.add x () @@ aux xs e1
+  | E_static_array_get(_,e1) ->
+      aux xs e1
   | E_static_array_length(x) ->
-      SMap.singleton x ()
-  | E_static_array_set(x,e1,e2) ->
-      SMap.add x () @@ (aux xs e1 ++ aux xs e2)
+      SMap.empty
+  | E_static_array_set(_,e1,e2) ->
+      aux xs e1 ++ aux xs e2
   | E_par(e1,e2) ->
       aux xs e1 ++ aux xs e2
+  | E_absLabel(_,e) ->
+      aux xs e
+  | E_appLabel(e,_) ->
+      aux xs e    
   in
   aux SMap.empty e
 

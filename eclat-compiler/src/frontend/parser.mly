@@ -302,7 +302,7 @@ app_exp_desc:
 | x=IDENT LBRACKET e1=exp RBRACKET LEFT_ARROW e2=app_exp { E_static_array_set(x,e1,e2) }
 | e=aexp  es=aexp+ { match e::es with
                     | [e1;e2] -> (match un_annot e1 with
-                                  | E_var _ | E_const _ -> E_app(e1,e2)
+                                  | E_var _ | E_const _ | E_appLabel _ -> E_app(e1,e2) 
                                   | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
                                ~msg:"expression in functional position should be a variable or a constante" ())
                     | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
@@ -339,6 +339,8 @@ app_exp_desc:
 | e1=aexp DOT LPAREN e2=exp RPAREN LEFT_ARROW e3=app_exp
     { E_app(mk_loc (with_file $loc) @@ E_const (External Array_set),
             mk_loc (with_file ($startpos(e1),$endpos(e2))) @@ E_tuple[e1;e2;e3]) }
+| HAT l=IDENT DOT e=exp { E_absLabel(l,e) }
+| LPAREN e=exp RPAREN LT l=IDENT GT { E_appLabel(e,l) }
 | e=aexp { e }
 
 

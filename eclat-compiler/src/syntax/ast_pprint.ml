@@ -286,6 +286,10 @@ let pp_exp (fmt:fmt) (e:e) : unit =
       fprintf fmt "(%a || %a)"
         (pp_e ~paren:false) e1
         (pp_e ~paren:false) e2
+  | E_absLabel(l,e1) ->
+      fprintf fmt "(<%s>. %a)" l (pp_e ~paren:false) e1
+  | E_appLabel(e1,l) ->
+      fprintf fmt "%a %s" (pp_e ~paren:true) e1 l
   in
   fprintf fmt "@[<v 0>%a@]" (pp_e ~paren:false) e
 

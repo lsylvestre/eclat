@@ -15,6 +15,7 @@ let rec flat = function
 | A_string_get _
 | A_buffer_get _
 | A_ptr_taken _
+| A_ptr_write_taken _
 | A_buffer_length _
 | A_encode _
 | A_decode _ as a ->  (* no sub-atoms*)
@@ -42,7 +43,8 @@ let rec flat_s s =
       let bs,a' = flat a in
       s_let_bindings bs @@
       S_setptr(x,a')
-  | S_ptr_take(x,b) ->
+  | S_ptr_take(x,_) 
+  | S_ptr_write_take(x,_) ->
       s
   | S_setptr_write(x,a,a_upd) ->
       let bs,a' = flat a in
