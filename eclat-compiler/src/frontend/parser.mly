@@ -110,17 +110,23 @@ ty_case:
 | x=UP_IDENT OF ty=ty { x,ty }
 
 fun_decl(In_kw):
-| f=IDENT p_ty_opt=arg_ty_atomic
+| f=IDENT p_ty_opt=arg_ty_atomic ls_opt=labels_fun_decl
                   ty_opt_ret=ret_ty_annot_eq
     e1=exp In_kw
         {
             let ef = mk_let_fun ~loc:(with_file ($startpos(f),$endpos(e1)))
                                 ~p_ty_opt
                                 ~ty_opt_ret
-                                e1
+                (match ls_opt with
+                 | None -> e1
+                 | Some ls -> List.fold_right (fun l e -> E_absLabel(l,e)) ls e1)
             in
             (P_var f,ef)
         }
+
+labels_fun_decl:
+| { None }
+| LT ls=separated_nonempty_list(COMMA,IDENT) GT { Some (ls) }
 
 
 after_let(In_kw):
@@ -274,14 +280,17 @@ ret_ty_annot_eq:
 | COL ty=ty EQ { Some ty }
 
 bindings(P,E):
+| b=bindings_and(P,E)
+  { b }
+
+bindings_and(P,E):
 | b=binding(P,E) { b }
-| b1=binding(P,E) AND b2=binding(P,E)
-  { let (p1,e1) = b1 in
-    let (p2,e2) = b2 in
-    (P_tuple[p1;p2], (E_par(e1,e2))) }
-/*| b=binding(P,E) AND bs=separated_nonempty_list(AND,binding(P,E))
-  { let ps,es = List.split (b::bs) in
-    group_ps ps, group_es es }*/
+| b1=binding(P,E) AND b2=bindings_and(P,E)
+   { let (p1,e1) = b1 in
+     let (p2,e2) = b2 in
+     (P_tuple[p1;p2], (E_par(e1,e2))) }
+
+
 
 binding(P,E):
 | p_ty_opt=ty_annot(P) EQ e=E
@@ -339,8 +348,11 @@ app_exp_desc:
 | e1=aexp DOT LPAREN e2=exp RPAREN LEFT_ARROW e3=app_exp
     { E_app(mk_loc (with_file $loc) @@ E_const (External Array_set),
             mk_loc (with_file ($startpos(e1),$endpos(e2))) @@ E_tuple[e1;e2;e3]) }
-| HAT l=IDENT DOT e=exp { E_absLabel(l,e) }
-| LPAREN e=exp RPAREN LT l=IDENT GT { E_appLabel(e,l) }
+| FUN LT ls=separated_nonempty_list(COMMA,IDENT) GT RIGHT_ARROW e=exp 
+    { List.fold_right (fun l e -> E_absLabel(l,e)) ls e }
+| LPAREN e=exp RPAREN 
+  LT ls=separated_nonempty_list(COMMA,IDENT) GT
+    { List.fold_right (fun l e -> E_appLabel(e,l)) ls e }
 | e=aexp { e }
 
 

@@ -51,6 +51,10 @@ let linear_bindings (e:e) : set =
       aux e1; aux e2
   | E_par(e1,e2) ->
       aux e1; aux e2
+  | E_absLabel(_,e1) ->
+      aux e1
+  | E_appLabel(e1,l) ->
+      aux e1
   in
   aux e;
   let keep x b acc =
