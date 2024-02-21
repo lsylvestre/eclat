@@ -47,6 +47,8 @@ let compile ?globalize
   let pi = Lambda_lifting.lambda_lifting_pi ?globalize pi in
   display_pi Lambda_lifting pi;
 
+  let pi = Macro.inl_pi pi in (* macro expansion *)
+
   (** inline non-recursive functions *)
   let pi = Inline.inl_pi pi in
   display_pi Inline pi;

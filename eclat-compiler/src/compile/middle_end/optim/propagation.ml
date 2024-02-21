@@ -25,36 +25,40 @@ let linear_bindings (e:e) : set =
   | E_match(e1,hs,eo) ->
       aux e1; List.iter (fun (_,(_,ei)) -> aux ei) hs;
       Option.iter aux eo
-  | E_letIn(p,e1,e2) ->
+  | E_letIn(_,e1,e2) ->
       aux e1; aux e2
   | E_app(e1,e2) ->
       aux e1; aux e2
-  | E_fun(p,e1) ->
+  | E_fun(_,e1) ->
       aux e1
-  | E_fix(f,(p,e)) ->
+  | E_fix(_,(_,e)) ->
       aux e
   | E_tuple(es) ->
       List.iter aux es
   | E_reg((_,e1), e0, _) ->
       aux e1; aux e0
-  | E_exec(e1,e2,_k) ->
+  | E_exec(e1,e2,_) ->
       aux e1; aux e2
-   | E_lastIn(x,e1,e2) ->
+   | E_lastIn(_,e1,e2) ->
       aux e1; aux e2
-  | E_set(x,e1) ->
+  | E_set(_,e1) ->
       aux e1
-  | E_static_array_get(x,e1) ->
+  | E_static_array_get(_,e1) ->
       aux e1
-  | E_static_array_length(x) ->
+  | E_static_array_length(_) ->
       ()
-  | E_static_array_set(x,e1,e2) ->
+  | E_static_array_set(_,e1,e2) ->
       aux e1; aux e2
   | E_par(e1,e2) ->
       aux e1; aux e2
   | E_absLabel(_,e1) ->
       aux e1
-  | E_appLabel(e1,l) ->
+  | E_appLabel(e1,_,_) ->
       aux e1
+  | E_for(_,e_st1,e_st2,e3,_) ->
+      aux e_st1; aux e_st2; aux e3
+  | E_generate((_,e1),e2,e_st3,_) ->
+      aux e1; aux e2; aux e_st3
   in
   aux e;
   let keep x b acc =

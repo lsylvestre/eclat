@@ -1,9 +1,12 @@
 (* $ ./eclat tests/map.ecl
    $ make simul NS=4000 
+ 
+ ./eclat tests/map.ecl  -yosys-ecp5 -clk-top="clk48" -top="a:1|b:2"
+
  *)
 
-let static tab = 100^128;;
-let static tab2 = 100^128;;
+let static tab = 100^1280;;
+let static tab2 = 100^1280;;
 
 let mapi_1(f)<src,dst> =
   let rec loop (i) =

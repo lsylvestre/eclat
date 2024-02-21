@@ -70,7 +70,7 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ -> ())) ?(relax=fal
         Current_filename.current_file_name := "%command-line-argument-"^string_of_int (i+1)^" (input: "^s^")";
         Parser.exp_eof Lexer.token (Lexing.from_string s))
   in
-  let entry_point = if relax then (E_var main) else (Ast.ty_annot ~ty:(Ast_mk.fresh_node ()) (E_var main)) in
+  let entry_point = (* if relax then (E_var main) else (Ast.ty_annot ~ty:(Ast_mk.fresh_node ())*) (E_var main) in
   let ds = List.concat @@
            List.map (function ((p,e),loc) ->
                        try Pattern.bindings p e |> SMap.bindings with

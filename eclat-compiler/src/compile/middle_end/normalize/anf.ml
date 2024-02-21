@@ -116,8 +116,15 @@ let rec anf (e:e) : e =
       E_par(anf e1, anf e2)
   | E_absLabel(l,e1) ->
       E_absLabel(l,anf e1)
-  | E_appLabel(e1,l) ->
-      E_appLabel(anf e1,l)
+  | E_appLabel(e1,l,lc) ->
+      E_appLabel(anf e1,l,lc)
+  | E_for(x,e_st1,e_st2,e3,loc) ->
+      E_for(x,anf e_st1,anf e_st2,anf e3,loc)
+      (* NB: [e_st1] and [e_st2] are *not* moved up with `plug` *)
+  | E_generate((p,e1),e2,e_st3,loc) ->
+      plug (anf e2) @@ fun xc ->
+      E_generate((p,anf e1),xc,anf e_st3,loc) 
+      (* NB: [e_st3] is *not* moved up with `plug` *)
 
 (** [in_anf e] check if expression [e] is in ANF-form *)
 let rec in_anf (e:e) : bool =
@@ -162,8 +169,12 @@ let rec in_anf (e:e) : bool =
       in_anf e1 && in_anf e2
   | E_absLabel(_,e1) ->
       in_anf e1
-  | E_appLabel(e1,_) ->
+  | E_appLabel(e1,_,_) ->
       in_anf e1
+  | E_for(_,e_st1,e_st2,e3,_) ->
+      in_anf e_st1 && in_anf e_st2 && in_anf e3
+  | E_generate((_,e1),e2,e_st3,_) ->
+      in_anf e1 && is_xc e2 && in_anf e_st3
 
 (** [anf e] puts program [pi] in ANF-form *)
 let anf_pi (pi:pi) : pi =

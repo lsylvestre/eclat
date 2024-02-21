@@ -61,6 +61,18 @@ let const_zero nbits =
     | n,0 -> make n
     | n,m -> make n^"& X"^make m
 
+
+let int2bin ~int_size =
+  (* from https://discuss.ocaml.org/t/pretty-printing-binary-ints/9062 *)
+  let buf = Bytes.create int_size in
+  fun n ->
+    for i = 0 to int_size - 1 do
+      let pos = int_size - 1 - i in
+      Bytes.set buf pos (if n land (1 lsl i) != 0 then '1' else '0')
+    done;
+    Bytes.to_string buf
+
+
 let pp_tuple fmt pp vs =
   pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt " & ") pp fmt vs
 
@@ -71,15 +83,16 @@ let rec pp_c fmt c =
   | Int {value=n;tsize} ->
       let is_neg = n < 0 in
       let n = abs n in
-      let v = Printf.sprintf "%x" n in
-      let l_pad = size_ty tsize - String.length v * 4 in
-      if l_pad < 0 then
-      begin
-        assert false (** should not happen ! *)
-      end;
+      let sz = size_ty tsize in
       if is_neg then fprintf fmt "eclat_neg(";
+      if n < 16 then
+        fprintf fmt "\"%s\"" (int2bin ~int_size:sz n)
+      else
+      let v = Printf.sprintf "%x" n in (* dislay in hexa directly *)
+      let l_pad = sz - String.length v * 4 in
       if l_pad = 0 then fprintf fmt "X\"%s\"" v else
       fprintf fmt "%s & X\"%s\"" (const_zero l_pad) v;
+
       if is_neg then fprintf fmt ")";
   | Bool b ->
       (* notice: in VHDL, eclat_true(0) is valid, but "1"(0) is invalid. *)
@@ -380,7 +393,7 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
           fprintf fmt "signal %a : array_value_%d(0 to %d)" pp_ident x (size_const c) (n-1);
 
           if not(!ram_inference) then (
-           fprintf fmt " := (others => %a); @," pp_c c
+           fprintf fmt " := (others => %a);@," pp_c c
           ) else (fprintf fmt ";@,";
                   if !intel_max10_target then (
                     (** Intel MAX 10 FPGA device do not support memory initialization.

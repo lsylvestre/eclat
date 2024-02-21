@@ -41,9 +41,12 @@ let rec map f e =
       E_exec(f e1,f e2,k)
   | E_absLabel(l,e1) ->
       E_absLabel(l, f e1)
-  | E_appLabel(e1,l) ->
-      E_appLabel(f e1,l)
-
+  | E_appLabel(e1,l,lc') ->
+      E_appLabel(f e1,l,lc')
+  | E_for(x,e_st1,e_st2,e,loc) ->
+      E_for(x,f e_st1,f e_st2,f e,loc)
+  | E_generate((p,e1),e2,e_st1,loc) ->
+      E_generate((p,f e1),f e2,f e_st1,loc)
 (** traversal order of sub-expressions is unspecified *)
 
 let rec iter f (e:e) : unit =
@@ -86,9 +89,11 @@ let rec iter f (e:e) : unit =
       f e1; f e2
   | E_absLabel(_,e1) ->
       f e1
-  | E_appLabel(e1,_) ->
+  | E_appLabel(e1,_,_) ->
       f e1
-
-
+  | E_for(_,_,_,e,_) ->
+      f e
+  | E_generate((_,e1),e2,e_st3,_) ->
+      f e1; f e2; f e_st3
 let map_pi f pi =
   Map_pi.map (map f) pi

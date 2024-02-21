@@ -27,6 +27,7 @@ type ty =                (** type *)
   | T_add of ty * ty   (** t + t'  *)
   | T_max of ty * ty   (** max(t,t') *)
   | T_le of ty * ty    (** t such that t <= t' *)
+  | T_forall of x * ty * ty
 
 and tconst = (** type constant *)
 | TBool      (** boolean type [bool] *)
@@ -114,6 +115,7 @@ let rec canon t =
   | T_string tz -> T_string (canon tz)
   | T_sum cs -> T_sum (List.map (fun (x,t) -> (x,canon t)) cs)
   | T_static {elem=t;size=tz} -> T_static {elem=canon t;size=canon tz}
+  | T_forall(x,t1,t2) -> T_forall(x,canon t1,canon t2)
   | (T_size _ | T_infinity | T_add _ | T_max _ | T_le _) as t -> simplify_size_constraints t
 
 

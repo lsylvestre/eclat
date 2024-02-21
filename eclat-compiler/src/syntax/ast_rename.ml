@@ -37,18 +37,21 @@ end
 
 open Gensym
 
+let rename_ident ~statics x =
+  gensym ~statics x
+
 (** [rename_pat p] rename all names in the pattern [p],
   assuming that any variable is bound several times in p *)
 let rec rename_pat ~statics p =
    match p with
    | P_unit -> P_unit
-   | P_var x -> P_var (gensym ~statics x)
+   | P_var x -> P_var (rename_ident ~statics x)
    | P_tuple ps -> P_tuple (List.map (rename_pat ~statics) ps)
 
 let rename_e ~statics e =
   let rec ren_e = function
   | E_fix(f,(p,e1)) ->
-      let g = gensym ~statics f in
+      let g = rename_ident ~statics f in
       let pz = rename_pat ~statics p in
       let e1_ren = subst_e f (E_var g) @@
                    subst_p_e p (pat2exp pz) e1 in
@@ -71,8 +74,11 @@ let rename_e ~statics e =
       let e1' = ren_e (subst_p_e p (pat2exp pz) e1) in
      E_reg((pz,e1'),ren_e e0,l)
   | E_lastIn(x,e1,e2) ->
-      let y = gensym ~statics x in
+      let y = rename_ident ~statics x in
       E_lastIn(y, ren_e e1, ren_e @@ subst_e x (E_var y) e2)
+  | E_for(x,lc,lc',e,loc) ->
+      let x' = rename_ident ~statics x in
+      E_for(x',lc,lc',ren_e @@ subst_e x (E_var x') e,loc) (* rename lc & lc' ? *)
   | e -> Ast_mapper.map ren_e e
   in
   ren_e e

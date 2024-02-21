@@ -30,7 +30,8 @@ let rec size_ty =
     | TVar _ ->
         if not !seen then begin seen := true;
           let open Prelude.Errors in
-          if !emit_warning_flag then warning (fun fmt -> Format.fprintf fmt "Unknown value size in the generated code replaced by a %d bits range size.\n" when_tvar);
+          if !emit_warning_flag then warning (fun fmt -> 
+            Format.fprintf fmt "Unknown value size in the generated code replaced by a %d bits range size.\n" when_tvar);
         end;
         when_tvar
     | TString tz -> (size_ty tz * 8)
@@ -119,7 +120,7 @@ let rec translate_ty =
   | Types.T_static{elem=te;size=tz} -> TStatic{elem=translate_ty te;size=translate_ty tz}
   | Types.(T_infinity|T_fun _|T_add (_, _)|T_max (_, _)|T_le (_, _)) ->
      assert false (* already expanded *)
-
+  | Types.T_forall _ -> assert false (* already expanded *)
 
 
 let rec typing_c = function

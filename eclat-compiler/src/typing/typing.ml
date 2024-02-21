@@ -1,7 +1,9 @@
 open Types
 open Ast
 
-let flag_print_signature = ref false
+let print_signature_flag = ref false
+
+let relax_flag = ref false
 
 let pp_ty = Ast_pprint.pp_ty
 
@@ -24,6 +26,8 @@ let rec occur v ty =
       List.iter (fun (_,ty) -> f ty) cs
   | T_static{elem=t;size=tz} ->
       f t; f tz
+  | T_forall(_,t1,t2) ->
+      f t1; f t2
   | (T_size _ | T_infinity) -> ()
   | T_max(tz1,tz2) | T_add(tz1,tz2) | T_le(tz1,tz2) ->
       f tz1; f tz2
@@ -56,6 +60,8 @@ let rec occur v ty =
 
     | T_static{elem=t;size=tz} ->
         vars (vars s t) tz
+    | T_forall(_,t1,t2) ->
+        vars (vars s t1) t2
     | T_size _ | T_infinity -> s
     | T_max(t1,t2) | T_add(t1,t2) | T_le(t1,t2) ->
         vars (vars s t1) t2
@@ -90,6 +96,8 @@ let rec occur v ty =
      | T_sum cs -> T_sum (List.map (fun (x,t) -> (x,instance t)) cs)
      | T_static{elem=t;size=tz} ->
         T_static{elem=instance t;size=instance tz}
+     | T_forall(x,t1,t2) ->
+        T_forall(x,instance t1,instance t2)
      | (T_size _ | T_infinity) as t -> t
      | T_max(t1,t2) -> T_max(instance t1,instance t2)
      | T_add(t1,t2) -> T_add(instance t1,instance t2)
@@ -177,6 +185,10 @@ let rec unify ~loc t1 t2 =
   | T_static{elem=t;size=tz},T_static{elem=t';size=tz'} ->
       unify ~loc t t';
       unify ~loc tz tz'
+  | T_forall(x,tt1,tt2), T_forall(x',tt1',tt2') ->
+      if x <> x' then raise (CannotUnify (t1,t2,loc));
+      unify ~loc tt1 tt1';
+      unify ~loc tt2 tt2'
   | (T_size _ | T_infinity | T_add _ | T_max _ | T_le _),
     (T_size _ | T_infinity | T_add _ | T_max _ | T_le _) ->
     let t1 = simplify_size_constraints t1 in
@@ -271,6 +283,7 @@ let rec typ_const ~loc g = function
 | Inj x ->
     typ_ident g x loc
 
+
 let rec non_expansive = function
   | E_deco(e,_) -> non_expansive e
   | E_app(e1,_) ->
@@ -309,6 +322,7 @@ let rec contain_fun t =
   | T_sum(cs) ->
       List.iter (fun (_,t) -> contain_fun t) cs
   | T_static {elem=t;size=tz} -> contain_fun t
+  | T_forall(_,_,t2) -> contain_fun t2
   | (T_size _ | T_infinity | T_add _ | T_max _ | T_le _) -> ()
 
 let check_conditional_shape ~loc e t =
@@ -354,22 +368,41 @@ let is_TyConstr = function
 | E_const(Op(TyConstr _)) -> true
 | _ -> false
 
+let typ_ident_static ~loc x statics =
+  match List.assoc_opt x statics with
+  | None -> 
+     let open Prelude.Errors in
+      error ~loc (fun fmt ->
+        Format.fprintf fmt
+          "@[<v>variables %s should be defined at toplevel with keyword ``static''.@]"
+                x)
+  | Some t -> t
+
+
+let typ_lc ~statics g ~loc lc =
+  match lc with
+  | St_var l' ->
+      typ_ident g l' loc
+  | St_const c ->
+      typ_const ~loc g c
 
 let trace_last_exp = ref (E_const Unit) (* fake *)
 
-let rec typ_exp ~sums ~toplevel ~loc (g:env) e =
+let rec typ_exp ~statics ~sums ~toplevel ~loc (g:env) e =
   trace_last_exp := e;
   match e with
-  | E_deco(e,loc) -> typ_exp ~sums ~toplevel ~loc g e
+  | E_deco(e,loc) -> typ_exp ~statics ~sums ~toplevel ~loc g e
   | E_const c ->
       (typ_const ~loc g c, Response_time.zero)
   | E_var(x) ->
       (* lookup *)
-      (typ_ident g x loc, Response_time.zero)
+      let tx = if List.mem_assoc x statics then typ_ident_static ~loc x statics 
+               else typ_ident g x loc in 
+      (tx, Response_time.zero)
   | E_if(e1,e2,e3) ->
-      let t1,n1 = typ_exp ~sums ~toplevel:false ~loc g e1 in
-      let t2,n2 = typ_exp ~sums ~toplevel:false ~loc g e2
-      and t3,n3 = typ_exp ~sums ~toplevel:false ~loc g e3 in
+      let t1,n1 = typ_exp ~statics ~sums ~toplevel:false ~loc g e1 in
+      let t2,n2 = typ_exp ~statics ~sums ~toplevel:false ~loc g e2
+      and t3,n3 = typ_exp ~statics ~sums ~toplevel:false ~loc g e3 in
       unify ~loc t1 tbool;
       unify ~loc t2 t3;
       (** NB: [t2 <= t3] (according to the subtyping relation).
@@ -378,11 +411,11 @@ let rec typ_exp ~sums ~toplevel ~loc (g:env) e =
       check_conditional_shape ~loc e t;
       (t,Response_time.(add n1 (max n2 n3)))
   | E_case(e1,hs,e_els) ->
-      let t1,n1 = typ_exp ~sums ~toplevel:false ~loc g e1 in
+      let t1,n1 = typ_exp ~statics ~sums ~toplevel:false ~loc g e1 in
       List.iter (fun (c,_) -> unify ~loc (typ_const ~loc g c) t1) hs;
-      let t_els,n_els = typ_exp ~sums ~toplevel:false ~loc g e_els in
+      let t_els,n_els = typ_exp ~statics ~sums ~toplevel:false ~loc g e_els in
       let ns = List.map (fun (_,ei) ->
-        let t,n = typ_exp ~sums ~toplevel:false ~loc g ei in
+        let t,n = typ_exp ~statics ~sums ~toplevel:false ~loc g ei in
         unify ~loc:(loc_of ei) t_els t; n) hs in
       let n = Response_time.add n1 (List.fold_left Response_time.max n_els ns) in
       t_els,n
@@ -390,7 +423,7 @@ let rec typ_exp ~sums ~toplevel ~loc (g:env) e =
       let error_unbound_constructor ctor =
         Prelude.Errors.error ~loc (fun fmt -> Format.fprintf fmt "Unbound constructor %s" ctor)
       in
-      let t1,n1 = typ_exp ~sums ~toplevel:false ~loc g e1 in
+      let t1,n1 = typ_exp ~statics ~sums ~toplevel:false ~loc g e1 in
       let c_witness = match hs with (x,_)::_ -> x | _ -> assert false in
       let _,sum,_ = try Types.find_ctor c_witness sums
                     with Not_found -> error_unbound_constructor c_witness in
@@ -402,12 +435,12 @@ let rec typ_exp ~sums ~toplevel ~loc (g:env) e =
                      | None -> error_unbound_constructor inj
          in
          let g' = env_extend ~loc g p t_inj in
-         let t',dur = typ_exp ~sums ~toplevel:false ~loc g' ei in
+         let t',dur = typ_exp ~statics ~sums ~toplevel:false ~loc g' ei in
          unify ~loc t' v;
          r := T_max(!r,dur)) hs;
 
       Option.iter (fun ew ->
-         let t',dur = typ_exp ~sums ~toplevel:false ~loc g ew in
+         let t',dur = typ_exp ~statics ~sums ~toplevel:false ~loc g ew in
          unify ~loc t' v) eo;
 
       let ctors = smap_of_list (List.map (fun (x,_) -> x,()) hs) in
@@ -420,28 +453,28 @@ let rec typ_exp ~sums ~toplevel ~loc (g:env) e =
       v,T_add(n1,!r)
   | E_tuple(es) ->
       let ts,ns = List.split @@ List.map (fun ei ->
-                    typ_exp ~sums ~toplevel:false ~loc g ei) es
+                    typ_exp ~statics ~sums ~toplevel:false ~loc g ei) es
       in
       let n = List.fold_left Response_time.add Response_time.zero ns in
       T_tuple ts,n
   | E_fun(p,e1) ->
       let v = unknown() in
       let g' = env_extend ~loc g p v in
-      let t,dur = typ_exp ~sums ~toplevel:false ~loc g' e1 in
+      let t,dur = typ_exp ~statics ~sums ~toplevel:false ~loc g' e1 in
       (T_fun{arg=v;dur;ret=t}, Response_time.zero)
   | E_app(e1,e2) ->
-      let t1,n1 = typ_exp ~sums ~toplevel:false ~loc g e1 in
-      let t2,n2 = typ_exp ~sums ~toplevel:(toplevel && is_TyConstr e1) ~loc g e2 in
+      let t1,n1 = typ_exp ~statics ~sums ~toplevel:false ~loc g e1 in
+      let t2,n2 = typ_exp ~statics ~sums ~toplevel:(toplevel && is_TyConstr e1) ~loc g e2 in
       let t = unknown () in
       let n = unknown () in
       unify ~loc:(loc_of e1) (T_fun{arg=t2;dur=n;ret=t}) t1; (* t1 in second for subtyping *)
       check_app_shape ~loc e t;
       (t, Response_time.(add n (add n1 n2)))
   | E_letIn(p,e1,e2) ->
-      let t1,n1 = typ_exp ~sums ~toplevel:false ~loc g e1 in
+      let t1,n1 = typ_exp ~statics ~sums ~toplevel:false ~loc g e1 in
       let gen = non_expansive e1 in
       let g' = env_extend ~loc ~gen g p t1 in
-      (if toplevel && !flag_print_signature then
+      (if toplevel && !print_signature_flag then
        begin
         let open Prelude.Errors in
         let open Format in
@@ -457,7 +490,7 @@ let rec typ_exp ~sums ~toplevel ~loc (g:env) e =
         fprintf std_formatter "val %a : %a\n" Ast_pprint.pp_pat p pp_ty (canon t1);
        end);
 
-      let t2,n2 = typ_exp ~sums ~toplevel ~loc g' e2 in
+      let t2,n2 = typ_exp ~statics ~sums ~toplevel ~loc g' e2 in
 
       (t2, Response_time.add n1 n2)
   | E_fix(f,(x,e1)) ->
@@ -467,68 +500,94 @@ let rec typ_exp ~sums ~toplevel ~loc (g:env) e =
                       dur = Response_time.(add one (unknown()));
                       ret = t2 } in
       let g' = env_extend ~loc g (P_var f) tf in
-      let t,n = typ_exp ~sums ~toplevel:false ~loc g' (E_fun(x,e1)) in
+      let t,n = typ_exp ~statics ~sums ~toplevel:false ~loc g' (E_fun(x,e1)) in
       (** NB: [t <= tf] (according to the subtyping relation) *)
       (* unify ~loc t tf; *)
       (tf, n)
   | E_reg((p,e1),e0,_) ->
-     let t0,n0 = typ_exp ~sums ~toplevel:false ~loc g e0 in
+     let t0,n0 = typ_exp ~statics ~sums ~toplevel:false ~loc g e0 in
      let g' = env_extend ~loc g p t0 in
-     let t1,n1 = typ_exp ~sums ~toplevel:false ~loc g' e1 in
+     let t1,n1 = typ_exp ~statics ~sums ~toplevel:false ~loc g' e1 in
      unify ~loc t0 t1;
      unify ~loc n0 Response_time.zero;
-     unify ~loc n1 Response_time.zero;
-     (t0, Response_time.zero)
+     (* unify ~loc n1 Response_time.zero;*)
+     (t0, n1(* Response_time.zero*))
   | E_exec(e1,e2,_) ->
-     let t1,_ = typ_exp ~sums ~toplevel:false ~loc g e1 in
-     let t2,n2 = typ_exp ~sums ~toplevel:false ~loc g e2 in
+     let t1,_ = typ_exp ~statics ~sums ~toplevel:false ~loc g e1 in
+     let t2,n2 = typ_exp ~statics ~sums ~toplevel:false ~loc g e2 in
      unify ~loc t1 t2;
      unify ~loc n2 Response_time.zero;
      (T_tuple[t1;tbool], Response_time.zero)
   | E_par(e1,e2) ->
-    let t1,n1 = typ_exp ~sums ~toplevel:false ~loc g e1 in
-    let t2,n2 = typ_exp ~sums ~toplevel:false ~loc g e2 in
+    let t1,n1 = typ_exp ~statics ~sums ~toplevel:false ~loc g e1 in
+    let t2,n2 = typ_exp ~statics ~sums ~toplevel:false ~loc g e2 in
     T_tuple [t1;t2],T_max(n1,n2)
   | E_set (x,e1) ->
-     let t1,n = typ_exp ~sums ~toplevel:false ~loc g e1 in
+     let t1,n = typ_exp ~statics ~sums ~toplevel:false ~loc g e1 in
      unify ~loc n Response_time.zero;
      let t2 = typ_ident g x loc in
      unify ~loc t1 t2;
      (T_const TUnit, Response_time.zero)
   | E_static_array_get(x,e1) ->
-     let t1,n = typ_exp ~sums ~toplevel:false ~loc g e1 in
+     let t1,n = typ_exp ~statics ~sums ~toplevel:false ~loc g e1 in
      unify ~loc t1 (tint (unknown()));
      let tx = typ_ident g x loc in
      let t3 = unknown() in
      unify ~loc (T_static{elem=t3;size=(unknown())}) tx;
      (t3, n)
   | E_static_array_length(x) ->
-     let tx = typ_ident g x loc in
+     let tx =  typ_ident g x loc in
      unify ~loc (T_static{elem=unknown();size=unknown()}) tx;
      (tint (unknown()), Response_time.zero)
   | E_static_array_set(x,e1,e2) ->
-     let t1,n = typ_exp ~sums ~toplevel:false ~loc g e1 in
-     let t2,m = typ_exp ~sums ~toplevel:false ~loc g e2 in
+     let t1,n = typ_exp ~statics ~sums ~toplevel:false ~loc g e1 in
+     let t2,m = typ_exp ~statics ~sums ~toplevel:false ~loc g e2 in
      unify ~loc t1 (tint (unknown()));
      let t3 = typ_ident g x loc in
      unify ~loc (T_static{elem=t2;size=(unknown())}) t3;
      (T_const TUnit, T_add(n,m))
  | E_lastIn(x,e1,e2) ->
-      let t1,n1 = typ_exp ~sums ~toplevel:false ~loc g e1 in
+      let t1,n1 = typ_exp ~statics ~sums ~toplevel:false ~loc g e1 in
       let g' = env_extend ~loc g (P_var x) t1 in
       unify ~loc n1 Response_time.zero;
-      let t2,n2 = typ_exp ~sums ~toplevel:false ~loc g' e2 in
+      let t2,n2 = typ_exp ~statics ~sums ~toplevel:false ~loc g' e2 in
       unify ~loc n2 Response_time.zero;
       (t2, Response_time.zero)
   | E_absLabel(l,e1) ->
-      let t = T_static{elem=unknown();size=unknown()} in
-      let g' = env_extend ~loc g (P_var l) t in
-      typ_exp ~sums ~toplevel:false ~loc g' e1
-  | E_appLabel(e1,l) ->
-      let t = T_static{elem=unknown();size=unknown()} in
-      let tx = typ_ident g l loc in
-      unify ~loc tx t;
-      typ_exp ~sums ~toplevel:false ~loc g e1
+      let t2 = unknown() in
+      let statics' = (l,t2)::statics in
+      let t1,n1 = typ_exp ~statics:statics' ~sums ~toplevel:false ~loc g e1 in
+      T_forall(l,t2,t1), n1
+  | E_appLabel(e1,l,lc) -> (* avoir un environnement des variables liées par grand lambda + statics *)
+      let tl = typ_lc ~statics g ~loc lc in
+      let t1,n1 = typ_exp ~statics:((l,tl)::statics) 
+                           ~sums ~toplevel:false ~loc g e1 in
+      let t2 = unknown() in
+      unify ~loc t1 (T_forall(l,tl,t2));
+      t2,n1
+  | E_for(x,e_st1,e_st2,e3,_) ->
+      let v = unknown() in
+      let intv = tint v in
+      let t1,n1 = typ_exp ~statics ~sums ~toplevel:false ~loc g e_st1 in
+      unify ~loc t1 intv; 
+      unify ~loc n1 Response_time.zero;
+      let t2,n2 = typ_exp ~statics ~sums ~toplevel:false ~loc g e_st2 in
+      unify ~loc t2 intv; 
+      unify ~loc n2 Response_time.zero;
+      let g' = env_extend ~loc g (P_var x) intv in
+      typ_exp ~statics ~sums ~toplevel:false ~loc g' e3
+  | E_generate((p,e1),e2,e_st3,_) ->
+      let t3,n3 = typ_exp ~statics ~sums ~toplevel:false ~loc g e_st3 in
+      unify ~loc t3 (tint (unknown())); 
+      unify ~loc n3 Response_time.zero;
+
+      let v = unknown() in
+      let t2,n = typ_exp ~statics ~sums ~toplevel:false ~loc g e2 in
+      let intv = tint v in
+      let g' = env_extend ~loc g p (T_tuple[intv;t2]) in
+      let t1,n1 = typ_exp ~statics ~sums ~toplevel:false ~loc g' e1 in
+      t2,n1 (* n1+n1+ ... n fois *)
+
 
 let typing_handler ?(msg="") f () =
   let open Prelude.Errors in
@@ -550,9 +609,9 @@ let typing_handler ?(msg="") f () =
       Prelude.Errors.raise_error ~loc ~msg:("unbound variable "^x) ()
 
 
-let typing ?(env=SMap.empty) ?(msg="") ~sums e =
+let typing ?(env=SMap.empty) ?(msg="") ~statics ~sums e =
   typing_handler (fun () ->
-    let t,n = typ_exp ~sums ~toplevel:true ~loc:(loc_of e) env e in
+    let t,n = typ_exp ~statics ~sums ~toplevel:true ~loc:(loc_of e) env e in
     canon t, simplify_size_constraints n) ()
 
 
@@ -568,6 +627,8 @@ let typing_static g =
   | Static_array(c,n) ->
       let elem = typ_const ~loc:Prelude.dloc SMap.empty c in  (*todo loc *)
       T_static{elem;size=T_size n}
+  | Static_const c ->
+      typ_const ~loc:Prelude.dloc SMap.empty c
 
 (** Typing of the program [e].
    The program must be a function of type [t1 -> t2] that takes
@@ -588,11 +649,25 @@ let typing_with_argument ({statics;sums;main} : pi) (arg_list : e list) : ty * t
                                List.fold_left (fun env (ctor,targ) ->
                                 SMap.add ctor (generalize (SMap.bindings env) (targ ==> t)) env) env cases) env sums
   in
-
-  let e = mk_loc (loc_of main) @@ ty_annot ~ty:(fun_shape t_arg) main in
-  let (ty,response_time) = typing ~env ~sums e in
-
-  List.iter (fun a -> typing ~env ~msg:"checking inputs given by option -arg, " ~sums
+  let loc = loc_of main in
+  let e = mk_loc loc @@ ty_annot ~ty:(fun_shape t_arg) main in
+  let statics_env = List.map (fun (x,st) -> x,typing_static st) statics in
+  let (ty,response_time) =
+    typing ~env ~statics:statics_env ~sums e
+  in
+  (if !relax_flag then () else
+    let t = canon ty in
+    match t with
+    | T_fun{dur} ->
+        if simplify_size_constraints (canon dur) <> T_size 0 then
+          let open Prelude.Errors in
+          error (fun fmt ->
+          Format.fprintf fmt
+        "@[<v>This program has type %a. It is not reactive. @]" (* Hint: use eta-expansion. *)
+                 (emph_pp green pp_ty) t)
+    | _ -> assert false);
+  List.iter (fun a -> typing ~env ~msg:"checking inputs given by option -arg, " 
+                         ~statics:statics_env ~sums
                          (ty_annot ~ty:t_arg a)
                       |> ignore) arg_list;
 
@@ -602,7 +677,7 @@ let typing_with_argument ({statics;sums;main} : pi) (arg_list : e list) : ty * t
 let when_repl : ((p * e) * Prelude.loc) -> unit =
   let r = ref SMap.empty in
   fun ((p,e),loc) ->
-    let (ty,_) = typing ~env:!r ~sums:[] e in
+    let (ty,_) = typing ~env:!r ~statics:[] ~sums:[] e in
     let gen = non_expansive e in
     r := typing_handler (fun () -> (env_extend ~loc ~gen !r p ty)) ();
     Format.fprintf Format.std_formatter "val %a : %a@."  Ast_pprint.pp_pat p pp_ty ty

@@ -89,8 +89,17 @@ and glob (e:e) : ((p * e) list * e) =
       [],E_par(let_floating e1,let_floating e2)
   | E_absLabel(l,e1) ->
       [],E_absLabel(l,let_floating e1)
-  | E_appLabel(e1,l) ->
-      [],E_appLabel(let_floating e1,l)
+  | E_appLabel(e1,l,lc) ->
+      [],E_appLabel(let_floating e1,l,lc)
+  | E_for(x,e_st1,e_st2,e3,loc) ->
+      [],E_for(x,let_floating e_st1,let_floating e_st2,let_floating e3,loc)
+            (* NB: definitions in [e_st1] and [e_st2] and [e3] 
+               are *not* globalized *)
+  | E_generate((p,e1),e2,e_st3,loc) ->
+      let ds1,e1' = glob e1 in
+      let ds2,e2' = glob e2 in
+      ds1@ds2,E_generate((p,e1'),e2',let_floating e_st3,loc)
+      (* NB: definitions in [e_st3] are *not* globalized *)
 
 (** [let_floating_pi pi] perform let floating on program [pi] *)
 let let_floating_pi pi =

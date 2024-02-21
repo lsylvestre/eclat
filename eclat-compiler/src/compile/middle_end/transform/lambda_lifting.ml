@@ -20,7 +20,7 @@ open Pattern
 (** [fv ~statics ~decls e] returns the free variables of [e] that are not
     global definitions (bound in ~static and ~decls) *)
 let fv ~statics e =
-  SMap.filter (fun x _ -> not (SMap.mem x statics)) (Free_vars.fv e)
+  SMap.filter (fun x _ -> not (SMap.mem x statics)) (Free_vars.fv ~get_arrays:false e)
 
 (** [has_changed] boolean flag setted to true each time a [lift] pass modifies
     the input expression *)
@@ -117,6 +117,13 @@ let lifting ~statics (env:env) (e:e) : e =
     | E_reg((p,e1),e0,l) ->
         let env' = env_filter env p in
         E_reg((p,lift env' e1),lift env e0,l)
+    
+    (* | E_absLabel(l,e1) -> 
+        let env' = env_filter env (P_var l) in
+        E_absLabel(l,lift env' e1)*)
+    | E_for(x,lc1,lc2,e1,loc) ->
+        let env' = env_filter env (P_var x) in
+        E_for(x,lc1,lc2,lift env' e1,loc)
     | e -> Ast_mapper.map (lift env) e
   in lift env e
 
@@ -216,10 +223,25 @@ let globalize_e (e:e) : ((x * e) list * e) =
         ds0,E_exec(declare ds1 e1',e0',l)
     | E_absLabel (l, e1) ->
         let ds1,e1' = glob e1 in
-        ds1,E_absLabel (l, e1')   (* scope is ok ? *)
-    | E_appLabel (e1, l) ->
+        [],E_absLabel (l, declare ds1 e1')   (* scope is ok ? *)
+    | E_appLabel (e1,l,lc) ->
         let ds1,e1' = glob e1 in
-        ds1,E_appLabel (e1',l)   (* scope is ok ? *)
+        [],E_appLabel (declare ds1 e1',l,lc)   (* scope is ok ? *)
+    | E_for(x,e_st1,e_st2,e3,loc) ->
+        let ds1,e_st1' = glob e_st1 in
+        let ds2,e_st2' = glob e_st2 in
+        let ds3,e3' = glob e3 in
+        [],E_for(x,declare ds1 e_st1',
+                   declare ds2 e_st2',
+                   declare ds3 e3',loc)
+         (* NB: definitions in [e_st1] and [e_st2] and [e3]
+            are *not* globalized *)
+    | E_generate((p,e1),e2,e_st3,loc) ->
+      let ds1,e1' = glob e1 in
+      let ds2,e2' = glob e2 in
+      let ds3,e_st3' = glob e_st3 in
+      ds2,E_generate((p,declare ds1 e1'),e2',declare ds3 e_st3',loc)
+      (* NB: definitions in [e_st1] are *not* globalized *)
   in glob e
 
 

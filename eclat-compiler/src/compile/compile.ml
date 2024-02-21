@@ -15,7 +15,13 @@ let compile ?(vhdl_comment="") ?(prop_fsm=false) arg_list name ty fmt pi =
 
   let (rdy,result,compute,fsm) as design = Fsm_comp.compile pi in
 
-  let statics = List.map (function x,Ast.Static_array(c,n) -> x,Fsm_syntax.Static_array(Fsm_comp.to_c c,n)) pi.statics in
+  let statics = pi.statics |> List.filter (function (x,Ast.Static_array _) -> true | _ -> false)
+        |>
+    List.map (function 
+              | x,Ast.Static_array(c,n) -> 
+                  x,Fsm_syntax.Static_array(Fsm_comp.to_c c,n)
+              | _ -> assert false (* already expanded *)
+           ) in
 
   Display_target.(display Fsm fsm);
 

@@ -12,6 +12,14 @@
 
 
   let alias_types = Hashtbl.create 10
+
+  let rec as_const loc e =
+    match un_annot e with
+    | E_const c -> c
+    | E_tuple es -> C_tuple(List.map (as_const loc) es)
+    | _ -> Prelude.Errors.raise_error ~loc:(with_file loc)
+              ~msg:"this expression should be a constant" ()
+
 %}
 
 %token LPAREN RPAREN LBRACKET RBRACKET COMMA PIPE_PIPE PIPE_COMMA_PIPE EQ EQ_EQ COL SEMI HAT STATIC DOT_LENGTH
@@ -32,7 +40,9 @@
 %token EXIT_REPL
 %token <string> STRING_LIT
 %token QUOTE TYPE
-
+%token TILDE PAR GENERATE
+%token FOR TO DO DONE
+%token BIG_LAMBDA 
 /* The precedences must be listed from low to high. */
 
 %right    PIPE_PIPE PIPE_COMMA_PIPE /* parallel construct */
@@ -67,17 +77,17 @@ pi:
 
 static:
 | LET STATIC x=IDENT EQ w=const_init_static HAT n=INT_LIT SEMI_SEMI {
-    let rec as_const e =
-      match un_annot e with
-      | E_const c -> c
-      | E_tuple es -> C_tuple(List.map as_const es)
-      | _ ->  Prelude.Errors.raise_error ~loc:(with_file $loc)
-                  ~msg:"this expression should be a constant" ()
-      in
       let (ce,tyopt) = w in
-      let c = as_const ce in
+      let c = as_const $loc ce in
       (* todo: add loc and type annotation [tyopt] *)
-      (x,Static_array(c,n)) }
+      (x,Static_array(c,n)) 
+  }
+| LET STATIC x=IDENT EQ ec=aexp SEMI_SEMI {
+      let c = as_const $loc ec in
+      (x,Static_const c)
+
+}
+
 
 const_init_static:
 | ce=aexp { (ce,None) }
@@ -126,8 +136,14 @@ fun_decl(In_kw):
 
 labels_fun_decl:
 | { None }
-| LT ls=separated_nonempty_list(COMMA,IDENT) GT { Some (ls) }
+| ls=nonempty_list(lbl) { Some (ls) }
 
+lbl:
+TILDE x=IDENT { x }
+
+lblapp:
+| TILDE x=IDENT COL y=IDENT { (x,St_var y) }
+| TILDE x=IDENT COL c=const { (x,St_const c) }
 
 after_let(In_kw):
 | b=bindings(apat,exp) In_kw { b }
@@ -264,17 +280,23 @@ lexp_desc:
 | FUN p_ty_opt=arg_ty RIGHT_ARROW e=exp
         { let (p,ty_p_opt) = p_ty_opt in
           mk_fun_ty_annot_p p ty_p_opt e }
-| IF e1=exp THEN e2=lexp ELSE e3=lexp
-        { E_if(e1,e2,e3) }
+| IF e1=exp THEN e2_e3=if_end
+        { let (e2,e3) = e2_e3 in E_if(e1,e2,e3) }
 | LET b=after_let(IN) e2=exp
         { let (p,e1) = b in
           E_letIn(p,e1,e2) }
 | VAR x=IDENT EQ e1=exp IN e2=exp
         { E_lastIn(x,e1,e2) }
-
 | NODE b=fun_decl(IN) e2=exp
         { let (p,e1) = enforce_node b in
           E_letIn(p,e1,e2) }
+| BIG_LAMBDA TILDE x=IDENT /* COL ty */
+DOT e=exp { E_absLabel(x,e) }
+
+if_end:
+| e2=lexp { e2,E_const Unit }
+| e2=lexp ELSE e3=lexp { e2, e3 }
+
 ret_ty_annot_eq:
 | EQ { None }
 | COL ty=ty EQ { Some ty }
@@ -306,16 +328,24 @@ app_exp:
 
 app_exp_desc:
 | x=IDENT LEFT_ARROW e=aexp { E_set(x,e) }
-| x=IDENT LBRACKET e1=exp RBRACKET { E_static_array_get(x,e1) }
+| x=IDENT LBRACKET e1=exp RBRACKET
+| x=IDENT DOT LPAREN e1=exp RPAREN { E_static_array_get(x,e1) }
 | x=IDENT DOT_LENGTH { E_static_array_length x }
-| x=IDENT LBRACKET e1=exp RBRACKET LEFT_ARROW e2=app_exp { E_static_array_set(x,e1,e2) }
-| e=aexp  es=aexp+ { match e::es with
-                    | [e1;e2] -> (match un_annot e1 with
-                                  | E_var _ | E_const _ | E_appLabel _ -> E_app(e1,e2) 
-                                  | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
-                               ~msg:"expression in functional position should be a variable or a constante" ())
-                    | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
-                               ~msg:"All functions and primitives should be unary. Hints: use a tuple as argument" () }
+| x=IDENT LBRACKET e1=exp RBRACKET LEFT_ARROW e2=app_exp
+| x=IDENT DOT LPAREN e1=exp RPAREN LEFT_ARROW e2=app_exp 
+  { E_static_array_set(x,e1,e2) }
+| e=aexp  es=aexp+ ls=list(lblapp)
+      { match e::es with
+        | [e1;e2] -> (match un_annot e1 with
+                      | E_var _ | E_const _ | E_appLabel _ -> 
+                          let e = E_app(e1,e2) in
+                          List.fold_left (fun e (l,lc) -> 
+                            E_appLabel(e,l,lc)) e ls
+                      | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
+                   ~msg:"expression in functional position should be a variable or a constante" ())
+        | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
+                   ~msg:"All functions and primitives should be unary. Hints: use a tuple as argument" () }
+| e=aexp ll=lblapp { let (l,lc) = ll in E_appLabel(e,l,lc) } 
 | MINUS e1=aexp %prec prec_unary_minus { E_app(E_const(Op(Runtime(Sub))),E_tuple[E_const(Int(0,unknown()));e1]) }
 | e1=app_exp op=binop e2=app_exp
         { E_app (mk_loc (with_file $loc) @@ E_const (Op (Runtime(op))),
@@ -342,19 +372,20 @@ app_exp_desc:
        }
 | EXEC e1=exp DEFAULT e2=lexp
        { E_exec(e1,e2,"") }
-| e1=aexp DOT LPAREN e2=exp RPAREN
-       { E_app(mk_loc (with_file $loc) @@ E_const (External Array_get),
-               mk_loc (with_file $loc) @@ E_tuple[e1;e2]) }
-| e1=aexp DOT LPAREN e2=exp RPAREN LEFT_ARROW e3=app_exp
-    { E_app(mk_loc (with_file $loc) @@ E_const (External Array_set),
-            mk_loc (with_file ($startpos(e1),$endpos(e2))) @@ E_tuple[e1;e2;e3]) }
-| FUN LT ls=separated_nonempty_list(COMMA,IDENT) GT RIGHT_ARROW e=exp 
+| FUN ls=nonempty_list(lbl) RIGHT_ARROW e=exp
     { List.fold_right (fun l e -> E_absLabel(l,e)) ls e }
-| LPAREN e=exp RPAREN 
-  LT ls=separated_nonempty_list(COMMA,IDENT) GT
-    { List.fold_right (fun l e -> E_appLabel(e,l)) ls e }
+| GENERATE ef1=aexp e_init2=aexp lbl=lbl COL e_st3=aexp
+  { let z = Ast.gensym () in
+    (if lbl = "depth" then () 
+     else Prelude.Errors.raise_error ~loc:(with_file $loc)
+             ~msg:"keyword ~depth expected." ());
+    E_generate((P_var z,E_app(ef1,E_var z)),e_init2,e_st3,with_file $loc) }
+
 | e=aexp { e }
 
+lc:
+| x=IDENT { St_var x }
+| c=const { St_const c }
 
 aexp:
   e=aexp_desc { mk_loc (with_file $loc) e }
@@ -391,6 +422,8 @@ aexp_desc:
     PIPE? rev_cases=match_cases END
       { let (hs,eo) = rev_cases in
         E_match(e,List.rev hs,eo) }
+| FOR x=IDENT EQ e_st1=exp TO e_st2=exp DO e=exp DONE 
+      { E_for(x,e_st1,e_st2,e,with_file $loc) }
 
 match_case_const:
 | c=const RIGHT_ARROW e=exp PIPE { (c,e) }

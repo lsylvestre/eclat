@@ -9,7 +9,9 @@ type token =
   | TYPE
   | TVAR_IDENT of (string)
   | TUPLE_OF_INT
+  | TO
   | TIMES
+  | TILDE
   | THEN
   | STRING_LIT of (string)
   | STATIC
@@ -28,6 +30,7 @@ type token =
   | PIPE_PIPE
   | PIPE_COMMA_PIPE
   | PIPE
+  | PAR
   | OR
   | OF
   | NOT
@@ -55,8 +58,10 @@ type token =
   | IDENT of (string)
   | HAT
   | GT
+  | GENERATE
   | GE
   | FUN
+  | FOR
   | FIX
   | EXIT_REPL
   | EXEC
@@ -67,11 +72,14 @@ type token =
   | ELSE
   | DOT_LENGTH
   | DOT
+  | DONE
+  | DO
   | DIV
   | DEFAULT
   | COMMA
   | COL
   | BOOL_LIT of (bool)
+  | BIG_LAMBDA
   | ASR
   | AND
   | AMP_AMP
@@ -84,8 +92,8 @@ exception Error
 (* The monolithic API. *)
 
 val pi: (Lexing.lexbuf -> token) -> Lexing.lexbuf -> ((Ast.x * Ast.static) list * (Ast.x * (Ast.x * Types.ty) list) list *
-  ((Ast.p * Ast.e) * Prelude.loc) list)
+  ((Ast.p * Ast.e_static) * Prelude.loc) list)
 
-val exp_eof: (Lexing.lexbuf -> token) -> Lexing.lexbuf -> (Ast.e)
+val exp_eof: (Lexing.lexbuf -> token) -> Lexing.lexbuf -> (Ast.e_static)
 
-val decl_opt: (Lexing.lexbuf -> token) -> Lexing.lexbuf -> (((Ast.p * Ast.e) * Prelude.loc) option)
+val decl_opt: (Lexing.lexbuf -> token) -> Lexing.lexbuf -> (((Ast.p * Ast.e_static) * Prelude.loc) option)

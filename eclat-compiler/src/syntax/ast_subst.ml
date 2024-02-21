@@ -19,6 +19,19 @@ let as_ident ex =
   | E_var z -> z
   | _ -> assert false (* todo: better error message *)
 
+let subst_lc x ex lc = 
+  match lc with
+  | St_var l' -> if x = l' 
+                 then (match un_deco ex with
+                       | E_const c -> St_const c
+                       | E_var y -> St_var y
+                       | _ -> let open Prelude.Errors in
+                               error (* ~loc*) (fun fmt ->
+                               Format.fprintf fmt
+                                "@[<v>value %s should be statically known.@]" x))
+                 else lc 
+  | St_const _ -> lc
+
 let subst_e x ex e =
   let rec ss e =
     match e with
@@ -44,6 +57,24 @@ let subst_e x ex e =
     | E_set(y,e1) ->
         let z = if x <> y then y else as_ident ex in
         E_set(z,ss e1)
+    | E_static_array_length(y) ->
+        let z = if x <> y then y else as_ident ex in
+        E_static_array_length(z)
+    | E_static_array_get(y,e1) ->
+        let z = if x <> y then y else as_ident ex in
+        E_static_array_get(z, ss e1)
+    | E_static_array_set(y,e1,e2) ->
+        let z = if x <> y then y else as_ident ex in
+        E_static_array_set(z, ss e1, ss e2)
+    | E_appLabel(e1,l,lc) ->
+        let lc' = subst_lc x ex lc in
+        E_appLabel(ss e1,l,lc')
+    | E_for(y,e_st1,e_st2,e3,loc) ->
+       E_for(y,ss e_st1,ss e_st2,
+             (if x = y then e3 else ss e3),loc)
+    | E_generate((p,e1),e2,e_st3,loc) ->
+        let e1' = if pat_mem x p then e1 else ss e1 in
+        E_generate((p,e1'),ss e2,ss e_st3,loc)
     | e -> Ast_mapper.map ss e
   in
   ss e
@@ -110,6 +141,11 @@ module OtherVersion = struct
 end
 
 
+let subst_lc x lc lc' =
+  match lc with
+  | St_var l2 -> if l2 = x then lc' else lc
+  | _ -> lc
+
 let subst_label l1 l2 e =
   let subst_l l = if l = l1 then l2 else l in
   let rec ss e =
@@ -124,15 +160,62 @@ let subst_label l1 l2 e =
     | E_static_array_set(l,e1,e2) ->
         E_static_array_set(subst_l l,ss e1,ss e2)
     | E_absLabel(l,e1) -> if l = l1 then e else E_absLabel(l,ss e1)
-    | E_appLabel(e1,l) -> E_appLabel(ss e1,subst_l l)
+    | E_appLabel(e1,l,St_var l') -> 
+        E_appLabel(ss e1,l,St_var (subst_l l'))
+    | E_appLabel(e1,l,(St_const _ as lc)) -> 
+        if l = l1 then e else E_appLabel(ss e1,l,lc)
+    | E_for(x,e_st1,e_st2,e3,loc) ->
+        E_for(x,ss e_st1, ss e_st2, ss e3,loc)
+    | E_generate((p,e1),e2,e_st3,loc) ->
+        (* assume l not in p ? *)
+        E_generate((p,ss e1),ss e2,ss e_st3,loc)
     | e -> Ast_mapper.map ss e
   in
   ss e
 
 
-let rec app_label e l =
+let subst_const l1 c e =
+  let rec ss e =
+    match e with
+    | E_var x -> if l1 = x then E_const c else e
+    | E_absLabel(l,e1) -> if l = l1 then e else E_absLabel(l,ss e1)
+    | E_appLabel(e1,l,lc) -> 
+        let lc' = subst_lc l1 lc (St_const c) in
+        E_appLabel(ss e1,l,lc')
+    | E_for(x,e_st1,e_st2,e1,loc) ->
+        E_for(x,ss e_st1, ss e_st2,ss e1,loc)
+    | E_generate((p,e1),e2,e_st3,loc) ->
+        (* assume l not in p ? *)
+        E_generate((p,ss e1),ss e2,ss e_st3,loc)
+    | e -> Ast_mapper.map ss e
+  in
+  ss e
+
+let rec app_label e l l' =
   match e with
-  | E_letIn(p,e1,e2) -> E_letIn(p,e1,app_label e2 l)
-  | E_if(e,e1,e2) -> E_if(e,app_label e1 l,app_label e2 l)
-  | E_absLabel(l2,e1) -> subst_label l2 l e1
-  | e -> Ast_mapper.map (fun e -> app_label e l) e
+  | E_letIn(p,e1,e2) -> E_letIn(p,subst_label l l' e1,app_label e2 l l')
+  | E_if(e,e1,e2) -> E_if(subst_label l l' e,app_label e1 l l',app_label e2 l l')
+  | E_absLabel(l2,e1) -> 
+      if l <> l2 then failwith ("app_label") else subst_label l l' e1
+  | E_appLabel(e1,l1,lc) ->
+     app_label (app_labelC e1 l1 lc) l l'
+  | e -> Ast_mapper.map (fun e -> app_label e l l') e
+
+
+and app_const e l c =
+  match e with
+  | E_letIn(p,e1,e2) -> E_letIn(p,subst_const l c e1,app_const e2 l c)
+  | E_if(e,e1,e2) -> E_if(subst_const l c e,app_const e1 l c,app_const e2 l c)
+  | E_absLabel(l2,e1) -> 
+      if l <> l2 then failwith "app_const" else subst_const l2 c e1
+  | E_appLabel(e1,l1,lc) ->
+     app_const (app_labelC e1 l1 lc) l c
+  | e -> Ast_mapper.map (fun e -> app_const e l c) e
+
+
+and app_labelC e l lc =
+  match lc with
+  | St_var l' -> app_label e l l'
+  | St_const c -> app_const e l c
+
+

@@ -30,8 +30,9 @@ let applyed e =
       let ys = vars_of_p p in
       let xs' = xs ++ ys in
       aux xs e1 ++ aux xs' e2
-  | E_app(E_var x,e2) ->
-      if SMap.mem x xs then SMap.empty else SMap.singleton x ()
+  | E_app(E_var f,e2) ->
+      (if SMap.mem f xs then SMap.empty else SMap.singleton f ())
+      ++ aux xs e2
   | E_app(e1,e2) ->
       aux xs e1 ++ aux xs e2
   | E_fun(p,e1) ->
@@ -65,8 +66,16 @@ let applyed e =
       aux xs e1 ++ aux xs e2
   | E_absLabel(_,e) ->
       aux xs e
-  | E_appLabel(e,_) ->
-      aux xs e    
+  | E_appLabel(e,_,_) ->
+      aux xs e  
+  | E_for(i,e_st1,e_st2,e3,_) ->
+      aux xs e_st1 ++ aux xs e_st2 ++
+      (let xs' = SMap.add i () xs in
+       aux xs' e3)
+  | E_generate((p,e1),e2,e_st3,_) ->
+      let ys = vars_of_p p in
+      (let xs' = xs ++ ys in
+       aux xs' e1) ++ aux xs e2 ++ aux xs e_st3
   in
   aux SMap.empty e
 

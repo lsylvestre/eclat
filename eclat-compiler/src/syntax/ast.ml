@@ -2,7 +2,7 @@ open Types
 
 type deco = Prelude.loc (** information of position from the source file *)
 
-type x = string         (** identifier [x] *)
+type x = string         (** identifier [x,y,z,f,g] *)
 
 type l = string         (** location (i.e., pointer) [l] *)
 
@@ -16,6 +16,7 @@ type c =                (** constant [c] *)
   | V_loc of l          (** pointer [l], only for the interpreter, not in source programs *)
   | C_tuple of c list   (** tuple literal *)
   | Inj of x            (* constructor (data type) *)
+
 
 and op = (** primitives *)
        (* instantaneous primitives *)
@@ -66,10 +67,18 @@ type e =                      (** expression     [e]                       *)
                                   type checking must ensure that [x]
                                   is bound using the var/in construct    *)
   | E_absLabel of l * e       (** big lambda for binding labels *)
-  | E_appLabel of e * l       (** label application *)
+  | E_appLabel of e * l * lc  (** label application *)
+
+  | E_generate of (p * e) * e * e_static * deco
+  | E_for of x * e_static * e_static * e * deco
+
+and e_static = e
+
+and lc = St_const of c | St_var of l
 
 type static =                 (* static toplevel data *)
   | Static_array of c * int   (** static global array [c^n] *)
+  | Static_const of c
 
 (** each program is a sequence of toplevel definitions (static arrays
     and functions) coupled with an entry point, e.g. the variable [main]
@@ -173,7 +182,7 @@ let as_variable (e:e) : x =
 (** [evaluated e] returns [true] iff [e] is a value *)
 let rec evaluated (e:e) : bool =
   match un_annot e with
-  | E_const _ | E_fun _ | E_fix _ | E_appLabel _ -> true
+  | E_const _ | E_fun _ | E_fix _ | E_absLabel _ -> true
   | E_tuple es -> List.for_all evaluated es
   | E_app(E_const(Op(TyConstr _)),e) -> evaluated e
   | _ -> false

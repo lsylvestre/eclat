@@ -57,6 +57,7 @@ OBJS= $(SRC_DIR)/prelude.cmo \
       $(SRC_DIR)/compile/middle_end/transform/let_floating.cmo \
       $(SRC_DIR)/compile/middle_end/transform/specialize.cmo \
       $(SRC_DIR)/compile/middle_end/transform/lambda_lifting.cmo \
+      $(SRC_DIR)/compile/middle_end/transform/macro.cmo \
       $(SRC_DIR)/compile/middle_end/transform/inline.cmo \
       $(SRC_DIR)/compile/middle_end/transform/matching.cmo \
       \

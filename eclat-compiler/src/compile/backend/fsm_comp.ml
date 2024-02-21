@@ -355,6 +355,8 @@ let rec to_s ~statics ~sums g e x k =
                      seq_ (S_in_fsm(id2,s2)) @@
                      S_continue q
 
+  | E_for _ -> assert false
+
   | e -> Ast_pprint.pp_exp Format.std_formatter e; assert false (* todo *)
 
 (* takes a program and translates it into an FSM *)

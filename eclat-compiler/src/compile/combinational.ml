@@ -55,5 +55,8 @@ let rec combinational (e:e) : bool =
 	| E_static_array_set _ ->
 	    false (* side effect *)
 	| E_absLabel(_,e1) -> combinational e1
-	| E_appLabel(e1,_) -> combinational e1
-
+	| E_appLabel(e1,_,_) -> combinational e1
+	| E_for(_,e_st1,e_st2,e3,_) ->
+	   combinational e_st1 && combinational e_st2 && combinational e3
+	| E_generate((_,e1),e2,e_st3,_) ->
+	   combinational e1 && combinational e2 && combinational e_st3

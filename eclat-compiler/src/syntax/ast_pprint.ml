@@ -97,6 +97,10 @@ let pp_ty (fmt:fmt) (ty:ty) : unit =
       fprintf fmt "%a static<%a>"
         (pp_type ~paren:true) t
         (pp_type ~paren:false) tz
+  | T_forall(x,t1,t2) ->
+      fprintf fmt "forall ~%s:%a . %a" x
+        (pp_type ~paren:true) t1
+        (pp_type ~paren:true) t2
   | T_size n ->
       fprintf fmt "%d" n
   | T_infinity ->
@@ -197,6 +201,11 @@ let rec pp_pat (fmt:fmt) (p:p) : unit =
       pp_tuple fmt pp_pat ps
 
 
+let pp_lc fmt lc = 
+  match lc with
+  | St_const c -> pp_const fmt c
+  | St_var l -> fprintf fmt "%s" l
+
 (** pretty printer for expressions *)
 let pp_exp (fmt:fmt) (e:e) : unit =
   let rec pp_e ~paren fmt e =
@@ -287,9 +296,19 @@ let pp_exp (fmt:fmt) (e:e) : unit =
         (pp_e ~paren:false) e1
         (pp_e ~paren:false) e2
   | E_absLabel(l,e1) ->
-      fprintf fmt "(<%s>. %a)" l (pp_e ~paren:false) e1
-  | E_appLabel(e1,l) ->
-      fprintf fmt "%a %s" (pp_e ~paren:true) e1 l
+      fprintf fmt "(/\\ ~%s . %a)" l (pp_e ~paren:false) e1
+  | E_appLabel(e1,l,lc) ->
+      fprintf fmt "%a ~%s:%a" (pp_e ~paren:true) e1 l pp_lc lc
+  | E_for(x,e_st1,e_st2,e3,_) ->
+      fprintf fmt "for %s = %a to %a do %a done" x 
+        (pp_e ~paren:false) e_st1
+        (pp_e ~paren:false) e_st2
+        (pp_e ~paren:false) e3
+  | E_generate((p,e1),e2,e_st3,_) ->
+      fprintf fmt "generate %a %a ~depth:%a"
+        (pp_e ~paren:true) (E_fun(p,e1))
+        (pp_e ~paren:true) e2
+        (pp_e ~paren:true) e_st3
   in
   fprintf fmt "@[<v 0>%a@]" (pp_e ~paren:false) e
 
@@ -297,7 +316,9 @@ let pp_exp (fmt:fmt) (e:e) : unit =
 let pp_static (fmt:fmt) (g:static) : unit =
   match g with
   | Static_array(c,n) ->
-    fprintf fmt "(%a)^%d" pp_const c n
+      fprintf fmt "(%a)^%d" pp_const c n
+  | Static_const(c) ->
+      fprintf fmt "(%a)" pp_const c
 
 (** pretty printer for programs *)
 let pp_pi (fmt:fmt) (pi:pi) : unit =

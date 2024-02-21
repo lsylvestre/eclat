@@ -14,7 +14,6 @@ let show_ty_and_exit_flag = ref false
 let show_ast_and_exit_flag = ref false
 let interp_flag = ref false
 let top_flag = ref false
-let relax_flag = ref false
 let simul_flag = ref true
 
 let prop_fsm_flag = ref false
@@ -71,7 +70,7 @@ let () =
     ("-hexa",    Arg.Set Ast_pprint.hexa_int_pp_flag,
                  "printer using hexadecimal");
 
-    ("-relax",   Arg.Set relax_flag,
+    ("-relax",   Arg.Set Typing.relax_flag,
                  "allow the main function to be non-instantaneous (such program is no longer reactive!)");
 
     ("-noassert",   Arg.Set Operators.flag_no_assert, "remove assertion after typing");
@@ -103,7 +102,7 @@ let () =
                                  clock_top := "clk48"),
      "synthesis for Intel MAX 10 FPGA");
 
-    ("-i", Arg.Set Typing.flag_print_signature,
+    ("-i", Arg.Set Typing.print_signature_flag,
      "Print inferred interface");
     ("-no-prop-linear", Arg.Clear Propagation.flag_propagate_combinational_linear,
                  "do not propagate linear combinational expression.");
@@ -116,7 +115,7 @@ let main () : unit =
   let (pi,arg_list) =
     Frontend.frontend ~inputs:!inputs !top_flag
                       ~when_repl:Typing.when_repl
-                      ~relax:!relax_flag
+                      ~relax:!Typing.relax_flag
                       !Ast_mk.main_symbol
                       !arguments
   in

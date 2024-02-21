@@ -4,7 +4,7 @@ open Ast
 let fv_var xs x =
   if SMap.mem x xs then SMap.empty else SMap.singleton x ()
 
-let fv ?(xs=SMap.empty) e =
+let fv ?(get_arrays=true) ?(xs=SMap.empty) e =
   let open Ast in
   let rec aux xs = function
   | E_deco(e,_) ->
@@ -52,21 +52,41 @@ let fv ?(xs=SMap.empty) e =
       (* _k is in a different name space than variables *)
       aux xs e1 ++ aux xs e2
    | E_lastIn(x,e1,e2) ->
-      let xs' = SMap.add x () xs in
+      let xs' = SMap.add x () xs in (* todo *)
       aux xs e1 ++ aux xs' e2
   | E_set(x,e1) ->
-      fv_var xs x ++ aux xs e1
-  | E_static_array_get(_,e1) ->
-      aux xs e1
-  | E_static_array_length(_) ->
-      SMap.empty
-  | E_static_array_set(_,e1,e2) ->
-      aux xs e1 ++ aux xs e2
+      let vs = fv_var xs x ++ aux xs e1 in
+      if get_arrays 
+      then SMap.add x () vs 
+      else vs
+  | E_static_array_get(x,e1) ->
+      let vs = aux xs e1 in
+      if get_arrays 
+      then SMap.add x () vs 
+      else vs
+  | E_static_array_length(x) ->
+      if get_arrays 
+      then SMap.singleton x () 
+      else SMap.empty
+  | E_static_array_set(x,e1,e2) ->
+      let vs = aux xs e1 ++ aux xs e2 in
+      if get_arrays 
+      then SMap.add x () vs 
+      else vs
   | E_par(e1,e2) ->
       aux xs e1 ++ aux xs e2
-  | E_absLabel(_,e1) ->
+  | E_absLabel(l,e1) ->
+      let xs' = SMap.add l () @@ xs in
+      aux xs' e1
+  | E_appLabel(e1,_,l) ->
       aux xs e1
-  | E_appLabel(e1,_) ->
-      aux xs e1
+  | E_for(i,e_st1,e_st2,e,_) ->
+      aux xs e_st1 ++ aux xs e_st2 ++
+        (let xs' = SMap.add i () @@ xs in
+        aux xs' e)
+  | E_generate((p,e1),e2,e_st3,_) ->
+      let ys = vars_of_p p in
+      let xs' = xs++ys in
+      aux xs' e1 ++ aux xs e2 ++ aux xs e_st3
   in
   aux xs e

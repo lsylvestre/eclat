@@ -3,6 +3,7 @@
    $ cd eclat-compiler
    $ make
    $ ./eclat ../examples/abcro.ecl \
+             -main=abcro \
              -arg="(((false,false),false),false);(((true,true),true),false);(((true,true),true),false);(((true,true),true),true);(((false,true),false),false);(((true,false),false),false);(((false,false),false),false);(((false,false),true),false)"
 
     (option -arg is used for simulation only and ignored for synthesis)
@@ -25,14 +26,10 @@ let await (i,reset) =
   
 let fby (a,b) =
   let step (x,_) = (b,x) in
-  let (_,x) = reg step last (a,b) in x
-;;
+  let (_,x) = reg step last (a,b) in x ;;
 
 let edge i = not (fby(false,i)) & i ;;
 
 let abro ((a,b),r) = edge (await (a,r) & await(b,r)) ;;
 
 let abcro (((a,b),c),r) = abro ((abro((a,b),r),c),r) ;;
-
-let main x = abcro x ;;
-

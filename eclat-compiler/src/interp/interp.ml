@@ -265,14 +265,18 @@ let rec red (e,r) =
       let e1',r1 = red (e1,r) in
       let e2',r2 = red (e2,r1) in
       E_static_array_set (x,e1',e2'),r2
-  | E_appLabel(e1,l) -> 
+  | E_appLabel(e1,l,lc) -> 
       let e1',r' = red (e1,r) in
       if not (evaluated e1')
-      then (E_appLabel(e1',l), r')
+      then (E_appLabel(e1',l,lc), r')
       else (match e1' with
-            | E_absLabel(l2,e2) -> red (subst_label l2 l e2,r')
+            | E_absLabel(l2,e2) -> 
+                if l2 <> l then failwith "ill-typed reference passing" (* todo: error *) 
+                else red (app_labelC e1 l lc,r')
             | _ -> assert false) (* error *)
-
+  
+  | E_generate _ 
+  | E_for _ -> assert false (* todo *)
 
 let rec reduce_until (e_init,r) args =
   let rec aux (e,r) args =
@@ -299,7 +303,9 @@ let interp ?(init_env=r_init) (e : e) (value_list : e list) : (e * r) =
 
 let prepare_statics (statics: (x * static) list) : c array SMap.t =
   smap_of_list statics |>
-  SMap.map (function Static_array(c,n) -> Array.make n c)
+  SMap.map (function 
+            | Static_array(c,n) -> Array.make n c
+            | Static_const c -> Array.make 1 c)
 
 
 let interp_pi (pi : pi) (value_list : e list) : (e * r) =

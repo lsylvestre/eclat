@@ -143,6 +143,7 @@ src/compile/middle_end/middle_end.cmo : \
     src/compile/middle_end/optim/propagation.cmo \
     src/compile/middle_end/normalize/move_down_gfun_under_exec_and_par.cmo \
     src/compile/middle_end/transform/matching.cmo \
+    src/compile/middle_end/transform/macro.cmo \
     src/compile/middle_end/transform/lambda_lifting.cmo \
     src/compile/middle_end/normalize/instantiate.cmo \
     src/compile/middle_end/transform/inline.cmo \
@@ -159,6 +160,7 @@ src/compile/middle_end/middle_end.cmx : \
     src/compile/middle_end/optim/propagation.cmx \
     src/compile/middle_end/normalize/move_down_gfun_under_exec_and_par.cmx \
     src/compile/middle_end/transform/matching.cmx \
+    src/compile/middle_end/transform/macro.cmx \
     src/compile/middle_end/transform/lambda_lifting.cmx \
     src/compile/middle_end/normalize/instantiate.cmx \
     src/compile/middle_end/transform/inline.cmx \
@@ -229,11 +231,15 @@ src/compile/middle_end/rename_main_arg.cmx : \
     src/syntax/ast_pprint.cmx \
     src/syntax/ast.cmx
 src/compile/middle_end/transform/inline.cmo : \
+    src/prelude.cmo \
     src/syntax/ast_subst.cmo \
+    src/syntax/ast_pprint.cmo \
     src/syntax/ast_mapper.cmo \
     src/syntax/ast.cmo
 src/compile/middle_end/transform/inline.cmx : \
+    src/prelude.cmx \
     src/syntax/ast_subst.cmx \
+    src/syntax/ast_pprint.cmx \
     src/syntax/ast_mapper.cmx \
     src/syntax/ast.cmx
 src/compile/middle_end/transform/lambda_lifting.cmo : \
@@ -258,6 +264,12 @@ src/compile/middle_end/transform/let_floating.cmo : \
 src/compile/middle_end/transform/let_floating.cmx : \
     src/syntax/map_pi.cmx \
     src/syntax/ast_undecorated.cmx \
+    src/syntax/ast_subst.cmx \
+    src/syntax/ast.cmx
+src/compile/middle_end/transform/macro.cmo : \
+    src/syntax/ast_subst.cmo \
+    src/syntax/ast.cmo
+src/compile/middle_end/transform/macro.cmx : \
     src/syntax/ast_subst.cmx \
     src/syntax/ast.cmx
 src/compile/middle_end/transform/matching.cmo : \
@@ -303,14 +315,12 @@ src/frontend/frontend.cmo : \
     src/syntax/pattern.cmo \
     src/frontend/parser.cmi \
     src/frontend/current_filename.cmo \
-    src/syntax/ast_mk.cmo \
     src/syntax/ast.cmo
 src/frontend/frontend.cmx : \
     src/prelude.cmx \
     src/syntax/pattern.cmx \
     src/frontend/parser.cmi \
     src/frontend/current_filename.cmx \
-    src/syntax/ast_mk.cmx \
     src/syntax/ast.cmx
 src/frontend/parser.cmi : \
     src/typing/types.cmo \
@@ -427,10 +437,12 @@ src/syntax/ast_rename.cmx : \
     src/syntax/ast_mapper.cmx \
     src/syntax/ast.cmx
 src/syntax/ast_subst.cmo : \
+    src/prelude.cmo \
     src/syntax/pattern.cmo \
     src/syntax/ast_mapper.cmo \
     src/syntax/ast.cmo
 src/syntax/ast_subst.cmx : \
+    src/prelude.cmx \
     src/syntax/pattern.cmx \
     src/syntax/ast_mapper.cmx \
     src/syntax/ast.cmx
