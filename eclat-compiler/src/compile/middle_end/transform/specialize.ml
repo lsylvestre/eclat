@@ -62,8 +62,8 @@ let applyed e =
       SMap.empty
   | E_static_array_set(_,e1,e2) ->
       aux xs e1 ++ aux xs e2
-  | E_par(e1,e2) ->
-      aux xs e1 ++ aux xs e2
+  | E_par(es) ->
+      List.fold_left (fun acc ei -> acc ++ aux xs ei) SMap.empty es
   | E_absLabel(_,e) ->
       aux xs e
   | E_appLabel(e,_,_) ->

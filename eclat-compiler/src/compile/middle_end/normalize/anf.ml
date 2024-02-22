@@ -112,8 +112,8 @@ let rec anf (e:e) : e =
       plug (anf e1) @@ fun xc1 ->
       plug (anf e2) @@ fun xc2 ->
       E_static_array_set(x,xc1,xc2)
-  | E_par(e1,e2) ->
-      E_par(anf e1, anf e2)
+  | E_par(es) ->
+      E_par(List.map anf es)
   | E_absLabel(l,e1) ->
       E_absLabel(l,anf e1)
   | E_appLabel(e1,l,lc) ->
@@ -165,8 +165,8 @@ let rec in_anf (e:e) : bool =
       true
   | E_static_array_set(x,e1,e2) ->
       is_xc e1 && is_xc e2
-  | E_par(e1,e2) ->
-      in_anf e1 && in_anf e2
+  | E_par(es) ->
+      List.for_all in_anf es
   | E_absLabel(_,e1) ->
       in_anf e1
   | E_appLabel(e1,_,_) ->

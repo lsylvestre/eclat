@@ -73,8 +73,8 @@ let fv ?(get_arrays=true) ?(xs=SMap.empty) e =
       if get_arrays 
       then SMap.add x () vs 
       else vs
-  | E_par(e1,e2) ->
-      aux xs e1 ++ aux xs e2
+  | E_par(es) ->
+      List.fold_left (fun acc ei -> acc ++ aux xs ei) SMap.empty es
   | E_absLabel(l,e1) ->
       let xs' = SMap.add l () @@ xs in
       aux xs' e1

@@ -9,7 +9,7 @@ let eval_static_exp_int ~loc e =
     | E_app(E_const(Op(Runtime op)),e) ->
         let app_binop (f,e1,e2) = 
           let (v1,size) = eval e1 in
-          let (v2,_) = eval e1 in
+          let (v2,_) = eval e2 in
           (f v1 v2, size)
         in
         (match op,e with 
@@ -67,11 +67,7 @@ let rec inline e =
       E_letIn(P_var ignore,
               (let es = List.init (m-n+1) (fun i -> 
                  E_letIn(P_var x, E_const (Int(n+i,w)),e3)) in
-              match es with
-              | [] -> E_const Unit
-              | [e] -> e
-              | e0::es ->
-                  List.fold_left (fun acc ei -> E_par(acc,ei)) e0 es),
+              E_par(es)),
               E_const Unit)
 
   | E_appLabel(e1,l,lc) ->

@@ -49,8 +49,8 @@ let linear_bindings (e:e) : set =
       ()
   | E_static_array_set(_,e1,e2) ->
       aux e1; aux e2
-  | E_par(e1,e2) ->
-      aux e1; aux e2
+  | E_par(es) ->
+      List.iter aux es
   | E_absLabel(_,e1) ->
       aux e1
   | E_appLabel(e1,_,_) ->

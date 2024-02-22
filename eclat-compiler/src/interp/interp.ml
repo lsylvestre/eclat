@@ -107,31 +107,6 @@ let app_const e e2 r =
   | Inj _ -> E_app(e,e2),r
   | (Unit|Bool _|Int _|String _|V_loc _|C_tuple _) ->
       error_cannot_be_reduced (E_app(e,e2))
-  | External ext ->
-      let n = Random.int !flag_bus_proba in
-      let v = match ext,e2 with
-              | Array_make,E_tuple [E_const (Int (n,_)); E_const c] ->
-                  let arr = Array.make n c in
-                  let l = gensym ~prefix:"l" () in
-                  Hashtbl.add r.heap l arr;
-                  E_const (V_loc l)
-              | Array_length,E_const (V_loc l) ->
-                  let n = match Hashtbl.find_opt r.heap l with
-                          | None -> assert false
-                          | Some arr -> Array.length arr
-                  in E_const (Int (n,T_size 32))
-              | Array_get, E_tuple[E_const (V_loc l);E_const (Int (i,_))] ->
-                  let c = match Hashtbl.find_opt r.heap l with
-                          | None -> assert false
-                          | Some arr -> Array.get arr i
-                  in E_const c
-              | Array_set, E_tuple[E_const (V_loc l);E_const (Int (i,_));E_const c0] ->
-                  (match Hashtbl.find_opt r.heap l with
-                   | None -> assert false
-                   | Some arr -> Array.set arr i c0);
-                  E_const Unit
-              | (Array_make|Array_length|Array_get|Array_set),_ -> error_cannot_be_reduced (E_app(e,e2)) in
-      E_app(E_const(Op(Wait n)),v),r
 
 
 open Format
@@ -245,15 +220,19 @@ let rec red (e,r) =
           let v2,r'' = red (e2,r') in
           assert (evaluated v2);
           E_tuple[v2;E_const(Bool false)], (add_r k e' r'')
-  | E_par(e1,e2) ->
+  | E_par(es) ->
       (* [Par] *)
-      if evaluated e1 && evaluated e2 then E_tuple[e1;e2],r else
-      let e1',r1 = red (e1,r) in
-      let e2',r2 = red (e2,r1) in
-      let e' = if evaluated e1' && evaluated e2'
-               then E_tuple[e1';e2']
-               else E_par(e1',e2') in
-      e',r2
+      let rec red_list acc es r =
+        match es with
+        | [] -> List.rev acc,r
+        | e1::es' -> let e1',r1 = red (e1,r) in
+                     red_list (e1 :: acc) es' r1 in
+
+      let es',r' = red_list [] es r in
+      let e' = if List.for_all evaluated es'
+               then E_tuple es'
+               else E_par es' in
+      e',r'
   | E_static_array_get (x,e1) ->
       if evaluated e1 then E_const (buffer_get x e1 r),r else
       let e1',r1 = red (e1,r) in

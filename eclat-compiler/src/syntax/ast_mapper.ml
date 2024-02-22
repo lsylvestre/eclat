@@ -33,8 +33,8 @@ let rec map f e =
       e
   | E_static_array_set(x,e1,e2) ->
       E_static_array_set(x,f e1, f e2)
-  | E_par(e1,e2) ->
-      E_par(f e1,f e2)
+  | E_par(es) ->
+      E_par (List.map f es)
   | E_reg((p,e1),e0,l) ->
       E_reg((p,f e1),f e0,l)
   | E_exec(e1,e2,k) ->
@@ -75,8 +75,8 @@ let rec iter f (e:e) : unit =
       f e1; f e2
   | E_set(_,e1) ->
       f e1
-  | E_par(e1,e2) ->
-      f e1; f e2
+  | E_par(es) ->
+      List.iter f es
    | E_reg((_,e1),e0,_) ->
       f e1; f e0
   | E_exec(e1,e2,_) ->

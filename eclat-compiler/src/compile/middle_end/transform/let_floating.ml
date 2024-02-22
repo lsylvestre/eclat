@@ -85,8 +85,8 @@ and glob (e:e) : ((p * e) list * e) =
       let ds1,e1' = glob e1 in
       let ds2,e2' = glob e2 in
       ds1@ds2,E_static_array_set(x,e1',e2')
-  | E_par(e1,e2) ->
-      [],E_par(let_floating e1,let_floating e2)
+  | E_par(es) ->
+      [],E_par(List.map let_floating es)
   | E_absLabel(l,e1) ->
       [],E_absLabel(l,let_floating e1)
   | E_appLabel(e1,l,lc) ->

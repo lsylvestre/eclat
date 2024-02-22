@@ -206,7 +206,7 @@ aty:
                         | "string" -> T_string tz
                         | "int" -> T_const (TInt tz)
                         | s -> Prelude.Errors.raise_error ~loc:(with_file $loc) ~msg:("unbound type constructor "^s) () }
-| at=aty STATIC LT tz=ty GT { T_static{elem=at;size=tz} }
+| at=aty STATIC LT tz=ty GT { T_array{elem=at;size=tz} }
 | n=INT_LIT           { T_size n }
 | x=TVAR_IDENT { unknown () } /* TODO: hashmap to constrain occurrences */
 | LPAREN ty=ty RPAREN { ty }
@@ -251,7 +251,7 @@ exp_desc:
 | e1=lexp PIPE_PIPE e2=lexp
 | e1=lexp PIPE_COMMA_PIPE e2=lexp
         {
-            E_par(e1,e2)
+            E_par[e1;e2]
         }
 | e=lexp {e}
 
@@ -302,15 +302,18 @@ ret_ty_annot_eq:
 | COL ty=ty EQ { Some ty }
 
 bindings(P,E):
-| b=bindings_and(P,E)
-  { b }
+| w=bindings_and(P,E)
+  { match w with
+    | [],_ | _,[] -> assert false
+    | [p],[e] -> (p,e)
+    | ps,es -> (P_tuple ps, E_par es) }
 
 bindings_and(P,E):
-| b=binding(P,E) { b }
-| b1=binding(P,E) AND b2=bindings_and(P,E)
+| b=binding(P,E) { let (p,e) = b in ([p],[e]) }
+| b1=binding(P,E) AND bs=bindings_and(P,E)
    { let (p1,e1) = b1 in
-     let (p2,e2) = b2 in
-     (P_tuple[p1;p2], (E_par(e1,e2))) }
+     let (ps,es) = bs in
+     (p1::ps,e1::es) }
 
 
 
@@ -405,8 +408,6 @@ aexp_desc:
             | "print_newline" -> E_const (Op(Runtime(Print_newline)))
             | "string_length" -> E_const (Op(Runtime(String_length)))
             | "assert" -> E_const (Op(Runtime(Assert)))
-            | "array_make" -> E_const (External Array_make)
-            | "array_length" -> E_const (External Array_length)
             | "_" -> Prelude.Errors.raise_error ~loc:(with_file $loc)
                          ~msg:"wildcard \"_\" not expected." ()
             | _ -> E_var x }

@@ -14,13 +14,12 @@ type ty =                (** type *)
       ret:ty    (* type [arg], produces a value of type [ret] after no more than [dur] clock ticks *)
     }
   | T_sum of (x * ty) list
-  | T_array of ty  (** dynamic array of elements of type [ty] *)
   | T_string of ty (** string parameterized by its size using a the size type [ty] *)
-  | T_static of {
+  | T_array of {
       elem : ty ; (** static array of elements of type [elem], *)
       size : ty   (** parameterized by its size using a the size type [size] *)
     }
-
+  | T_static of ty
   (* sized types for check response time and static datastructures *)
   | T_size of int      (** n *)
   | T_infinity         (** plus infinite *)
@@ -30,11 +29,11 @@ type ty =                (** type *)
   | T_forall of x * ty * ty
 
 and tconst = (** type constant *)
-| TBool      (** boolean type [bool] *)
-| TInt of ty (** integer type [int<ty>]
+  | TBool      (** boolean type [bool] *)
+  | TInt of ty (** integer type [int<ty>]
                  where [ty] is a size type denoting the size of the interger.
                  All integers are signed. *)
-| TUnit      (** unit type [unit] *)
+  | TUnit      (** unit type [unit] *)
 
 and tvar =              (** type variable *)
   | Unknown of int      (** type unknown 'a identified by a unique integer *)
@@ -111,10 +110,10 @@ let rec canon t =
       T_fun{ arg = canon arg;
              dur = canon dur;
              ret = canon ret }
-  | T_array t -> T_array (canon t)
   | T_string tz -> T_string (canon tz)
   | T_sum cs -> T_sum (List.map (fun (x,t) -> (x,canon t)) cs)
-  | T_static {elem=t;size=tz} -> T_static {elem=canon t;size=canon tz}
+  | T_array {elem=t;size=tz} -> T_array {elem=canon t;size=canon tz}
+  | T_static t -> T_static (canon t)
   | T_forall(x,t1,t2) -> T_forall(x,canon t1,canon t2)
   | (T_size _ | T_infinity | T_add _ | T_max _ | T_le _) as t -> simplify_size_constraints t
 

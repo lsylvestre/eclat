@@ -102,6 +102,9 @@ let () =
                                  clock_top := "clk48"),
      "synthesis for Intel MAX 10 FPGA");
 
+    ("-rw-lock", Arg.Set Gen_vhdl.single_read_write_lock_flag,
+     "use a same lock per array to protect read and write memory accesses");
+
     ("-i", Arg.Set Typing.print_signature_flag,
      "Print inferred interface");
     ("-no-prop-linear", Arg.Clear Propagation.flag_propagate_combinational_linear,

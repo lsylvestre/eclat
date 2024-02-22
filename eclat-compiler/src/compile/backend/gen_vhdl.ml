@@ -3,6 +3,8 @@ open Format
 
 let ram_inference = ref false
 let intel_max10_target = ref false
+let single_read_write_lock_flag = ref false
+
 
 let size_ty t =
   (* we must canonising [t] to prevent it from being considered as a type variable *)
@@ -72,6 +74,27 @@ let int2bin ~int_size =
     done;
     Bytes.to_string buf
 
+
+(* lock-based support for concurrent memory accesses *)
+let ptr_taken x = "$"^x^"_ptr_take" 
+
+let ptr_read_taken x = 
+  if !single_read_write_lock_flag then ptr_taken x 
+  else "$"^x^"_ptr_read_take" 
+
+let ptr_write_taken x =
+  if !single_read_write_lock_flag then ptr_taken x 
+  else "$"^x^"_ptr_write_take"
+
+let decl_locks fmt x =
+  if !single_read_write_lock_flag then (
+    fprintf fmt "variable %a : value(0 to 0) := \"0\";@," pp_ident (ptr_taken x)
+  ) else (
+    fprintf fmt "variable %a : value(0 to 0) := \"0\";@," pp_ident (ptr_read_taken x);
+    fprintf fmt "variable %a : value(0 to 0) := \"0\";@," pp_ident (ptr_write_taken x);
+  ) 
+
+(* ******************************** *)
 
 let pp_tuple fmt pp vs =
   pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt " & ") pp fmt vs
@@ -168,7 +191,6 @@ and pp_op fmt = function
 | GetTuple (i,_,_) -> assert false (* special case, defined below (see tuple_access) *)
 | Compute_address -> assert false (* deal with in pp_call*)
 
-
 (** code generator for atoms (i.e. combinatorial expression) *)
 (* assumes that the let-bindings of atoms are not nested *)
 and pp_a fmt = function
@@ -184,9 +206,9 @@ and pp_a fmt = function
 | A_buffer_get(xb) ->
     pp_ident fmt ("$"^xb^"_value")
 | A_ptr_taken(x) ->
-    pp_ident fmt ("$"^x^"_ptr_take")
+    pp_ident fmt (ptr_read_taken x)
 | A_ptr_write_taken(x) ->
-    pp_ident fmt ("$"^x^"_ptr_write_take")
+    pp_ident fmt (ptr_write_taken x)
 | A_buffer_length(x,tz) ->
     fprintf fmt  "std_logic_vector(to_unsigned(%a'length,%d))" pp_ident x (size_ty tz)
 | A_encode(y,ty,n) ->
@@ -220,10 +242,10 @@ let rec pp_s ~st fmt = function
          "@[%a <= to_integer(unsigned(%a));@]" pp_ident ("$"^x^"_ptr") pp_a idx)
 | S_ptr_take(x,b) ->
     fprintf fmt
-      "@[%a(0) := '%d';@]" pp_ident ("$"^x^"_ptr_take") (if b then 1 else 0)
+      "@[%a(0) := '%d';@]" pp_ident (ptr_read_taken x) (if b then 1 else 0)
 | S_ptr_write_take(x,b) ->
     fprintf fmt
-      "@[%a(0) := '%d';@]" pp_ident ("$"^x^"_ptr_write_take") (if b then 1 else 0)
+      "@[%a(0) := '%d';@]" pp_ident (ptr_write_taken x) (if b then 1 else 0)
 | S_setptr_write(x,idx,a) ->
     (match idx with
     | A_const(Int{value=n}) ->
@@ -455,8 +477,7 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
 
 
   List.iter (fun (x,Static_array(c,n)) ->
-      fprintf fmt "variable %a : value(0 to 0) := \"0\";@," pp_ident ("$"^x^"_ptr_take");
-      fprintf fmt "variable %a : value(0 to 0) := \"0\";@," pp_ident ("$"^x^"_ptr_write_take");
+      decl_locks fmt x
   ) statics;
 
   fprintf fmt "@]@,@[<v 2>begin@,";

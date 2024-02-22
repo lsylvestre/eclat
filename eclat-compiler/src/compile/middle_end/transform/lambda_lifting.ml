@@ -209,10 +209,9 @@ let globalize_e (e:e) : ((x * e) list * e) =
         let ds1,e1' = glob e1 in
         let ds2,e2' = glob e2 in
         ds1@ds2,E_static_array_set(x,e1',e2')
-    | E_par(e1,e2) ->
-        let ds1,e1' = glob e1 in
-        let ds2,e2' = glob e2 in
-        ds1@ds2,E_par (e1',e2')
+    | E_par(es) ->
+        let ds,es' = globalize_list es in
+        ds,E_par(es')
     | E_reg((p,e1),e0,l) ->
         let ds1,e1' = glob e1 in
         let ds0,e0' = glob e0 in

@@ -74,8 +74,8 @@ let rec map_under_exec_and_par e =
         let e1' = aux env e1 in (* assume [env] disjoint of [g] and [p] *)
         let phi' = E_fix(g,(p,aux env e1')) in
         E_letIn(P_var f,phi',aux ((f,phi')::env) e2)
-    | E_par(e1,e2) ->
-        E_par(map_under_exec_and_par (decl env e1), map_under_exec_and_par (decl env e2))
+    | E_par(es) ->
+        E_par(List.map (fun e -> map_under_exec_and_par (decl env e)) es)
     | E_exec(e1,e0,l) ->
         E_exec(map_under_exec_and_par (decl env e1), aux env e0,l)
     | e -> Ast_mapper.map (aux env) e

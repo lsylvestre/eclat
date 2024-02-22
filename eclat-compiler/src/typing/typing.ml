@@ -19,13 +19,13 @@ let rec occur v ty =
       List.iter f ts
   | T_fun{arg;dur;ret} ->
       f arg; f dur; f ret
-  | T_array t -> f t
   | T_string tz ->
       f tz
   | T_sum cs ->
       List.iter (fun (_,ty) -> f ty) cs
-  | T_static{elem=t;size=tz} ->
+  | T_array{elem=t;size=tz} ->
       f t; f tz
+  | T_static t -> f t
   | T_forall(_,t1,t2) ->
       f t1; f t2
   | (T_size _ | T_infinity) -> ()
@@ -51,15 +51,13 @@ let rec occur v ty =
                vars s t)
     | T_fun{arg;dur;ret} ->
         vars (vars (vars s arg) dur) ret
-    | T_array t ->
-        vars s t
     | T_string tz ->
         vars s tz
     | T_sum cs ->
         List.fold_left (fun s (_,t) -> vars s t) s cs
-
-    | T_static{elem=t;size=tz} ->
+    | T_array{elem=t;size=tz} ->
         vars (vars s t) tz
+    | T_static tz -> vars s tz
     | T_forall(_,t1,t2) ->
         vars (vars s t1) t2
     | T_size _ | T_infinity -> s
@@ -83,8 +81,6 @@ let rec occur v ty =
          T_const(TInt (instance tz))
      | (T_const _) as t ->
          t
-     | T_array t ->
-         T_array(instance t)
      | T_tuple ts ->
          T_tuple(List.map instance ts)
      | T_fun{arg;dur;ret} ->
@@ -94,8 +90,8 @@ let rec occur v ty =
      | T_string tz ->
         T_string(instance tz)
      | T_sum cs -> T_sum (List.map (fun (x,t) -> (x,instance t)) cs)
-     | T_static{elem=t;size=tz} ->
-        T_static{elem=instance t;size=instance tz}
+     | T_array{elem=t;size=tz} ->
+        T_array{elem=instance t;size=instance tz}
      | T_forall(x,t1,t2) ->
         T_forall(x,instance t1,instance t2)
      | (T_size _ | T_infinity) as t -> t
@@ -173,8 +169,6 @@ let rec unify ~loc t1 t2 =
       unify ~loc arg a;
       unify ~loc dur d;
       unify ~loc ret r
-  | T_array t,T_array t' ->
-      unify ~loc t t'
   | T_string tz,T_string tz' ->
       unify ~loc tz tz'
   | T_sum cs, T_sum cs' ->
@@ -182,9 +176,11 @@ let rec unify ~loc t1 t2 =
       List.iter2 (fun (x1,t1) (x2,t2) ->
         if x1 <> x2 then raise (CannotUnify (t1,t2,loc));
         unify ~loc t1 t2) cs cs'
-  | T_static{elem=t;size=tz},T_static{elem=t';size=tz'} ->
+  | T_array{elem=t;size=tz},T_array{elem=t';size=tz'} ->
       unify ~loc t t';
       unify ~loc tz tz'
+  | T_static t1', T_static t2' ->
+      unify ~loc t1' t2'
   | T_forall(x,tt1,tt2), T_forall(x',tt1',tt2') ->
       if x <> x' then raise (CannotUnify (t1,t2,loc));
       unify ~loc tt1 tt1';
@@ -256,18 +252,6 @@ let ty_op ~loc op =
       assert (0 <= pos && pos <= arity);
       fun_ty (group_ts ts) (T_size 0) (List.nth ts pos)
 
-let ty_extern ext =
-  let v = unknown() in
-  match ext with
-  | Array_make ->
-      fun_ty (T_tuple[tint (T_size 32);v]) T_infinity (T_array v)
-  | Array_get ->
-      fun_ty (T_tuple[T_array v;tint (T_size 32)]) T_infinity v
-  | Array_set ->
-      fun_ty (T_tuple[T_array v;tint (T_size 32);v]) T_infinity tunit
-  | Array_length ->
-      fun_ty (T_array v) T_infinity (tint (T_size 32))
-
 let rec typ_const ~loc g = function
 | Int(_,tz) -> (* TODO, add a type constraint according to the size of the literal *)
     tint tz
@@ -275,7 +259,6 @@ let rec typ_const ~loc g = function
 | Unit -> tunit
 | String s -> T_string (T_size (String.length s))
 | Op op -> ty_op ~loc op
-| External ext -> ty_extern ext
 | (V_loc _) ->
     (* not in source program: handled in the typer *)
     unknown()
@@ -316,12 +299,10 @@ let rec contain_fun t =
       List.iter contain_fun ts
   | T_fun _ ->
       raise Functional
-  | T_array t ->
-      contain_fun t
   | T_string _ -> ()
   | T_sum(cs) ->
       List.iter (fun (_,t) -> contain_fun t) cs
-  | T_static {elem=t;size=tz} -> contain_fun t
+  | T_array {elem=t;size=tz} -> contain_fun t
   | T_forall(_,_,t2) -> contain_fun t2
   | (T_size _ | T_infinity | T_add _ | T_max _ | T_le _) -> ()
 
@@ -518,10 +499,12 @@ let rec typ_exp ~statics ~sums ~toplevel ~loc (g:env) e =
      unify ~loc t1 t2;
      unify ~loc n2 Response_time.zero;
      (T_tuple[t1;tbool], Response_time.zero)
-  | E_par(e1,e2) ->
-    let t1,n1 = typ_exp ~statics ~sums ~toplevel:false ~loc g e1 in
-    let t2,n2 = typ_exp ~statics ~sums ~toplevel:false ~loc g e2 in
-    T_tuple [t1;t2],T_max(n1,n2)
+  | E_par(es) ->
+    let ts,ns = List.split @@ List.map (fun ei ->
+                    typ_exp ~statics ~sums ~toplevel:false ~loc g ei) es
+      in
+      let n = List.fold_left Response_time.max Response_time.zero ns in
+      T_tuple ts,n
   | E_set (x,e1) ->
      let t1,n = typ_exp ~statics ~sums ~toplevel:false ~loc g e1 in
      unify ~loc n Response_time.zero;
@@ -533,18 +516,18 @@ let rec typ_exp ~statics ~sums ~toplevel ~loc (g:env) e =
      unify ~loc t1 (tint (unknown()));
      let tx = typ_ident g x loc in
      let t3 = unknown() in
-     unify ~loc (T_static{elem=t3;size=(unknown())}) tx;
+     unify ~loc (T_array{elem=t3;size=(unknown())}) tx;
      (t3, n)
   | E_static_array_length(x) ->
      let tx =  typ_ident g x loc in
-     unify ~loc (T_static{elem=unknown();size=unknown()}) tx;
+     unify ~loc (T_array{elem=unknown();size=unknown()}) tx;
      (tint (unknown()), Response_time.zero)
   | E_static_array_set(x,e1,e2) ->
      let t1,n = typ_exp ~statics ~sums ~toplevel:false ~loc g e1 in
      let t2,m = typ_exp ~statics ~sums ~toplevel:false ~loc g e2 in
      unify ~loc t1 (tint (unknown()));
      let t3 = typ_ident g x loc in
-     unify ~loc (T_static{elem=t2;size=(unknown())}) t3;
+     unify ~loc (T_array{elem=t2;size=(unknown())}) t3;
      (T_const TUnit, T_add(n,m))
  | E_lastIn(x,e1,e2) ->
       let t1,n1 = typ_exp ~statics ~sums ~toplevel:false ~loc g e1 in
@@ -626,7 +609,7 @@ let typing_static g =
   match g with
   | Static_array(c,n) ->
       let elem = typ_const ~loc:Prelude.dloc SMap.empty c in  (*todo loc *)
-      T_static{elem;size=T_size n}
+      T_array{elem;size=T_size n}
   | Static_const c ->
       typ_const ~loc:Prelude.dloc SMap.empty c
 

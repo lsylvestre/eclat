@@ -87,13 +87,10 @@ let pp_ty (fmt:fmt) (ty:ty) : unit =
       (fun fmt (x,t) ->
          fprintf fmt "%s of %a" x (pp_type ~paren:false) t) fmt cs;
       fprintf fmt ")"
-  | T_array t ->
-      fprintf fmt "%a array"
-        (pp_type ~paren:true) t
   | T_string tz ->
       fprintf fmt "string<%a>"
         (pp_type ~paren:false) tz
-  | T_static{elem=t;size=tz} ->
+  | T_array{elem=t;size=tz} ->
       fprintf fmt "%a static<%a>"
         (pp_type ~paren:true) t
         (pp_type ~paren:false) tz
@@ -180,9 +177,6 @@ let rec pp_const (fmt:fmt) (c:c) : unit =
   | Op op ->
      fprintf fmt "(%a)"
         pp_op op
-  | External ext ->
-     fprintf fmt "(%a)"
-        pp_external ext
   | V_loc l ->
       fprintf fmt "#%a" pp_ident l
   | C_tuple(cs) ->
@@ -291,10 +285,12 @@ let pp_exp (fmt:fmt) (e:e) : unit =
           pp_ident x
           (pp_e ~paren:false) e1
           (pp_e ~paren:false) e2) fmt ()
-  | E_par(e1,e2) ->
-      fprintf fmt "(%a || %a)"
-        (pp_e ~paren:false) e1
-        (pp_e ~paren:false) e2
+  | E_par(es) ->
+      fprintf fmt "(";
+      pp_print_list
+        ~pp_sep:(fun fmt () -> fprintf fmt " || ")
+          (pp_e ~paren:false) fmt es;
+      fprintf fmt ")"
   | E_absLabel(l,e1) ->
       fprintf fmt "(/\\ ~%s . %a)" l (pp_e ~paren:false) e1
   | E_appLabel(e1,l,lc) ->

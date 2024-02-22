@@ -117,7 +117,7 @@ let rec to_c = function
 | Ast.String s -> String s
 | Ast.C_tuple cs -> CTuple (List.map to_c cs)
 | Ast.Inj _ -> assert false (* no partial application in the generated code *)
-| Ast.(Op _ | External _ | V_loc _) -> assert false
+| Ast.(Op _ | V_loc _) -> assert false
 
 let to_op = function
 | Ast.TyConstr ty -> TyConstr (Fsm_typing.translate_ty ty)
@@ -150,6 +150,18 @@ let rec to_a ~sums (e:Ast.e) : a =
   | _ ->
       Format.fprintf Format.std_formatter "--> %a\n"  Ast_pprint.pp_exp  e; assert false
 
+
+let rec seq_list_ ss = match ss with 
+  | [] -> S_skip
+  | [s] -> s
+  | s::ss' -> seq_ s (seq_list_ ss')
+
+let rec conjonction_atoms alist =
+  match alist with
+  | [] -> A_const (Bool true)
+  | [a1;a2] -> A_call(Runtime And, A_tuple(alist))
+  | a1::alist' -> let a2 = conjonction_atoms alist' in 
+                  A_call(Runtime And, A_tuple([a1;a2]))
 
 let replace_arg e =
   match e with
@@ -331,7 +343,29 @@ let rec to_s ~statics ~sums g e x k =
                         (S_set(y^"_init",A_const (Bool true))),
                    None))) s2 in
      (w2,ts,s)
-  | E_par(e1,e2) ->
+  | E_par(es) ->
+      let id_s = List.map (fun _ -> Ast.gensym ~prefix:"id" ()) es in
+      let pi_s = List.map (fun e -> compile @@ Ast.{statics;sums;main=e}) es in
+      let q = Ast.gensym ~prefix:"par" () in
+      let ts = SMap.singleton q (
+        let s_fin =
+          let rdys = List.map (fun (rdy_i,_,_,_) -> A_var rdy_i) pi_s in
+          let ress = List.map (fun (_,res_i,_,_) -> A_var res_i) pi_s in
+          let_plug_s (conjonction_atoms rdys) (fun z ->
+                       S_if(z,
+                        (seq_ (S_set(x,(A_tuple ress))) @@ k),Some (S_continue q)))
+        in
+        let s_list' = List.map2 (fun id_i (rdy_i,res_i,compute_i,(ts_i,s_i)) -> 
+                        S_fsm(id_i,rdy_i,res_i,compute_i,ts_i,S_skip,false)) id_s pi_s
+        in seq_ (seq_list_ s_list') s_fin
+      ) in
+      let s_inFsm_list = List.map2 (fun id_i (rdy_i,res_i,compute_i,(ts_i,s_i)) -> 
+                                   (S_in_fsm(id_i,s_i))) id_s pi_s in
+      SMap.empty,ts, seq_ (seq_list_ s_inFsm_list)
+                     (S_continue q)
+  (* simplified version with only two branches:
+     -----------------------------------------  
+    | E_par[e1;e2] ->
       let id1 = Ast.gensym ~prefix:"id" () in
       let id2 = Ast.gensym ~prefix:"id" () in
 
@@ -353,7 +387,7 @@ let rec to_s ~statics ~sums g e x k =
       ) in
       SMap.empty,ts, seq_ (S_in_fsm(id1,s1)) @@
                      seq_ (S_in_fsm(id2,s2)) @@
-                     S_continue q
+                     S_continue q*)
 
   | E_for _ -> assert false
 

@@ -13,7 +13,6 @@ let op_combinational (op:op) : bool =
 
 let const_combinational (c:c) : bool =
 	match c with
-  | External _ -> false
   | _ -> true
 
 let rec combinational (e:e) : bool =
