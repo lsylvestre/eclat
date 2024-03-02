@@ -25,6 +25,8 @@ let rec occur v ty =
       List.iter (fun (_,ty) -> f ty) cs
   | T_array{elem=t;size=tz} ->
       f t; f tz
+  | T_matrix{elem=t;size=tz} ->
+      f t; f tz
   | T_static t -> f t
   | T_forall(_,t1,t2) ->
       f t1; f t2
@@ -56,6 +58,8 @@ let rec occur v ty =
     | T_sum cs ->
         List.fold_left (fun s (_,t) -> vars s t) s cs
     | T_array{elem=t;size=tz} ->
+        vars (vars s t) tz
+    | T_matrix{elem=t;size=tz} ->
         vars (vars s t) tz
     | T_static tz -> vars s tz
     | T_forall(_,t1,t2) ->
@@ -92,12 +96,15 @@ let rec occur v ty =
      | T_sum cs -> T_sum (List.map (fun (x,t) -> (x,instance t)) cs)
      | T_array{elem=t;size=tz} ->
         T_array{elem=instance t;size=instance tz}
+     | T_matrix{elem=t;size=tz} ->
+        T_matrix{elem=instance t;size=instance tz}
      | T_forall(x,t1,t2) ->
         T_forall(x,instance t1,instance t2)
      | (T_size _ | T_infinity) as t -> t
      | T_max(t1,t2) -> T_max(instance t1,instance t2)
      | T_add(t1,t2) -> T_add(instance t1,instance t2)
      | T_le(t1,t2) -> T_le(instance t1,instance t2)
+     | T_static t1 -> T_static (instance t1)
      in
        instance ty
 
@@ -131,6 +138,7 @@ exception CannotUnify of ty * ty * Prelude.loc
 
 (* unify t1 and t2 with subtyping: t1 <= t2 *)
 let rec unify ~loc t1 t2 =
+  (* Format.fprintf Format.std_formatter "----> %a ~? %a\n" pp_ty t1 pp_ty t2; *)
   let unify_tconst tc1 tc2 =
     match tc1,tc2 with
     | TInt tz, TInt tz' ->
@@ -177,6 +185,9 @@ let rec unify ~loc t1 t2 =
         if x1 <> x2 then raise (CannotUnify (t1,t2,loc));
         unify ~loc t1 t2) cs cs'
   | T_array{elem=t;size=tz},T_array{elem=t';size=tz'} ->
+      unify ~loc t t';
+      unify ~loc tz tz'
+  | T_matrix{elem=t;size=tz},T_matrix{elem=t';size=tz'} ->
       unify ~loc t t';
       unify ~loc tz tz'
   | T_static t1', T_static t2' ->
@@ -303,8 +314,10 @@ let rec contain_fun t =
   | T_sum(cs) ->
       List.iter (fun (_,t) -> contain_fun t) cs
   | T_array {elem=t;size=tz} -> contain_fun t
+  | T_matrix {elem=t;size=tz} -> contain_fun t
   | T_forall(_,_,t2) -> contain_fun t2
   | (T_size _ | T_infinity | T_add _ | T_max _ | T_le _) -> ()
+  | T_static t1 -> contain_fun t1
 
 let check_conditional_shape ~loc e t =
   try contain_fun t with
@@ -502,33 +515,58 @@ let rec typ_exp ~statics ~sums ~toplevel ~loc (g:env) e =
   | E_par(es) ->
     let ts,ns = List.split @@ List.map (fun ei ->
                     typ_exp ~statics ~sums ~toplevel:false ~loc g ei) es
-      in
-      let n = List.fold_left Response_time.max Response_time.zero ns in
-      T_tuple ts,n
+    in
+    let n = List.fold_left Response_time.max Response_time.zero ns in
+    T_tuple ts,n
   | E_set (x,e1) ->
      let t1,n = typ_exp ~statics ~sums ~toplevel:false ~loc g e1 in
      unify ~loc n Response_time.zero;
      let t2 = typ_ident g x loc in
      unify ~loc t1 t2;
      (T_const TUnit, Response_time.zero)
-  | E_static_array_get(x,e1) ->
+  | E_array_length(x) ->
+     let tx =  typ_ident g x loc in
+     unify ~loc (T_array{elem=unknown();size=unknown()}) tx;
+     (tint (unknown()), Response_time.zero)
+  | E_array_get(x,e1) ->
      let t1,n = typ_exp ~statics ~sums ~toplevel:false ~loc g e1 in
      unify ~loc t1 (tint (unknown()));
      let tx = typ_ident g x loc in
      let t3 = unknown() in
      unify ~loc (T_array{elem=t3;size=(unknown())}) tx;
      (t3, n)
-  | E_static_array_length(x) ->
-     let tx =  typ_ident g x loc in
-     unify ~loc (T_array{elem=unknown();size=unknown()}) tx;
-     (tint (unknown()), Response_time.zero)
-  | E_static_array_set(x,e1,e2) ->
+  | E_array_set(x,e1,e2) ->
      let t1,n = typ_exp ~statics ~sums ~toplevel:false ~loc g e1 in
      let t2,m = typ_exp ~statics ~sums ~toplevel:false ~loc g e2 in
      unify ~loc t1 (tint (unknown()));
      let t3 = typ_ident g x loc in
      unify ~loc (T_array{elem=t2;size=(unknown())}) t3;
      (T_const TUnit, T_add(n,m))
+  | E_matrix_size(x,n) ->
+     let tx = typ_ident g x loc in
+     let tz = unknown() in
+     unify ~loc (T_matrix{elem=unknown();size=tz}) tx;
+     let t = tint (unknown()) in
+     t, Response_time.zero
+  | E_matrix_get(x,es) ->
+     let ts,ns = List.split @@ List.map (fun ei ->
+                    typ_exp ~statics ~sums ~toplevel:false ~loc g ei) es in
+     List.iter (fun ti -> unify ~loc ti (tint (unknown()))) ts;
+     let tx = typ_ident g x loc in
+     let t3 = unknown() in
+     unify ~loc (T_matrix{elem=t3;size=T_tuple (List.map (fun _ -> unknown()) es)}) tx;
+     let n = List.fold_left Response_time.add Response_time.zero ns in
+     (t3, n)
+  | E_matrix_set(x,es,e2) ->
+     let ts,ns = List.split @@ List.map (fun ei ->
+                    typ_exp ~statics ~sums ~toplevel:false ~loc g ei) es in
+     List.iter (fun ti -> unify ~loc ti (tint (unknown()))) ts;
+
+     let t2,m = typ_exp ~statics ~sums ~toplevel:false ~loc g e2 in
+     let tx = typ_ident g x loc in
+     unify ~loc (T_matrix{elem=t2;size=T_tuple (List.map (fun _ -> unknown()) es)}) tx;
+     let n = List.fold_left Response_time.add m ns in
+     (T_const TUnit, n)
  | E_lastIn(x,e1,e2) ->
       let t1,n1 = typ_exp ~statics ~sums ~toplevel:false ~loc g e1 in
       let g' = env_extend ~loc g (P_var x) t1 in
@@ -610,6 +648,9 @@ let typing_static g =
   | Static_array(c,n) ->
       let elem = typ_const ~loc:Prelude.dloc SMap.empty c in  (*todo loc *)
       T_array{elem;size=T_size n}
+  | Static_matrix(c,n_list) ->
+      let elem = typ_const ~loc:Prelude.dloc SMap.empty c in  (*todo loc *)
+      T_matrix{elem;size=T_tuple (List.map (fun n -> T_size n) n_list) }
   | Static_const c ->
       typ_const ~loc:Prelude.dloc SMap.empty c
 

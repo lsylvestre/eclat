@@ -43,12 +43,18 @@ let linear_bindings (e:e) : set =
       aux e1; aux e2
   | E_set(_,e1) ->
       aux e1
-  | E_static_array_get(_,e1) ->
-      aux e1
-  | E_static_array_length(_) ->
+  | E_array_length _ ->
       ()
-  | E_static_array_set(_,e1,e2) ->
+  | E_array_get(_,e1) ->
+      aux e1
+  | E_array_set(_,e1,e2) ->
       aux e1; aux e2
+  | E_matrix_size _ ->
+      ()
+  | E_matrix_get(_,es) ->
+      List.iter aux es
+  | E_matrix_set(_,es,e2) ->
+      List.iter aux es; aux e2
   | E_par(es) ->
       List.iter aux es
   | E_absLabel(_,e1) ->
@@ -94,8 +100,6 @@ let propagation e =
         prop (List.nth vs pos)
     | E_app(e1,e2) ->
         E_app(prop e1,prop e2)
-    | E_static_array_set(x,e1,e2) ->
-        E_static_array_set(x,prop e1,prop e2)
     | e -> Ast_mapper.map prop e
   in prop e
 

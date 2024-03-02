@@ -231,12 +231,14 @@ src/compile/middle_end/rename_main_arg.cmx : \
     src/syntax/ast_pprint.cmx \
     src/syntax/ast.cmx
 src/compile/middle_end/transform/inline.cmo : \
+    src/typing/types.cmo \
     src/prelude.cmo \
     src/syntax/ast_subst.cmo \
     src/syntax/ast_pprint.cmo \
     src/syntax/ast_mapper.cmo \
     src/syntax/ast.cmo
 src/compile/middle_end/transform/inline.cmx : \
+    src/typing/types.cmx \
     src/prelude.cmx \
     src/syntax/ast_subst.cmx \
     src/syntax/ast_pprint.cmx \

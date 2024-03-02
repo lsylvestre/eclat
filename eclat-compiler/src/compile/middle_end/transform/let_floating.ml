@@ -76,15 +76,24 @@ and glob (e:e) : ((p * e) list * e) =
   | E_set(x,e1) ->
       let ds1,e1' = glob e1 in
       ds1,E_set(x,e1')
-  | E_static_array_get(x,e1) ->
-      let ds1,e1' = glob e1 in
-      ds1,E_static_array_get(x,e1')
-  | E_static_array_length _ ->
+  | E_array_length _ ->
       [],e
-  | E_static_array_set(x,e1,e2) ->
+  | E_array_get(x,e1) ->
+      let ds1,e1' = glob e1 in
+      ds1,E_array_get(x,e1')
+  | E_array_set(x,e1,e2) ->
       let ds1,e1' = glob e1 in
       let ds2,e2' = glob e2 in
-      ds1@ds2,E_static_array_set(x,e1',e2')
+      ds1@ds2,E_array_set(x,e1',e2')
+  | E_matrix_size _ ->
+      [],e
+  | E_matrix_get(x,es) ->
+      let dss,es' = List.map glob es |> List.split in
+      List.concat dss,E_matrix_get(x,es')
+  | E_matrix_set(x,es,e2) ->
+      let dss,es' = List.map glob es |> List.split in
+      let ds2,e2' = glob e2 in
+      (List.concat dss) @ ds2,E_matrix_set(x,es',e2')
   | E_par(es) ->
       [],E_par(List.map let_floating es)
   | E_absLabel(l,e1) ->

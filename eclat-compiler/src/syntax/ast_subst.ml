@@ -57,15 +57,24 @@ let subst_e x ex e =
     | E_set(y,e1) ->
         let z = if x <> y then y else as_ident ex in
         E_set(z,ss e1)
-    | E_static_array_length(y) ->
+    | E_array_length(y) ->
         let z = if x <> y then y else as_ident ex in
-        E_static_array_length(z)
-    | E_static_array_get(y,e1) ->
+        E_array_length(z)
+    | E_array_get(y,e1) ->
         let z = if x <> y then y else as_ident ex in
-        E_static_array_get(z, ss e1)
-    | E_static_array_set(y,e1,e2) ->
+        E_array_get(z, ss e1)
+    | E_array_set(y,e1,e2) ->
         let z = if x <> y then y else as_ident ex in
-        E_static_array_set(z, ss e1, ss e2)
+        E_array_set(z, ss e1, ss e2)
+    | E_matrix_size(y,n) ->
+        let z = if x <> y then y else as_ident ex in
+        E_matrix_size(z,n)
+    | E_matrix_get(y,es) ->
+        let z = if x <> y then y else as_ident ex in
+        E_matrix_get(z,List.map ss es)
+    | E_matrix_set(y,es,e2) ->
+        let z = if x <> y then y else as_ident ex in
+        E_matrix_set(z,List.map ss es, ss e2)
     | E_appLabel(e1,l,lc) ->
         let lc' = subst_lc x ex lc in
         E_appLabel(ss e1,l,lc')
@@ -152,13 +161,18 @@ let subst_label l1 l2 e =
     match e with
     (* 
        E_reg _ | E_exec _ | E_set -> ? *)
-    | E_static_array_get(l,e1) ->
-        
-        E_static_array_get(subst_l l,ss e1)
-    | E_static_array_length(l) ->
-        E_static_array_length(subst_l l)
-    | E_static_array_set(l,e1,e2) ->
-        E_static_array_set(subst_l l,ss e1,ss e2)
+    | E_array_length(l) ->
+        E_array_length(subst_l l)
+    | E_array_get(l,e1) ->        
+        E_array_get(subst_l l,ss e1)
+    | E_array_set(l,e1,e2) ->
+        E_array_set(subst_l l,ss e1,ss e2)
+    | E_matrix_size(x,n) ->
+        E_matrix_size(subst_l x,n)
+    | E_matrix_get(l,es) ->        
+        E_matrix_get(subst_l l,List.map ss es)
+    | E_matrix_set(l,es,e2) ->        
+        E_matrix_set(subst_l l,List.map ss es, ss e2)
     | E_absLabel(l,e1) -> if l = l1 then e else E_absLabel(l,ss e1)
     | E_appLabel(e1,l,St_var l') -> 
         E_appLabel(ss e1,l,St_var (subst_l l'))

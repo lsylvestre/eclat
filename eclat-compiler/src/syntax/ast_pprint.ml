@@ -90,8 +90,15 @@ let pp_ty (fmt:fmt) (ty:ty) : unit =
   | T_string tz ->
       fprintf fmt "string<%a>"
         (pp_type ~paren:false) tz
+  | T_static tz ->
+      fprintf fmt "static<%a>"
+        (pp_type ~paren:false) tz
   | T_array{elem=t;size=tz} ->
-      fprintf fmt "%a static<%a>"
+      fprintf fmt "%a array<%a>"
+        (pp_type ~paren:true) t
+        (pp_type ~paren:false) tz
+  | T_matrix{elem=t;size=tz} ->
+      fprintf fmt "%a matrix<%a>"
         (pp_type ~paren:true) t
         (pp_type ~paren:false) tz
   | T_forall(x,t1,t2) ->
@@ -272,19 +279,36 @@ let pp_exp (fmt:fmt) (e:e) : unit =
       parenthesize ~paren (fun fmt () ->
         fprintf fmt "@[<v>%a <- %a@]"
           pp_ident x (pp_e ~paren:false) e1) fmt ()
-  | E_static_array_get(x,e1) ->
-      fprintf fmt "@[<v>(%a[%a])@]"
-        pp_ident x
-        (pp_e ~paren:false) e1
-  | E_static_array_length(x) ->
+  | E_array_length(x) ->
       fprintf fmt "@[<v>%a.length@]"
         pp_ident x
-  | E_static_array_set(x,e1,e2) ->
+  | E_array_get(x,e1) ->
+      fprintf fmt "@[<v>%a.(%a)@]"
+        pp_ident x
+        (pp_e ~paren:false) e1
+  | E_array_set(x,e1,e2) ->
       parenthesize ~paren (fun fmt () ->
-        fprintf fmt "@[<v>%a[%a] <- %a@]"
+        fprintf fmt "@[<v>%a.(%a) <- %a@]"
           pp_ident x
           (pp_e ~paren:false) e1
           (pp_e ~paren:false) e2) fmt ()
+  | E_matrix_size(x,n) ->
+      fprintf fmt "@[<v>%a.(%d).size@]"
+        pp_ident x n
+  | E_matrix_get(x,es) ->
+      fprintf fmt "@[<v>";
+      pp_ident fmt x;
+      List.iter (fun e -> 
+        fprintf fmt ".(%a)" (pp_e ~paren:false) e
+      ) es;
+      fprintf fmt "@]";
+  | E_matrix_set(x,es,e2) ->
+      fprintf fmt "@[<v>";
+      pp_ident fmt x;
+      List.iter (fun e -> 
+        fprintf fmt ".(%a)" (pp_e ~paren:false) e
+      ) es;
+      fprintf fmt " <- %a@]" (pp_e ~paren:false) e2;
   | E_par(es) ->
       fprintf fmt "(";
       pp_print_list
@@ -313,6 +337,9 @@ let pp_static (fmt:fmt) (g:static) : unit =
   match g with
   | Static_array(c,n) ->
       fprintf fmt "(%a)^%d" pp_const c n
+  | Static_matrix(c,n_list) ->
+      fprintf fmt "(%a)" pp_const c;
+      List.iter (fun n -> fprintf fmt "^%d" n) n_list 
   | Static_const(c) ->
       fprintf fmt "(%a)" pp_const c
 

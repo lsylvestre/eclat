@@ -27,12 +27,18 @@ let rec map f e =
       E_lastIn(x,f e1,f e2)
   | E_set(x,e1) ->
       E_set(x,f e1)
-  | E_static_array_get(x,e1) ->
-      E_static_array_get(x,f e1)
-  | E_static_array_length _ ->
+  | E_array_length _ ->
       e
-  | E_static_array_set(x,e1,e2) ->
-      E_static_array_set(x,f e1, f e2)
+  | E_array_get(x,e1) ->
+      E_array_get(x,f e1)
+  | E_array_set(x,e1,e2) ->
+      E_array_set(x,f e1, f e2)
+  | E_matrix_size _ ->
+      e
+  | E_matrix_get(x,es) ->
+      E_matrix_get(x,List.map f es)
+  | E_matrix_set(x,es,e3) ->
+      E_matrix_set(x,List.map f es, f e3)
   | E_par(es) ->
       E_par (List.map f es)
   | E_reg((p,e1),e0,l) ->
@@ -81,12 +87,18 @@ let rec iter f (e:e) : unit =
       f e1; f e0
   | E_exec(e1,e2,_) ->
       f e1; f e2
-  | E_static_array_length _ ->
+  | E_array_length _ ->
       ()
-  | E_static_array_get(_,e1) ->
+  | E_array_get(_,e1) ->
       f e1
-  | E_static_array_set(_,e1,e2) ->
+  | E_array_set(_,e1,e2) ->
       f e1; f e2
+  | E_matrix_size _ ->
+      ()
+  | E_matrix_get(_,es) ->
+      List.iter f es
+  | E_matrix_set(_,es,e2) ->
+      List.iter f es; f e2
   | E_absLabel(_,e1) ->
       f e1
   | E_appLabel(e1,_,_) ->

@@ -103,15 +103,24 @@ let rec anf (e:e) : e =
   | E_set(x,e1) ->
       plug (anf e1) @@ fun xc1 ->
       E_set(x,xc1)
-  | E_static_array_get(x,e1) ->
-      plug (anf e1) @@ fun xc1 ->
-      E_static_array_get(x,xc1)
-  | E_static_array_length _ ->
+  | E_array_length _ ->
       e
-  | E_static_array_set(x,e1,e2) ->
+  | E_array_get(x,e1) ->
+      plug (anf e1) @@ fun xc1 ->
+      E_array_get(x,xc1)
+  | E_array_set(x,e1,e2) ->
       plug (anf e1) @@ fun xc1 ->
       plug (anf e2) @@ fun xc2 ->
-      E_static_array_set(x,xc1,xc2)
+      E_array_set(x,xc1,xc2)
+  | E_matrix_size _ ->
+      e
+  | E_matrix_get(x,es) ->
+      plug_n (List.map anf es) @@ fun xs ->
+      E_matrix_get(x,xs)
+  | E_matrix_set(x,es,e2) ->
+      plug_n (List.map anf es) @@ fun xs -> 
+      plug (anf e2) @@ fun xc2 ->
+      E_matrix_set(x,xs,xc2)
   | E_par(es) ->
       E_par(List.map anf es)
   | E_absLabel(l,e1) ->
@@ -159,12 +168,18 @@ let rec in_anf (e:e) : bool =
       in_anf e1 && in_anf e2
   | E_set(x,e1) ->
       is_xc e1
-  | E_static_array_get(x,e1) ->
-      is_xc e1
-  | E_static_array_length _ ->
+  | E_array_length _ ->
       true
-  | E_static_array_set(x,e1,e2) ->
+  | E_array_get(x,e1) ->
+      is_xc e1
+  | E_array_set(x,e1,e2) ->
       is_xc e1 && is_xc e2
+  | E_matrix_size _ ->
+      true
+  | E_matrix_get(x,es) ->
+      List.for_all is_xc es
+  | E_matrix_set(x,es,e2) ->
+      List.for_all is_xc es && is_xc e2 
   | E_par(es) ->
       List.for_all in_anf es
   | E_absLabel(_,e1) ->

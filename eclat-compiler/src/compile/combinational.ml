@@ -47,11 +47,11 @@ let rec combinational (e:e) : bool =
 	    false
 	| E_reg _ | E_exec _ ->
 	    false (* have an internal state *)
-	| E_static_array_length _ ->
+	| E_array_length _ | E_matrix_size _ ->
 	    true
-	| E_static_array_get _ ->
+	| E_array_get _ | E_matrix_get _ ->
 	    false
-	| E_static_array_set _ ->
+	| E_array_set _ | E_matrix_set _ ->
 	    false (* side effect *)
 	| E_absLabel(_,e1) -> combinational e1
 	| E_appLabel(e1,_,_) -> combinational e1

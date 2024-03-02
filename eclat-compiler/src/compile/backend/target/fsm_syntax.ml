@@ -28,7 +28,9 @@ type op = If (* i.e., a multiplexer *)
         | TyConstr of ty
         | Compute_address
 
-type global = Static_array of c * int
+type global =
+  | Static_array of c * int
+  | Static_matrix of c * int list
 
 type a = A_letIn of x * a * a
   | A_tuple of a list
@@ -40,6 +42,7 @@ type a = A_letIn of x * a * a
   | A_ptr_write_taken of x
   | A_buffer_get of x
   | A_buffer_length of x * ty (* [ty] is the size of the resulting integer *)
+  | A_buffer_matrix_length of x * int * ty
   | A_decode of x * ty
   | A_encode of x * ty * int
 
@@ -53,10 +56,12 @@ type s = (* all instructions terminates in one clock cycle *)
   | S_if of x * s * s option
   | S_case of x * (c * s) list * s option
   | S_set of x * a
-  | S_setptr of x * a
+  | S_setptr_read of x * a
+  | S_setptr_write of x * a * a
+  | S_setptr_matrix_read of x * a list
+  | S_setptr_matrix_write of x * a list * a
   | S_ptr_take of x * bool
   | S_ptr_write_take of x * bool
-  | S_setptr_write of x * a * a
   | S_buffer_set of x
   | S_seq of s * s
   | S_letIn of x * a * s
@@ -125,6 +130,7 @@ let pp_tuple = Ast_pprint.pp_tuple
   | A_ptr_write_taken(x) -> fprintf fmt "ptr_write_taken<%s>" x
   | A_buffer_get(x) -> fprintf fmt "static_get_value(%s)" x
   | A_buffer_length(x,_) -> fprintf fmt "%s.length" x
+  | A_buffer_matrix_length(x,n,_) -> fprintf fmt "%s.(%d).length" x n
   | A_decode(x,_) -> fprintf fmt "decode(%s)" x
   | A_encode(x,_,n) -> fprintf fmt "encode(%s,%d)" x n
 
@@ -144,14 +150,23 @@ let pp_tuple = Ast_pprint.pp_tuple
       fprintf fmt "@]end case;";
   | S_set(x,a) ->
       fprintf fmt "@[<v>%s := %a;@]" x pp_a a
-  | S_setptr(x,idx) ->
+  | S_setptr_read(x,idx) ->
       fprintf fmt "@[<v>setptr<%s>[%a];@]" x pp_a idx
+  | S_setptr_write(x,idx,a) ->
+      fprintf fmt "@[<v>setptr<%s>[%a] <- %a;@]" x pp_a idx pp_a a
+  | S_setptr_matrix_read(x,idx_list) ->
+      fprintf fmt "@[<v>setptr_matrix<%s>" x;
+      List.iter (fun a -> fprintf fmt "[%a]" pp_a a) idx_list;
+      fprintf fmt "@]"
+  | S_setptr_matrix_write(x,idx_list,a) ->
+      fprintf fmt "@[<v>setptr_matrix<%s>" x;
+      List.iter (fun a -> fprintf fmt "[%a]" pp_a a) idx_list;
+      fprintf fmt " <- %a;@]" pp_a a;
+      fprintf fmt "@]"
   | S_ptr_take(x,b) ->
       fprintf fmt "@[<v>ptr_take<%s> := %b;@]" x b
   | S_ptr_write_take(x,b) ->
       fprintf fmt "@[<v>ptr_write_take<%s> := %b;@]" x b
-  | S_setptr_write(x,idx,a) ->
-      fprintf fmt "@[<v>(%s[%a] <- %a;@]" x pp_a idx pp_a a
   | S_buffer_set(x) ->
       fprintf fmt "@[<v>static_set<%s>_end;@]" x
   | S_seq(s1,s2) ->
@@ -166,7 +181,7 @@ let pp_tuple = Ast_pprint.pp_tuple
      fprintf fmt "@[%a(%a)@]" Operators.pp_op op pp_a a
 
   and pp_fsm fmt (ts,s) =
-    let pp_t fmt (x,s) = fprintf fmt "%s = %a@]@," x pp_s s in
+    let pp_t fmt (x,s) = fprintf fmt "@[%s = %a@]@," x pp_s s in
     fprintf fmt "@[<v>let rec ";
     pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "@,and ") pp_t fmt ts;
     fprintf fmt "@,@]in %a" pp_s s

@@ -55,10 +55,13 @@ type e =                      (** expression     [e]                       *)
   | E_fix of x * (p * e)      (** recursive function [fix (fun p -> e)]    *)
   | E_reg of (p * e) * e * l     (** register       [reg^l (fun p -> e) last e] *)
   | E_exec of e * e * l       (** exec           [(exec^l e default e)]    *)
-  | E_static_array_get of x * e     (** static array access     [x[e]]      *)
-  | E_static_array_length of x      (** static array length access x.length *)
-  | E_static_array_set of x * e * e (** static array assignment [x[e] <- e] *)
-  | E_par of e list                 (** parallel       [e1 || e2]              *)
+  | E_array_get of x * e      (** static array access        [x.(e)]      *)
+  | E_array_length of x       (** static array length access [x.length]   *)
+  | E_array_set of x * e * e  (** static array assignment    [x.(e) <- e] *)
+  | E_matrix_get of x * e list (** static matrix access       [x.(e).(e). ...]  *)
+  | E_matrix_size of x * int   (** static matrix size         [x.(n).size]     *)
+  | E_matrix_set of x * e list * e (** static matrix assignment   [x.(e).(e) ... <- e]  *)
+  | E_par of e list           (** parallel tuple             [e1 || e2 ... en] *)
 
     (* the following constructs are used internally *)
   | E_lastIn of x * e * e     (** local variable [var x = e in e]        *)
@@ -77,6 +80,7 @@ and lc = St_const of c | St_var of l
 
 type static =                 (* static toplevel data *)
   | Static_array of c * int   (** static global array [c^n] *)
+  | Static_matrix of c * int list (** static global array [c^n^...] *)
   | Static_const of c
 
 (** each program is a sequence of toplevel definitions (static arrays

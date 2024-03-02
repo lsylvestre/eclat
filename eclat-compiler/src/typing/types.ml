@@ -19,6 +19,10 @@ type ty =                (** type *)
       elem : ty ; (** static array of elements of type [elem], *)
       size : ty   (** parameterized by its size using a the size type [size] *)
     }
+  | T_matrix of {
+      elem : ty ; (** static array of elements of type [elem], *)
+      size : ty   (** parameterized by its size using a the size type [size] *)
+    }
   | T_static of ty
   (* sized types for check response time and static datastructures *)
   | T_size of int      (** n *)
@@ -113,6 +117,7 @@ let rec canon t =
   | T_string tz -> T_string (canon tz)
   | T_sum cs -> T_sum (List.map (fun (x,t) -> (x,canon t)) cs)
   | T_array {elem=t;size=tz} -> T_array {elem=canon t;size=canon tz}
+  | T_matrix {elem=t;size=tz} -> T_matrix {elem=canon t;size=canon tz}
   | T_static t -> T_static (canon t)
   | T_forall(x,t1,t2) -> T_forall(x,canon t1,canon t2)
   | (T_size _ | T_infinity | T_add _ | T_max _ | T_le _) as t -> simplify_size_constraints t

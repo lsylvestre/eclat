@@ -6,7 +6,9 @@ let fv_var xs x =
 
 let fv ?(get_arrays=true) ?(xs=SMap.empty) e =
   let open Ast in
-  let rec aux xs = function
+  let rec fv_list xs es =
+    List.fold_left (fun acc ei -> acc ++ aux xs ei) SMap.empty es
+  and aux xs = function
   | E_deco(e,_) ->
       aux xs e
   | E_var x ->
@@ -17,7 +19,7 @@ let fv ?(get_arrays=true) ?(xs=SMap.empty) e =
       aux xs e1 ++ aux xs e2 ++ aux xs e3
   | E_case(e1,hs,e_els) ->
       aux xs e1 ++
-      List.fold_left (fun acc (c,ei) -> (acc ++ aux xs ei)) SMap.empty hs ++
+      fv_list xs (List.map snd hs) ++
       aux xs e_els
   | E_match(e1,hs,eo) ->
       let s = aux xs e1 ++
@@ -43,7 +45,7 @@ let fv ?(get_arrays=true) ?(xs=SMap.empty) e =
       let xs' = SMap.add f () @@ (xs++ys) in
       aux xs' e
   | E_tuple(es) ->
-      List.fold_left (fun acc ei -> acc ++ aux xs ei) SMap.empty es
+      fv_list xs es
   | E_reg((p,e1), e0, _) ->
       let ys = vars_of_p p in
       let xs' = xs++ys in
@@ -59,22 +61,36 @@ let fv ?(get_arrays=true) ?(xs=SMap.empty) e =
       if get_arrays 
       then SMap.add x () vs 
       else vs
-  | E_static_array_get(x,e1) ->
+  | E_array_length(x) ->
+      if get_arrays 
+      then SMap.singleton x () 
+      else SMap.empty
+  | E_array_get(x,e1) ->
       let vs = aux xs e1 in
       if get_arrays 
       then SMap.add x () vs 
       else vs
-  | E_static_array_length(x) ->
-      if get_arrays 
-      then SMap.singleton x () 
-      else SMap.empty
-  | E_static_array_set(x,e1,e2) ->
+  | E_array_set(x,e1,e2) ->
       let vs = aux xs e1 ++ aux xs e2 in
       if get_arrays 
       then SMap.add x () vs 
       else vs
+  | E_matrix_size(x,_) ->
+      if get_arrays 
+      then SMap.singleton x () 
+      else SMap.empty
+  | E_matrix_get(x,es) ->
+      let vs = fv_list xs es in
+      if get_arrays 
+      then SMap.add x () vs 
+      else vs
+ | E_matrix_set(x,es,e) ->
+      let vs = fv_list xs es ++ aux xs e in
+      if get_arrays 
+      then SMap.add x () vs 
+      else vs
   | E_par(es) ->
-      List.fold_left (fun acc ei -> acc ++ aux xs ei) SMap.empty es
+      fv_list xs es
   | E_absLabel(l,e1) ->
       let xs' = SMap.add l () @@ xs in
       aux xs' e1

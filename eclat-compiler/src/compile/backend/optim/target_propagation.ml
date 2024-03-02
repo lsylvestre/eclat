@@ -28,6 +28,7 @@ let rec prop env a =
   | A_string_get _
   | A_buffer_get _
   | A_buffer_length _
+  | A_buffer_matrix_length _
   | A_encode _
   | A_decode _ ->  (* no sub-atoms*)
       a
@@ -44,10 +45,9 @@ let rec prop_s env s =
   | S_set(x,a) ->
       S_set(x,prop env a)
   | S_buffer_set _
-  | S_setptr _
-  | S_ptr_take _
-  | S_ptr_write_take _
-  | S_setptr_write _ -> s
+  | S_setptr_read _ | S_setptr_write _ 
+  | S_setptr_matrix_read _ | S_setptr_matrix_write _ 
+  | S_ptr_take _ | S_ptr_write_take _-> s
   | S_seq(s1,s2) -> S_seq(prop_s env s1,prop_s env s2)
   | S_letIn(x,a1,s1) ->
       let a1' = prop env a1 in

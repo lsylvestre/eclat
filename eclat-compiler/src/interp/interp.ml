@@ -67,6 +67,15 @@ let buffer_length x r =
   | None -> assert false (* ill typed *)
 
 
+let matrix_size x n =
+  assert false (* not yet implemented *)
+
+let matrix_get x vs r =
+  assert false (* not yet implemented *)
+
+let matrix_set x vs v r =
+  assert false (* not yet implemented *)
+
 let app_const e e2 r =
   let c = match e with
           | E_const c -> c
@@ -117,6 +126,14 @@ let rec red (e,r) =
    (fprintf fmt "i: ";
              SMap.iter (fun x e -> fprintf fmt "    (%s %a)\n" x pp_exp e) r;
              fprintf fmt "@,");*)
+  let rec red_list es r =
+    let rec aux acc es r =
+      match es with
+      | [] -> List.rev acc,r
+      | e1::es' -> let e1',r1 = red (e1,r) in
+                   aux (e1 :: acc) es' r1
+    in aux [] es r
+  in
   match e with
   | E_deco(e1,_) -> red (e1,r)
   | E_const _ | E_fun (_, _) | E_fix (_, _) | E_absLabel _ ->
@@ -222,28 +239,34 @@ let rec red (e,r) =
           E_tuple[v2;E_const(Bool false)], (add_r k e' r'')
   | E_par(es) ->
       (* [Par] *)
-      let rec red_list acc es r =
-        match es with
-        | [] -> List.rev acc,r
-        | e1::es' -> let e1',r1 = red (e1,r) in
-                     red_list (e1 :: acc) es' r1 in
-
-      let es',r' = red_list [] es r in
+      let es',r' = red_list es r in
       let e' = if List.for_all evaluated es'
                then E_tuple es'
                else E_par es' in
       e',r'
-  | E_static_array_get (x,e1) ->
+  | E_array_get (x,e1) ->
       if evaluated e1 then E_const (buffer_get x e1 r),r else
       let e1',r1 = red (e1,r) in
-      E_static_array_get (x,e1'),r1
-  | E_static_array_length(x) ->
+      E_array_get (x,e1'),r1
+  | E_array_length(x) ->
       E_const(buffer_length x r),r
-  | E_static_array_set (x,e1,e2) ->
+  | E_array_set (x,e1,e2) ->
       if evaluated e1 && evaluated e2 then E_const(Unit), set_buffer x e1 e2 r else
       let e1',r1 = red (e1,r) in
       let e2',r2 = red (e2,r1) in
-      E_static_array_set (x,e1',e2'),r2
+      E_array_set (x,e1',e2'),r2
+  | E_matrix_size(x,n) ->
+      E_const(matrix_size x n),r
+  | E_matrix_get(x,es) ->
+      if List.for_all evaluated es then E_const (matrix_get x es r),r else
+      let es',r1 = red_list es r in
+      E_matrix_get (x,es'),r1
+  | E_matrix_set(x,es,ev) ->
+      if List.for_all evaluated es && evaluated ev 
+      then E_const (matrix_set x es ev r),r else
+      let es',r1 = red_list es r in
+      let ev',r2 = red (ev,r1) in
+      E_matrix_set (x,es',ev'),r2
   | E_appLabel(e1,l,lc) -> 
       let e1',r' = red (e1,r) in
       if not (evaluated e1')
@@ -284,7 +307,8 @@ let prepare_statics (statics: (x * static) list) : c array SMap.t =
   smap_of_list statics |>
   SMap.map (function 
             | Static_array(c,n) -> Array.make n c
-            | Static_const c -> Array.make 1 c)
+            | Static_const c -> Array.make 1 c
+            | Static_matrix _ -> assert false (* not yet implemented *))
 
 
 let interp_pi (pi : pi) (value_list : e list) : (e * r) =

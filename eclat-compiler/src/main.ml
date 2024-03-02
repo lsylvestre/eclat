@@ -56,7 +56,7 @@ let () =
                   "type and exit.");
 
     ("-pp",      Arg.String Display_internal_steps.set_print_mode,
-                 "display the output of the specified (intermediates)\
+                 "display the output of the specified (intermediate)\
                  \ compilation pass specified.\n\tPossible values:\
                  \ [front;float;lift;spec;inl;prop;match;anf;middle-end].");
 

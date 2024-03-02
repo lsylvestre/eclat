@@ -4,7 +4,9 @@ open Ast_subst
 let applyed e =
   let open Ast in
 
-  let rec aux xs = function
+  let rec applied_list xs es =
+    List.fold_left (fun acc ei -> acc ++ aux xs ei) SMap.empty es
+  and aux xs = function
   | E_deco(e,_) ->
       aux xs e
   | E_var x ->
@@ -44,7 +46,7 @@ let applyed e =
       let xs' = SMap.add f () @@ (xs++ys) in
       aux xs' e
   | E_tuple(es) ->
-      List.fold_left (fun acc ei -> acc ++ aux xs ei) SMap.empty es
+      applied_list xs es
   | E_reg((p,e1), e0,_) ->
       let ys = vars_of_p p in
       let xs' = xs ++ ys in
@@ -56,14 +58,20 @@ let applyed e =
       aux xs e1 ++ aux xs' e2
   | E_set(x,e1) ->
       SMap.add x () @@ aux xs e1
-  | E_static_array_get(_,e1) ->
-      aux xs e1
-  | E_static_array_length(x) ->
+  | E_array_length _ ->
       SMap.empty
-  | E_static_array_set(_,e1,e2) ->
+  | E_array_get(_,e1) ->
+      aux xs e1
+  | E_array_set(_,e1,e2) ->
       aux xs e1 ++ aux xs e2
+  | E_matrix_size _ ->
+      SMap.empty
+  | E_matrix_get(_,es) ->
+      applied_list xs es
+  | E_matrix_set(_,es,e2) ->
+      applied_list xs es ++ aux xs e2
   | E_par(es) ->
-      List.fold_left (fun acc ei -> acc ++ aux xs ei) SMap.empty es
+      applied_list xs es
   | E_absLabel(_,e) ->
       aux xs e
   | E_appLabel(e,_,_) ->

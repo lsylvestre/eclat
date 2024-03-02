@@ -74,6 +74,12 @@ let int2bin ~int_size =
     done;
     Bytes.to_string buf
 
+let ptr_matrix_read x n = 
+  "$"^x^"_ptr_"^string_of_int n
+
+let ptr_matrix_write x n = 
+  "$"^x^"_ptr_write_"^string_of_int n
+
 
 (* lock-based support for concurrent memory accesses *)
 let ptr_taken x = "$"^x^"_ptr_take" 
@@ -211,6 +217,10 @@ and pp_a fmt = function
     pp_ident fmt (ptr_write_taken x)
 | A_buffer_length(x,tz) ->
     fprintf fmt  "std_logic_vector(to_unsigned(%a'length,%d))" pp_ident x (size_ty tz)
+| A_buffer_matrix_length(x,n,tz) ->
+    fprintf fmt  "std_logic_vector(to_unsigned(%a" pp_ident x;
+    for i = 0 to n - 1 do fprintf fmt "(0)" done;
+    fprintf fmt  "'length,%d))"  (size_ty tz)
 | A_encode(y,ty,n) ->
    fprintf fmt "%a%s" pp_ident y (let m = size_ty ty in if n = m then "" else "&"^const_zero (n-m))
 | A_decode(y,ty) ->
@@ -232,7 +242,7 @@ let rec pp_s ~st fmt = function
       fprintf fmt "@[<v 2>when others =>@,%a@]@," (pp_s ~st) s) so;
     fprintf fmt "@]end case;";
 | S_set(x,a) -> fprintf fmt "@[<v>%a := %a;@]" pp_ident x pp_a a
-| S_setptr(x,idx) -> (* todo: avoid code duplication between S_setptr & S_setptr_write *)
+| S_setptr_read(x,idx) -> (* todo: avoid code duplication between S_setptr & S_setptr_write *)
     (match idx with
     | A_const(Int{value=n}) ->
        fprintf fmt
@@ -240,12 +250,6 @@ let rec pp_s ~st fmt = function
     | _ ->
        fprintf fmt
          "@[%a <= to_integer(unsigned(%a));@]" pp_ident ("$"^x^"_ptr") pp_a idx)
-| S_ptr_take(x,b) ->
-    fprintf fmt
-      "@[%a(0) := '%d';@]" pp_ident (ptr_read_taken x) (if b then 1 else 0)
-| S_ptr_write_take(x,b) ->
-    fprintf fmt
-      "@[%a(0) := '%d';@]" pp_ident (ptr_write_taken x) (if b then 1 else 0)
 | S_setptr_write(x,idx,a) ->
     (match idx with
     | A_const(Int{value=n}) ->
@@ -258,6 +262,35 @@ let rec pp_s ~st fmt = function
          "@[%a <= '1';@]@," pp_ident ("$"^x^"_write_request");
     fprintf fmt
       "@[%a <= %a;@]" pp_ident ("$"^x^"_write") pp_a a;
+| S_setptr_matrix_read(x,idx_list) ->
+    List.iteri (fun i idx ->
+      match idx with
+      | A_const(Int{value=n}) ->    
+            fprintf fmt "@[%a <= %d;@]" pp_ident (ptr_matrix_read x i) n
+      | _ ->
+         fprintf fmt
+           "@[%a <= to_integer(unsigned(%a));@]" 
+            pp_ident (ptr_matrix_read x i) pp_a idx) (List.rev idx_list)
+| S_setptr_matrix_write(x,idx_list,a) ->
+    List.iteri (fun i idx ->
+      match idx with
+      | A_const(Int{value=n}) ->
+         fprintf fmt
+           "@[%a <= %d;@]@," pp_ident (ptr_matrix_write x i) n;
+      | _ ->
+         fprintf fmt
+           "@[%a <= to_integer(unsigned(%a));@]@," 
+              pp_ident (ptr_matrix_write x i) pp_a idx) (List.rev idx_list);
+    fprintf fmt "@[%a <= '1';@]@," 
+      pp_ident ("$"^x^"_write_request");
+    fprintf fmt "@[%a <= %a;@]" pp_ident ("$"^x^"_write") pp_a a;
+| S_ptr_take(x,b) ->
+    fprintf fmt
+      "@[%a(0) := '%d';@]" pp_ident (ptr_read_taken x) (if b then 1 else 0)
+| S_ptr_write_take(x,b) ->
+    fprintf fmt
+      "@[%a(0) := '%d';@]" pp_ident (ptr_write_taken x) (if b then 1 else 0)
+
 | S_buffer_set(x) ->
     fprintf fmt
       "@[%a <= '0';@]" pp_ident ("$"^x^"_write_request")
@@ -294,7 +327,13 @@ let default_zero_value nbits =
 (* default value according to the given type. *)
 let default_zero t =
   match Fsm_typing.canon t with
-  | TStatic _ -> "(others => (others => '0'))"
+  | TStatic{size=TTuple ts} ->
+     let rec aux ts =
+       match ts with
+       | [] -> "'0'"
+       | _::ts' -> "(others => "^aux ts'^")"
+      in aux ts
+  | TStatic{size=t} -> "(others => (others => '0'))"
   | _ -> "(others => '0')"
 
 let qualify prefix y =
@@ -331,6 +370,9 @@ let declare_machine fmt ~state_var ~compute ~infos (ts,s) =
 (* type array_value is array (0 to 20) of value(0 to 31); *)
 let pp_ty fmt t =
   match Fsm_typing.canon t with
+  | TStatic{elem;size=TTuple ts} -> 
+      fprintf fmt "array_value_%d" (size_ty elem);
+      List.iter (fun tsize -> fprintf fmt "(0 to %d)" (size_ty tsize - 1)) ts;
   | TStatic{elem;size} -> fprintf fmt "array_value_%d(0 to %d)" (size_ty elem) (size_ty size - 1);
   | _ ->
       fprintf fmt "value(0 to %d)" (size_ty t-1)
@@ -341,6 +383,14 @@ let pp_ty fmt t =
 module ArrayType = Map.Make(struct
     type t = int let compare = Stdlib.compare
   end)
+
+module MatrixType = Map.Make(struct
+    type t = int list * int
+    let compare v1 v2 =
+      let (l1,n1),(l2,n2) = v1,v2 in
+        Stdlib.compare (List.length l1,n2) (List.length l2,n2)
+  end)
+
 
 let declare_variable ~argument ~statics typing_env fmt =
   let var_decls = Hashtbl.create 10 in
@@ -366,7 +416,24 @@ let pp_component fmt ~vhdl_comment ~name ~state_var ~argument ~result ~compute ~
 
   let arty = List.fold_left (fun arty (_,g) ->
       match g with
-      | Static_array(c,_) -> ArrayType.add (size_const c) () arty) ArrayType.empty statics
+      | Static_array(c,_) -> ArrayType.add (size_const c) () arty
+      | _ -> arty) ArrayType.empty statics
+  in
+  let maty = List.fold_left (fun maty (_,g) ->
+      match g with
+      | Static_matrix(c,n_list) ->
+          let sz_c = size_const c in
+          let rec loop maty rev_n_list =
+            match rev_n_list with
+            | [] -> maty
+            | _::n_list' ->
+              let maty' = MatrixType.add (n_list,sz_c) () maty in
+              loop maty' n_list'
+          in
+          let rev_n_list = List.rev n_list in
+          let maty' = loop maty rev_n_list in
+          MatrixType.add ([List.hd rev_n_list-1],sz_c) () maty'
+      | _ -> maty) MatrixType.empty statics
   in
 
   Fsm_comp.SMap.iter (fun x _ -> Hashtbl.remove typing_env x;
@@ -411,7 +478,74 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
   ArrayType.iter (fun n _ ->
       fprintf fmt "type array_value_%d is array (natural range <>) of value(0 to %d);@," n (n-1)) arty;
 
-  List.iter (fun (x,Static_array(c,n)) ->
+  MatrixType.iter (fun w _ ->
+    match w with
+    | [],_ -> assert false
+    | ([m],n) ->
+        fprintf fmt "type array_value_%d_%d is array(0 to %d) of value(0 to %d);@," m n m (n-1)
+    | (rev_n_list,cz) ->
+      let n_list = rev_n_list in
+      fprintf fmt "type array_value";
+      List.iter (fun n -> fprintf fmt  "_%d" (n-1)) n_list;
+      fprintf fmt  "_%d" cz;
+      fprintf fmt " is array (0 to %d) of array_value" (List.hd n_list);
+      List.iter (fun n -> fprintf fmt  "_%d" (n-1)) (List.tl n_list);
+      fprintf fmt  "_%d" cz;
+      fprintf fmt ";@,"
+    ) maty;
+
+(*
+  List.iter (fun (x,st) -> 
+     match st with
+     | Static_array(c,_)
+     | Static_matrix(c,_) ->
+          
+          (match st with
+          | Static_array(_,n) ->
+              fprintf fmt "signal %a : array_value_%d(0 to %d)" pp_ident x (size_const c) (n-1);
+          | Static_matrix(c,n_list) -> 
+              fprintf fmt "signal %a : array_value_%d" pp_ident x (size_const c);
+              List.iter (fun n -> fprintf fmt "(0 to %d)" n) n_list;
+          );
+
+          if not(!ram_inference) then (
+           fprintf fmt " := (others => %a);@," pp_c c
+          ) else (fprintf fmt ";@,";
+                  if !intel_max10_target then (
+                    (** Intel MAX 10 FPGA device do not support memory initialization.
+                        (source: https://www.intel.com/content/www/us/en/support/programmable/articles/000074796.html
+                     *)
+                    Prelude.Errors.warning (fun fmt ->
+                        Format.fprintf fmt
+                          "Static array %s%a%s (RAM block): Intel MAX 10 FPGA device do not support memory initialization.\n"
+                          Prelude.Errors.bold
+                          pp_ident x
+                          Prelude.Errors.reset)
+                  )
+                  else (
+                    fprintf fmt "attribute %a_init_file : string;@," pp_ident x;
+                    fprintf fmt
+                       "attribute %a_init_file of %a : signal is \"init_file_%a.mif\";@,"
+                       pp_ident x
+                       pp_ident x
+                       pp_ident x));
+          fprintf fmt "signal %a : value(0 to %d);@," pp_ident ("$"^x^"_value") (size_const c - 1);
+          (match st with
+          | Static_array(_,n) ->
+            fprintf fmt "signal %a : natural range 0 to %d;@," pp_ident ("$"^x^"_ptr") (n - 1);
+            fprintf fmt "signal %a : natural range 0 to %d;@," pp_ident ("$"^x^"_ptr_write") (n - 1);
+          | Static_matrix(_,n_list) -> ());
+          fprintf fmt "signal %a : value(0 to %d);@," pp_ident ("$"^x^"_write") (size_const c - 1);
+          fprintf fmt "signal %a : std_logic := '0';@," pp_ident ("$"^x^"_write_request")
+
+        ) statics;
+*)
+
+
+
+  List.iter (fun (x,st) ->
+    match st with
+    | Static_array(c,n) ->
           fprintf fmt "signal %a : array_value_%d(0 to %d)" pp_ident x (size_const c) (n-1);
 
           if not(!ram_inference) then (
@@ -440,14 +574,43 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
           fprintf fmt "signal %a : natural range 0 to %d;@," pp_ident ("$"^x^"_ptr_write") (n - 1);
           fprintf fmt "signal %a : value(0 to %d);@," pp_ident ("$"^x^"_write") (size_const c - 1);
           fprintf fmt "signal %a : std_logic := '0';@," pp_ident ("$"^x^"_write_request")
-        ) statics;
+    
+    | Static_matrix(c,n_list) ->
+        fprintf fmt "signal %a : array_value" pp_ident x;
+        List.iter (fun n -> fprintf fmt "_%d" (n-1)) n_list;
+        fprintf fmt "_%d" (size_const c);
+        (* fprintf fmt "(0 to %d)" (size_const c - 1); *)
+        if not(!ram_inference) then (
+            fprintf fmt " := ";
+            List.iter (fun _ -> fprintf fmt "(others => ") n_list;
+            pp_c fmt c;
+            List.iter (fun _ -> fprintf fmt ")") n_list;
+            fprintf fmt ";@,";
+          )
+       else fprintf fmt ";@,";
+    
+      fprintf fmt "signal %a : value(0 to %d);@," pp_ident ("$"^x^"_value") (size_const c - 1);
+      
+      List.iteri (fun i n ->
+      fprintf fmt "signal %a : natural range 0 to %d;@," pp_ident (ptr_matrix_read x i) (n - 1);
+      fprintf fmt "signal %a : natural range 0 to %d;@," pp_ident (ptr_matrix_write x i) (n - 1)
+      ) n_list;
+      fprintf fmt "signal %a : value(0 to %d);@," pp_ident ("$"^x^"_write") (size_const c - 1);
+      fprintf fmt "signal %a : std_logic := '0';@," pp_ident ("$"^x^"_write_request")
+    
+
+
+    ) statics;
+
+
 
   fprintf fmt "@,@[<v 2>begin@,";
 
 
-  List.iter (fun (x,Static_array(c,n)) ->
-
-    fprintf fmt "process (clk)
+  List.iter (fun (x,st) ->
+    match st with
+    | Static_array(c,_) ->
+      fprintf fmt "process (clk)
             begin
             if (rising_edge(clk)) then
                  %s if %a = '1' then
@@ -468,6 +631,37 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
           pp_ident ("$"^x^"_ptr")
           (if !ram_inference then "--" else "");
 
+    | Static_matrix(c,n_list) ->
+      
+      fprintf fmt "process (clk)
+            begin
+            if (rising_edge(clk)) then
+                 %s if %a = '1' then
+                    %a%a <= %a;
+                 %s else
+                   %a <= %a%a;
+                 %s end if;
+            end if;
+        end process;@,@,"
+          (if !ram_inference then "--" else "")
+          pp_ident ("$"^x^"_write_request")
+          pp_ident x
+          (fun fmt () -> 
+            List.iteri (fun i _ -> 
+              fprintf fmt "(%a)" 
+                 pp_ident (ptr_matrix_write x i)) n_list) ()
+          pp_ident ("$"^x^"_write")
+          (if !ram_inference then "--" else "")
+          pp_ident ("$"^x^"_value")
+          pp_ident x
+          (fun fmt () -> 
+            List.iteri (fun i _ -> 
+              fprintf fmt "(%a)" 
+                 pp_ident (ptr_matrix_read x i)) n_list) ()
+          (if !ram_inference then "--" else "");
+
+
+
     ) statics;
 
 
@@ -476,7 +670,7 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
   declare_variable ~argument ~statics typing_env fmt;
 
 
-  List.iter (fun (x,Static_array(c,n)) ->
+  List.iter (fun (x,(Static_array _ | Static_matrix _)) ->
       decl_locks fmt x
   ) statics;
 
@@ -491,6 +685,8 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
       match List.assoc_opt x statics with
       | Some (Static_array(c,n)) ->
           () (* fprintf fmt "@]@,%a <= (others => %a);@,@[<hov>" pp_ident x pp_c c *)
+      | Some (Static_matrix _) ->
+          ()
       | None ->
           if x <> argument then
             fprintf fmt "default_zero(%a);@ @," pp_ident x

@@ -75,18 +75,24 @@ pi:
 | type_alias pi=pi { pi }
 | EOF { [],[],[] }
 
-static:
-| LET STATIC x=IDENT EQ w=const_init_static HAT n=INT_LIT SEMI_SEMI {
+static: /* todo: add loc and type annotation [tyopt] */
+| LET STATIC x=IDENT EQ w=const_init_static n=static_dim SEMI_SEMI {
+      let (ce,tyopt) = w in
+      let c = as_const $loc ce in 
+      (x,Static_array(c,n)) 
+  }
+| LET STATIC x=IDENT EQ w=const_init_static n=static_dim n_list=static_dim+ SEMI_SEMI {
       let (ce,tyopt) = w in
       let c = as_const $loc ce in
-      (* todo: add loc and type annotation [tyopt] *)
-      (x,Static_array(c,n)) 
+      (x,Static_matrix(c,n::n_list)) 
   }
 | LET STATIC x=IDENT EQ ec=aexp SEMI_SEMI {
       let c = as_const $loc ec in
       (x,Static_const c)
 
 }
+
+static_dim: HAT n=INT_LIT { n }
 
 
 const_init_static:
@@ -332,11 +338,20 @@ app_exp:
 app_exp_desc:
 | x=IDENT LEFT_ARROW e=aexp { E_set(x,e) }
 | x=IDENT LBRACKET e1=exp RBRACKET
-| x=IDENT DOT LPAREN e1=exp RPAREN { E_static_array_get(x,e1) }
-| x=IDENT DOT_LENGTH { E_static_array_length x }
+| x=IDENT DOT LPAREN e1=exp RPAREN
+   { E_array_get(x,e1) }
+| x=IDENT LBRACKET n=INT_LIT RBRACKET DOT_LENGTH 
+  { E_matrix_size(x,n) }
+| x=IDENT e1=dot_get { E_array_get(x,e1) }
+| x=IDENT e1=dot_get es=dot_get+ { E_matrix_get(x,e1::es) }
+/* | x=IDENT e1=dot_get es=dot_get+ DOT_LENGTH 
+  { E_matrix_size(x,List.length es - 1) }*/
+| x=IDENT DOT_LENGTH { E_array_length x }
 | x=IDENT LBRACKET e1=exp RBRACKET LEFT_ARROW e2=app_exp
-| x=IDENT DOT LPAREN e1=exp RPAREN LEFT_ARROW e2=app_exp 
-  { E_static_array_set(x,e1,e2) }
+| x=IDENT e1=dot_get LEFT_ARROW e2=app_exp 
+  { E_array_set(x,e1,e2) }
+| x=IDENT e1=dot_get es=dot_get+ LEFT_ARROW e2=app_exp 
+  { E_matrix_set(x,e1::es,e2) }
 | e=aexp  es=aexp+ ls=list(lblapp)
       { match e::es with
         | [e1;e2] -> (match un_annot e1 with
@@ -385,6 +400,9 @@ app_exp_desc:
     E_generate((P_var z,E_app(ef1,E_var z)),e_init2,e_st3,with_file $loc) }
 
 | e=aexp { e }
+
+dot_get:
+DOT LPAREN e=exp RPAREN { e }
 
 lc:
 | x=IDENT { St_var x }
