@@ -23,10 +23,12 @@ let rec map f e =
       E_match(f e1,List.map (fun (c,(p,e)) -> c,(p,f e)) hs,Option.map f eo)
   | E_letIn(p,e1,e2) ->
      E_letIn(p,f e1,f e2)
-  | E_lastIn(x,e1,e2) ->
-      E_lastIn(x,f e1,f e2)
-  | E_set(x,e1) ->
-      E_set(x,f e1)
+  | E_ref(e1) ->
+      E_ref(f e1)
+  | E_get(e1) ->
+      E_get(f e1)
+  | E_set(e1,e2) ->
+      E_set(f e1,f e2)
   | E_array_length _ ->
       e
   | E_array_get(x,e1) ->
@@ -77,10 +79,11 @@ let rec iter f (e:e) : unit =
       List.iter f es
   | E_fun(_,e) | E_fix(_,(_,e)) ->
       f e
-  | E_lastIn(_,e1,e2) ->
-      f e1; f e2
-  | E_set(_,e1) ->
+  | E_ref(e1) ->
       f e1
+  | E_get(e1) -> f e1
+  | E_set(e1,e2) ->
+      f e1; f e2
   | E_par(es) ->
       List.iter f es
    | E_reg((_,e1),e0,_) ->

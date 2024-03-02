@@ -53,11 +53,12 @@ let applyed e =
       aux xs' e1 ++ aux xs e0
   | E_exec(e1,e2,_) ->
       aux xs e1 ++ aux xs e2
-   | E_lastIn(x,e1,e2) ->
-      let xs' = SMap.add x () xs in
-      aux xs e1 ++ aux xs' e2
+  | E_ref e1 ->
+      aux xs e1
+  | E_get(x) ->
+      SMap.empty
   | E_set(x,e1) ->
-      SMap.add x () @@ aux xs e1
+      aux xs e1
   | E_array_length _ ->
       SMap.empty
   | E_array_get(_,e1) ->
@@ -118,7 +119,9 @@ let specialize ds e =
       )
     | E_app(e1,xc) ->
         E_app(spec funcs e1,xc)
-    | E_letIn(P_var x,((E_var _ | E_tuple _) as xc1),e2) ->
+    | E_letIn(P_var x,((E_var _ (*
+     | E_tuple _ *)
+     ) as xc1),e2) ->
         (* copy propagation to remove aliasing of global functions *)
         spec funcs (Ast_subst.subst_e x xc1 e2)
     | E_letIn(P_var x,((E_fun _| E_fix _) as e1),e2) ->
@@ -144,3 +147,5 @@ let specialize_pi pi =
   { pi with main }
   |> Let_floating.let_floating_pi  (* needed *)
   |> Propagation.propagation_pi    (* needed *)
+
+  (* todo: repeat until fixpoint *)

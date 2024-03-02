@@ -93,6 +93,9 @@ let pp_ty (fmt:fmt) (ty:ty) : unit =
   | T_static tz ->
       fprintf fmt "static<%a>"
         (pp_type ~paren:false) tz
+  | T_ref telem ->
+      fprintf fmt "ref<%a>"
+        (pp_type ~paren:false) telem
   | T_array{elem=t;size=tz} ->
       fprintf fmt "%a array<%a>"
         (pp_type ~paren:true) t
@@ -106,6 +109,8 @@ let pp_ty (fmt:fmt) (ty:ty) : unit =
         (pp_type ~paren:true) t1
         (pp_type ~paren:true) t2
   | T_size n ->
+      fprintf fmt "%d" n
+  | T_response_time n ->
       fprintf fmt "%d" n
   | T_infinity ->
       fprintf fmt "+∞"
@@ -270,15 +275,16 @@ let pp_exp (fmt:fmt) (e:e) : unit =
   | E_exec(e1,e2,x) ->
       fprintf fmt "(@[<v>exec[%s] %a default %a@])"
         x (pp_e ~paren:false) e1 (pp_e ~paren:false) e2
-  | E_lastIn(x,e1,e2) ->
-      fprintf fmt "(@[<v>last %a = %a in@,%a@])"
-        pp_ident x
-        (pp_e ~paren:false) e1
-        (pp_e ~paren:false) e2
-  | E_set(x,e1) ->
+  | E_ref(e1) ->
       parenthesize ~paren (fun fmt () ->
-        fprintf fmt "@[<v>%a <- %a@]"
-          pp_ident x (pp_e ~paren:false) e1) fmt ()
+        fprintf fmt "ref %a" (pp_e ~paren:true) e1) fmt ()
+  | E_get(e1) ->
+        fprintf fmt "!%a" (pp_e ~paren:true) e1
+  | E_set(e1,e2) ->
+      parenthesize ~paren (fun fmt () ->
+        fprintf fmt "@[<v>%a := %a@]"
+          (pp_e ~paren:true) e1
+          (pp_e ~paren:true) e2) fmt ()
   | E_array_length(x) ->
       fprintf fmt "@[<v>%a.length@]"
         pp_ident x

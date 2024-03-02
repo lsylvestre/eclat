@@ -71,8 +71,11 @@ and glob (e:e) : ((p * e) list * e) =
   | E_exec(e1,e0,l) ->
       let ds0,e0' = glob e0 in
       ds0,E_exec(let_floating e1,e0',l)
-  | E_lastIn(x,e1,e2) ->
-      [],E_lastIn(x,let_floating e1,let_floating e2)
+  | E_ref e1 ->
+      let ds1,e1' = glob e1 in
+      ds1,E_ref e1'
+  | E_get _ ->
+      [],e
   | E_set(x,e1) ->
       let ds1,e1' = glob e1 in
       ds1,E_set(x,e1')

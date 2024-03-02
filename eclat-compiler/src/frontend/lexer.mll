@@ -51,7 +51,8 @@
        "to", TO;
        "do", DO;
        "done", DONE;
-       "for", FOR
+       "for", FOR;
+       "ref", REF
      ]
 
 
@@ -99,6 +100,8 @@ rule token = parse
 | ">="                { GE }
 | "=="                { EQ_EQ }
 | "="                 { EQ }
+| ":="                { COL_EQ }
+| "!"                 { BANG }
 | "!=" | "<>"         { NEQ }
 | "&&"                { AMP_AMP }
 | "&"                 { AMP }

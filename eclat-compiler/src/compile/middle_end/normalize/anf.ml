@@ -30,6 +30,23 @@ open Pattern
       | fst x | snd x | ...
 *)
 
+let rec name_kont_in e k =
+  match e with
+  | E_var _  -> k e
+  | E_letIn(p,e1,e2) ->
+      E_letIn(p,e1,name_kont_in e2 k)
+  | E_if(e1,e2,e3) ->
+      E_if(e1,name_kont_in e2 k,name_kont_in e3 k)
+  | E_case(e,hs,e_els) ->
+      E_case(e,
+             List.map (fun (c,e) -> c,name_kont_in e k) hs,
+             name_kont_in e_els k)
+  | E_match(e,hs,eo) ->
+      E_match(e,
+              List.map (fun (x,(p,e)) -> x,(p,name_kont_in e k)) hs,
+              Option.map (fun e -> name_kont_in e k) eo)
+  | _ -> assert false
+
 let rec is_xc (e:e) : bool =
   match un_deco e with
   | E_deco(e,_) -> is_xc e
@@ -98,11 +115,14 @@ let rec anf (e:e) : e =
     | E_exec(e1,e0,l) ->
         plug (anf e0) @@ fun xc0 ->
         E_exec(anf e1,xc0,l)
-  | E_lastIn(x,e1,e2) ->
-      E_lastIn(x,anf e1,anf e2)
-  | E_set(x,e1) ->
+  | E_ref(e1) ->
       plug (anf e1) @@ fun xc1 ->
-      E_set(x,xc1)
+        E_ref(xc1)
+  | E_get(e1) ->
+      name_kont_in e1 (fun x -> E_get x)
+  | E_set(e1,e2) ->
+      name_kont_in e1 (fun x -> plug (anf e2) @@ 
+                           fun xc1 -> E_set(x,xc1))
   | E_array_length _ ->
       e
   | E_array_get(x,e1) ->
@@ -164,8 +184,8 @@ let rec in_anf (e:e) : bool =
       in_anf e1 && is_xc e0
   | E_exec(e1,e0,l) ->
        in_anf e1 && is_xc e0
-  | E_lastIn(x,e1,e2) ->
-      in_anf e1 && in_anf e2
+  | E_ref(e1) -> is_xc e1
+  | E_get _ -> true
   | E_set(x,e1) ->
       is_xc e1
   | E_array_length _ ->

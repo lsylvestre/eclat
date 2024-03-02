@@ -193,10 +193,11 @@ let globalize_e (e:e) : ((x * e) list * e) =
         let ds1,e1' = glob e1 in
         let ds2,e2' = glob e2 in
         ds1@ds2,E_letIn(p,e1',e2')
-    | E_lastIn(x,e1,e2) ->
+    | E_ref(e1) ->
         let ds1,e1' = glob e1 in
-        let ds2,e2' = glob e2 in
-        ds1@ds2,E_lastIn(x,e1',e2')
+        ds1,E_ref(e1')
+    | E_get _ ->
+        [], e
     | E_set(x,e1) ->
         let ds1,e1' = glob e1 in
         ds1,E_set(x,e1')

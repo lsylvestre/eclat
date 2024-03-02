@@ -53,14 +53,13 @@ let fv ?(get_arrays=true) ?(xs=SMap.empty) e =
   | E_exec(e1,e2,_k) ->
       (* _k is in a different name space than variables *)
       aux xs e1 ++ aux xs e2
-   | E_lastIn(x,e1,e2) ->
-      let xs' = SMap.add x () xs in (* todo *)
-      aux xs e1 ++ aux xs' e2
-  | E_set(x,e1) ->
-      let vs = fv_var xs x ++ aux xs e1 in
-      if get_arrays 
-      then SMap.add x () vs 
-      else vs
+  | E_ref(e1) ->
+      aux xs e1
+  | E_get(e1) ->
+      if get_arrays then aux xs e1 else SMap.empty
+  | E_set(e1,e2) ->
+      (if get_arrays then aux xs e1 else SMap.empty) 
+      ++ aux xs e2
   | E_array_length(x) ->
       if get_arrays 
       then SMap.singleton x () 

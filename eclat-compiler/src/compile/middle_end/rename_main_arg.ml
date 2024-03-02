@@ -6,7 +6,6 @@ let rec rename_main_arg_exp e =
   | E_fun(P_var x,e1) ->
       subst_e x (E_var "argument") e1
   | E_letIn(p,e1,e2) -> E_letIn(p,e1,rename_main_arg_exp e2)
-  | E_lastIn(p,e1,e2) -> E_lastIn(p,e1,rename_main_arg_exp e2)
   | E_if(e1,e2,e3) -> E_if(e1, rename_main_arg_exp e2, rename_main_arg_exp e3)
   | _ -> 
     Format.(fprintf std_formatter "==========>%a\n" Ast_pprint.pp_exp (e));

@@ -58,10 +58,7 @@ let inline_with_statics ~statics e =
         (* substitution is needed (rather than a let-binding)
            since e2 could be a function (fun x -> e3)       (* no, first order now *) (* ah ? *) *)
         inline @@ E_letIn(p,e2,e1)
-    | E_lastIn(x,e1,e2) ->
-        let y = gensym () in
-        E_lastIn(y,inline e1,subst_e x (E_var y) (inline e2))
-   
+
     | E_generate((p,e1),init,e_st3,loc) ->
         let (n,w) = eval_static_exp_int ~loc ~statics e_st3 in
         inline @@

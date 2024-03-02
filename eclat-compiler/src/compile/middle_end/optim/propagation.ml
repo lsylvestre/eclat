@@ -39,8 +39,9 @@ let linear_bindings (e:e) : set =
       aux e1; aux e0
   | E_exec(e1,e2,_) ->
       aux e1; aux e2
-   | E_lastIn(_,e1,e2) ->
-      aux e1; aux e2
+  | E_ref(e1) ->
+      aux e1
+  | E_get _ -> ()
   | E_set(_,e1) ->
       aux e1
   | E_array_length _ ->

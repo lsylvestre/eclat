@@ -22,6 +22,7 @@ type token =
   | RIGHT_ARROW
   | RESIZE_INT
   | REGISTER
+  | REF
   | REC
   | RBRACKET
   | QUOTE
@@ -77,9 +78,11 @@ type token =
   | DIV
   | DEFAULT
   | COMMA
+  | COL_EQ
   | COL
   | BOOL_LIT of (bool)
   | BIG_LAMBDA
+  | BANG
   | ASR
   | AND
   | AMP_AMP

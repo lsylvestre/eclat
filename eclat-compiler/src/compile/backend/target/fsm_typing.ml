@@ -117,9 +117,10 @@ let rec translate_ty =
       let n = List.fold_left (max) 0 @@ List.map (fun (_,t) -> size_ty (translate_ty t)) cs in
       TTuple[TInt(TSize size_tag);TVect(n)]
   | Types.T_size n -> TSize n
+  | Types.T_ref t -> translate_ty t
   | Types.T_array{elem=te;size=tz} -> TStatic{elem=translate_ty te;size=translate_ty tz}
   | Types.T_matrix{elem=te;size=tz} -> TStatic{elem=translate_ty te;size=translate_ty tz}
-  | Types.(T_infinity|T_fun _|T_add (_, _)|T_max (_, _)|T_le (_, _)) ->
+  | Types.(T_response_time _|T_infinity|T_fun _|T_add (_, _)|T_max (_, _)|T_le (_, _)) ->
      assert false (* already expanded *)
   | Types.T_forall _ -> assert false (* already expanded *)
 

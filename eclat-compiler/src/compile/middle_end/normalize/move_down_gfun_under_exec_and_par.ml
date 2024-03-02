@@ -39,9 +39,6 @@ module Deadcode_elimination = struct
     | E_exec(e1,e2,_) ->
         (* note: no recursive call on [e1] *)
         aux xs e2
-    | E_lastIn(x,e1,e2) ->
-        let xs' = SMap.add x () xs in
-        aux xs e1; aux xs' e2
     | E_par _ ->
         (* note: no recursive call *)
         ()

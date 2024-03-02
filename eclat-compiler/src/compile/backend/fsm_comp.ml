@@ -272,12 +272,22 @@ let rec to_s ~statics ~sums gs e x k =
   | E_app(E_const(Op(Runtime op)),a) ->
       (* in case of instantaneous call which is not combinatorial,
          e.g., a display function for debug  *)
-      SMap.empty, SMap.empty, return_ (S_call(op,to_a ~sums a))
+      SMap.empty, SMap.empty, seq_ (set_ x (A_const Unit)) @@
+                              return_ (S_call(op,to_a ~sums a))
 
-  | E_set(y,a) ->
-      let w,ts,s = to_s ~statics ~sums gs (E_const Unit) x k in
-      (w, ts, seq_ (set_ y (to_a ~sums a)) s)
-
+  | E_ref(a) -> SMap.empty, SMap.empty, 
+                return_ (set_ x (to_a ~sums a))
+  | E_get(ay) -> 
+      (match ay with
+      | E_var y -> SMap.empty, SMap.empty, 
+                 return_ (set_ x (A_var y))
+      | _ -> assert false)
+  | E_set(ay,a) ->
+      (match ay with
+       | E_var y ->
+          let w,ts,s = to_s ~statics ~sums gs (E_const Unit) x k in
+          (w, ts, seq_ (set_ y (to_a ~sums a)) s)
+       | _ -> assert false)
   | E_array_get(y,idx) ->
       let a = to_a ~sums idx in
       let q1 = Ast.gensym ~prefix:"pause_getI" () in
@@ -364,15 +374,6 @@ let rec to_s ~statics ~sums gs e x k =
              S_if(z, set_ res (to_a ~sums e0), None))) @@
       return_ @@ set_ x (A_tuple[A_var res;A_var rdy]))
 
-  | E_lastIn(y,e1,e2) ->
-     (* todo: check if e1 is indeed always an atom, or not ? *)
-     let w2,ts,s2 = to_s ~statics ~sums gs e2 x k in
-     let s = seq_ (let_plug_s (A_call(Runtime(Not),A_var (y^"_init"))) (fun z ->
-             S_if (z,
-                   seq_ (S_set(y,to_a ~sums e1))
-                        (S_set(y^"_init",A_const (Bool true))),
-                   None))) s2 in
-     (w2,ts,s)
   | E_par(es) ->
       let id_s = List.map (fun _ -> Ast.gensym ~prefix:"id" ()) es in
       let pi_s = List.map (fun e -> compile @@ Ast.{statics;sums;main=e}) es in

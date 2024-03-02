@@ -53,21 +53,22 @@ type e =                      (** expression     [e]                       *)
   | E_match of e * (x * (p * e)) list * e option (* sum type projection [match e with inj1 p1 -> e1 | ... ] *)
   | E_fun of p * e            (** function       [fun p -> e]              *)
   | E_fix of x * (p * e)      (** recursive function [fix (fun p -> e)]    *)
+  | E_par of e list           (** parallel tuple             [e1 || e2 ... en] *)
+
   | E_reg of (p * e) * e * l     (** register       [reg^l (fun p -> e) last e] *)
   | E_exec of e * e * l       (** exec           [(exec^l e default e)]    *)
+
   | E_array_get of x * e      (** static array access        [x.(e)]      *)
   | E_array_length of x       (** static array length access [x.length]   *)
   | E_array_set of x * e * e  (** static array assignment    [x.(e) <- e] *)
   | E_matrix_get of x * e list (** static matrix access       [x.(e).(e). ...]  *)
   | E_matrix_size of x * int   (** static matrix size         [x.(n).size]     *)
   | E_matrix_set of x * e list * e (** static matrix assignment   [x.(e).(e) ... <- e]  *)
-  | E_par of e list           (** parallel tuple             [e1 || e2 ... en] *)
 
-    (* the following constructs are used internally *)
-  | E_lastIn of x * e * e     (** local variable [var x = e in e]        *)
-  | E_set of x * e            (** assignment     [x <- e]
-                                  type checking must ensure that [x]
-                                  is bound using the var/in construct    *)
+  | E_ref of e
+  | E_get of e 
+  | E_set of e * e
+
   | E_absLabel of l * e       (** big lambda for binding labels *)
   | E_appLabel of e * l * lc  (** label application *)
 

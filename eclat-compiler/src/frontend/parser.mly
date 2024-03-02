@@ -41,7 +41,8 @@
 %token <string> STRING_LIT
 %token QUOTE TYPE
 %token TILDE PAR GENERATE
-%token FOR TO DO DONE
+%token FOR TO DO DONE 
+%token REF COL_EQ BANG
 %token BIG_LAMBDA 
 /* The precedences must be listed from low to high. */
 
@@ -191,7 +192,7 @@ ty_annot(X) :
         { x_ty_opt }
 
 ty:
-| arg=oty IMPLY ret=oty { T_fun{arg;dur=T_size 0;ret} }
+| arg=oty IMPLY ret=oty { T_fun{arg;dur=T_response_time 0;ret} }
 | arg=oty RIGHT_ARROW ret=oty { T_fun{arg;dur=(unknown());ret} }
 | arg=oty MINUS LBRACKET ty=ty RBRACKET RIGHT_ARROW ret=oty { T_fun{arg;dur=ty;ret} }
 | t=oty { t }
@@ -291,8 +292,6 @@ lexp_desc:
 | LET b=after_let(IN) e2=exp
         { let (p,e1) = b in
           E_letIn(p,e1,e2) }
-| VAR x=IDENT EQ e1=exp IN e2=exp
-        { E_lastIn(x,e1,e2) }
 | NODE b=fun_decl(IN) e2=exp
         { let (p,e1) = enforce_node b in
           E_letIn(p,e1,e2) }
@@ -336,7 +335,8 @@ app_exp:
   e=app_exp_desc { mk_loc (with_file $loc) e }
 
 app_exp_desc:
-| x=IDENT LEFT_ARROW e=aexp { E_set(x,e) }
+| ex=aexp COL_EQ e=aexp { E_set(ex,e) }
+| REF e=aexp            { E_ref e }
 | x=IDENT LBRACKET e1=exp RBRACKET
 | x=IDENT DOT LPAREN e1=exp RPAREN
    { E_array_get(x,e1) }
@@ -412,6 +412,7 @@ aexp:
   e=aexp_desc { mk_loc (with_file $loc) e }
 
 aexp_desc:
+| BANG ex=aexp { E_get(ex) }
 | LPAREN e=exp RPAREN { e }
 | LPAREN e=exp COL ty=ty RPAREN { ty_annot ~ty e }
 | c=const { E_const c }

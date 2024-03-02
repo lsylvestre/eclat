@@ -41,7 +41,8 @@ let () =
 
     ("-int",     Arg.Int Fix_int_lit_size.set_size,
                  "force litteral integers to be of the given size");
-
+    ("-mono",    Arg.Set Typing.monomorphic,
+                 "monomorphic type system");
     ("-interp",   Arg.Set interp_flag,
                  "interprete and exit.");
 

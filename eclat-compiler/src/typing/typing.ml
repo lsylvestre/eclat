@@ -7,6 +7,9 @@ let relax_flag = ref false
 
 let pp_ty = Ast_pprint.pp_ty
 
+let monomorphic = ref false
+let signatures = Hashtbl.create 10 
+
 let rec occur v ty =
   let exception Found in
   let rec f = function
@@ -23,6 +26,7 @@ let rec occur v ty =
       f tz
   | T_sum cs ->
       List.iter (fun (_,ty) -> f ty) cs
+  | T_ref(t) -> f t
   | T_array{elem=t;size=tz} ->
       f t; f tz
   | T_matrix{elem=t;size=tz} ->
@@ -30,7 +34,8 @@ let rec occur v ty =
   | T_static t -> f t
   | T_forall(_,t1,t2) ->
       f t1; f t2
-  | (T_size _ | T_infinity) -> ()
+  | T_size _ -> ()
+  | (T_response_time _ | T_infinity) -> ()
   | T_max(tz1,tz2) | T_add(tz1,tz2) | T_le(tz1,tz2) ->
       f tz1; f tz2
   in try f ty; false with Found -> true
@@ -57,6 +62,7 @@ let rec occur v ty =
         vars s tz
     | T_sum cs ->
         List.fold_left (fun s (_,t) -> vars s t) s cs
+    | T_ref t -> vars s t
     | T_array{elem=t;size=tz} ->
         vars (vars s t) tz
     | T_matrix{elem=t;size=tz} ->
@@ -64,7 +70,8 @@ let rec occur v ty =
     | T_static tz -> vars s tz
     | T_forall(_,t1,t2) ->
         vars (vars s t1) t2
-    | T_size _ | T_infinity -> s
+    | T_size _ -> s
+    | T_response_time _ | T_infinity -> s
     | T_max(t1,t2) | T_add(t1,t2) | T_le(t1,t2) ->
         vars (vars s t1) t2
     in
@@ -94,13 +101,15 @@ let rec occur v ty =
      | T_string tz ->
         T_string(instance tz)
      | T_sum cs -> T_sum (List.map (fun (x,t) -> (x,instance t)) cs)
+     | T_ref t -> T_ref (instance t)
      | T_array{elem=t;size=tz} ->
         T_array{elem=instance t;size=instance tz}
      | T_matrix{elem=t;size=tz} ->
         T_matrix{elem=instance t;size=instance tz}
      | T_forall(x,t1,t2) ->
         T_forall(x,instance t1,instance t2)
-     | (T_size _ | T_infinity) as t -> t
+     | T_size _ as t -> t
+     | (T_response_time _ | T_infinity) as t -> t
      | T_max(t1,t2) -> T_max(instance t1,instance t2)
      | T_add(t1,t2) -> T_add(instance t1,instance t2)
      | T_le(t1,t2) -> T_le(instance t1,instance t2)
@@ -116,8 +125,11 @@ let rec occur v ty =
       Vs.empty l
 
   let generalize r ty =
-    let fvg = free_vars_of_type_env r in
-    Forall(free_vars_of_type (fvg,ty),ty)
+    match canon ty with
+    | T_var{contents=Ty (T_fun _)} | T_fun _ ->
+        let fvg = free_vars_of_type_env r in
+        Forall(free_vars_of_type (fvg,ty),ty)
+    | ty -> Forall(Vs.empty,ty)
 
   let tvar_a = T_var (ref (Unknown (-1)))
   let tvar_b = T_var (ref (Unknown (-2)))
@@ -142,15 +154,13 @@ let rec unify ~loc t1 t2 =
   let unify_tconst tc1 tc2 =
     match tc1,tc2 with
     | TInt tz, TInt tz' ->
-        (* if not (Fix_int_lit_size.is_set ()) then () else begin
-          unify ~loc tz (T_size (Fix_int_lit_size.get_size_type ()))
-         end; *)
-        unify ~loc tz tz'
+        unify ~loc tz tz'  
     | TBool,TBool | TUnit,TUnit -> ()
     | _ -> raise @@ CannotUnify(t1,t2,loc)
   in
   (* Format.(fprintf std_formatter "%a / %a\n" pp_ty  t1 pp_ty t2); *)
-  match canon t1, canon t2 with
+  let t1,t2 = canon t1, canon t2 in
+  match t1, t2 with
   | T_var {contents=(Unknown n)},
     T_var ({contents=Unknown m} as v) ->
       if n = m then () else v := Ty t1
@@ -184,6 +194,8 @@ let rec unify ~loc t1 t2 =
       List.iter2 (fun (x1,t1) (x2,t2) ->
         if x1 <> x2 then raise (CannotUnify (t1,t2,loc));
         unify ~loc t1 t2) cs cs'
+  | T_ref t1', T_ref t2' ->
+      unify ~loc t1' t2'
   | T_array{elem=t;size=tz},T_array{elem=t';size=tz'} ->
       unify ~loc t t';
       unify ~loc tz tz'
@@ -196,19 +208,22 @@ let rec unify ~loc t1 t2 =
       if x <> x' then raise (CannotUnify (t1,t2,loc));
       unify ~loc tt1 tt1';
       unify ~loc tt2 tt2'
-  | (T_size _ | T_infinity | T_add _ | T_max _ | T_le _),
-    (T_size _ | T_infinity | T_add _ | T_max _ | T_le _) ->
-    let t1 = simplify_size_constraints t1 in
-    let t2 = simplify_size_constraints t2 in
+  | T_size n,T_size m ->
+      if n <> m then raise (CannotUnify (t1,t2,loc))
+  | (T_response_time _ | T_infinity | T_add _ | T_max _ | T_le _),
+    (T_response_time _ | T_infinity | T_add _ | T_max _ | T_le _) ->
+    let t1 = simplify_response_time t1 in
+    let t2 = simplify_response_time t2 in
     (match t1, t2 with
-    | T_size n, T_size m ->
+    | T_response_time n, T_response_time m ->
         if n <> m then raise (CannotUnify (t1,t2,loc))
-    | T_size n, T_add(T_size m,a)
-    | T_add(T_size m,a), T_size n ->
+    | T_response_time n, T_add(T_response_time m,a)
+    | T_add(T_size m,a), T_response_time n ->
         if n >= m then
-          unify ~loc (T_size (n - m)) a
+          unify ~loc (T_response_time (n - m)) a
         else raise (CannotUnify (t1,t2,loc))
-    | T_infinity, T_size _ | T_size _,T_infinity -> raise (CannotUnify (t1,t2,loc))
+    | T_infinity, T_response_time _ | T_response_time _,T_infinity -> 
+        raise (CannotUnify (t1,t2,loc))
     | _ -> ())
     | _ -> raise (CannotUnify (t1,t2,loc))
 
@@ -253,18 +268,28 @@ let ty_op ~loc op =
       Operators.ty_op p
   | Wait n ->
       let v = unknown () in
-      fun_ty v (T_size n) v
+      fun_ty v (T_response_time n) v
   | TyConstr ty ->
      let v = unknown() in
      unify ~loc ty v;
-     fun_ty ty (T_size 0) v
+     fun_ty ty (T_response_time 0) v
   | GetTuple{pos;arity} ->
       let ts = List.init arity (fun _ -> unknown ()) in
       assert (0 <= pos && pos <= arity);
-      fun_ty (group_ts ts) (T_size 0) (List.nth ts pos)
+      fun_ty (group_ts ts) (T_response_time 0) (List.nth ts pos)
 
 let rec typ_const ~loc g = function
-| Int(_,tz) -> (* TODO, add a type constraint according to the size of the literal *)
+| Int(n,tz) -> (* TODO, add a type constraint according to the size of the literal *)
+    (match canon tz with
+    | T_var({contents=Ty (T_size k)}) | T_size k -> 
+        if int_of_float (Float.ceil (Float.log2 (float (n+1)))) > k then (* unsigned *) 
+          let open Prelude.Errors in
+          error ~loc (fun fmt ->
+          Format.fprintf fmt
+          "@[<v>Literal interger %d cannot be represented using an int<%d>.@]"
+                n k)
+    | _ -> () (* uncomplete verification, will be complete during type checking of the generate code *)
+    );
     tint tz
 | Bool _ -> tbool
 | Unit -> tunit
@@ -277,7 +302,7 @@ let rec typ_const ~loc g = function
 | Inj x ->
     typ_ident g x loc
 
-
+(* seems not required *)
 let rec non_expansive = function
   | E_deco(e,_) -> non_expansive e
   | E_app(e1,_) ->
@@ -301,6 +326,41 @@ let rec non_expansive = function
 
 exception Functional
 
+let base_type t =
+  let exception Not_a_base_type in
+  let rec aux t =
+    match t with
+    | T_const _ -> ()
+    | T_var{contents=Unknown _} -> ()
+    | T_var{contents=Ty t} -> aux t
+    | T_tuple (ts) ->
+        List.iter aux ts
+    | T_fun _ ->
+        raise Not_a_base_type
+    | T_string _ ->
+        raise Not_a_base_type
+    | T_sum(cs) ->
+        List.iter (fun (_,t) -> aux t) cs
+    | T_ref _
+    | T_array _
+    | T_matrix _ -> raise Not_a_base_type
+    | T_forall(_,_,t2) -> aux t2
+    | (T_size _ | T_response_time _ | T_infinity | T_add _ | T_max _ | T_le _) ->
+        assert false
+    | T_static t1 -> aux t1
+  in
+  try aux t; true with 
+  | Not_a_base_type -> false
+
+let check_base_type ~loc t =
+  if base_type t then () else
+  let open Prelude.Errors in
+      error ~loc (fun fmt ->
+      Format.fprintf fmt
+        "@[<v>This expression has type %a. It should be a base type.@]"
+                 (emph_pp green pp_ty) (canon t))
+
+
 let rec contain_fun t =
   match t with
   | T_const _ -> ()
@@ -313,10 +373,12 @@ let rec contain_fun t =
   | T_string _ -> ()
   | T_sum(cs) ->
       List.iter (fun (_,t) -> contain_fun t) cs
+  | T_ref t1 -> contain_fun t1
   | T_array {elem=t;size=tz} -> contain_fun t
   | T_matrix {elem=t;size=tz} -> contain_fun t
   | T_forall(_,_,t2) -> contain_fun t2
-  | (T_size _ | T_infinity | T_add _ | T_max _ | T_le _) -> ()
+  | T_size _ -> ()
+  | (T_response_time _ | T_infinity | T_add _ | T_max _ | T_le _) -> ()
   | T_static t1 -> contain_fun t1
 
 let check_conditional_shape ~loc e t =
@@ -351,8 +413,8 @@ let check_app_shape ~loc e tret =
 
 (* Subtyping_relation *)
 module Response_time = struct
-  let zero = T_size 0
-  let one = T_size 1
+  let zero = T_response_time 0
+  let one = T_response_time 1
   let infinity = T_infinity
   let max n m = T_max (n,m)
   let add n m = T_add (n,m)
@@ -382,10 +444,10 @@ let typ_lc ~statics g ~loc lc =
 
 let trace_last_exp = ref (E_const Unit) (* fake *)
 
-let rec typ_exp ~statics ~sums ~toplevel ~loc (g:env) e =
+let rec typ_exp ?(collect_sig=false) ~statics ~sums ~toplevel ~loc (g:env) e =
   trace_last_exp := e;
   match e with
-  | E_deco(e,loc) -> typ_exp ~statics ~sums ~toplevel ~loc g e
+  | E_deco(e,loc) -> typ_exp ~collect_sig ~statics ~sums ~toplevel ~loc g e
   | E_const c ->
       (typ_const ~loc g c, Response_time.zero)
   | E_var(x) ->
@@ -394,22 +456,23 @@ let rec typ_exp ~statics ~sums ~toplevel ~loc (g:env) e =
                else typ_ident g x loc in 
       (tx, Response_time.zero)
   | E_if(e1,e2,e3) ->
-      let t1,n1 = typ_exp ~statics ~sums ~toplevel:false ~loc g e1 in
-      let t2,n2 = typ_exp ~statics ~sums ~toplevel:false ~loc g e2
-      and t3,n3 = typ_exp ~statics ~sums ~toplevel:false ~loc g e3 in
+      let t1,n1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
+      let t2,n2 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e2
+      and t3,n3 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e3 in
       unify ~loc t1 tbool;
       unify ~loc t2 t3;
       (** NB: [t2 <= t3] (according to the subtyping relation).
           So the conditional has type [t3] (that is not [t2] !) *)
       let t = t3 in
+      check_base_type ~loc t;
       check_conditional_shape ~loc e t;
       (t,Response_time.(add n1 (max n2 n3)))
   | E_case(e1,hs,e_els) ->
-      let t1,n1 = typ_exp ~statics ~sums ~toplevel:false ~loc g e1 in
+      let t1,n1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
       List.iter (fun (c,_) -> unify ~loc (typ_const ~loc g c) t1) hs;
-      let t_els,n_els = typ_exp ~statics ~sums ~toplevel:false ~loc g e_els in
+      let t_els,n_els = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e_els in
       let ns = List.map (fun (_,ei) ->
-        let t,n = typ_exp ~statics ~sums ~toplevel:false ~loc g ei in
+        let t,n = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g ei in
         unify ~loc:(loc_of ei) t_els t; n) hs in
       let n = Response_time.add n1 (List.fold_left Response_time.max n_els ns) in
       t_els,n
@@ -417,7 +480,7 @@ let rec typ_exp ~statics ~sums ~toplevel ~loc (g:env) e =
       let error_unbound_constructor ctor =
         Prelude.Errors.error ~loc (fun fmt -> Format.fprintf fmt "Unbound constructor %s" ctor)
       in
-      let t1,n1 = typ_exp ~statics ~sums ~toplevel:false ~loc g e1 in
+      let t1,n1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
       let c_witness = match hs with (x,_)::_ -> x | _ -> assert false in
       let _,sum,_ = try Types.find_ctor c_witness sums
                     with Not_found -> error_unbound_constructor c_witness in
@@ -429,12 +492,12 @@ let rec typ_exp ~statics ~sums ~toplevel ~loc (g:env) e =
                      | None -> error_unbound_constructor inj
          in
          let g' = env_extend ~loc g p t_inj in
-         let t',dur = typ_exp ~statics ~sums ~toplevel:false ~loc g' ei in
+         let t',dur = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g' ei in
          unify ~loc t' v;
          r := T_max(!r,dur)) hs;
 
       Option.iter (fun ew ->
-         let t',dur = typ_exp ~statics ~sums ~toplevel:false ~loc g ew in
+         let t',dur = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g ew in
          unify ~loc t' v) eo;
 
       let ctors = smap_of_list (List.map (fun (x,_) -> x,()) hs) in
@@ -443,31 +506,46 @@ let rec typ_exp ~statics ~sums ~toplevel ~loc (g:env) e =
         Prelude.Errors.error ~loc (fun fmt ->
           Format.fprintf fmt "This pattern-matching is not exhaustive.")
       );
-
-      v,T_add(n1,!r)
+      let t = !r in
+      check_base_type ~loc t;
+      v,T_add(n1,t)
   | E_tuple(es) ->
       let ts,ns = List.split @@ List.map (fun ei ->
-                    typ_exp ~statics ~sums ~toplevel:false ~loc g ei) es
+                    typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g ei) es
       in
       let n = List.fold_left Response_time.add Response_time.zero ns in
       T_tuple ts,n
   | E_fun(p,e1) ->
       let v = unknown() in
       let g' = env_extend ~loc g p v in
-      let t,dur = typ_exp ~statics ~sums ~toplevel:false ~loc g' e1 in
+      let t,dur = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g' e1 in
+      check_base_type ~loc t;
+      (* Format.fprintf Format.std_formatter "=========> %a\n" pp_ty ( v); *)
       (T_fun{arg=v;dur;ret=t}, Response_time.zero)
   | E_app(e1,e2) ->
-      let t1,n1 = typ_exp ~statics ~sums ~toplevel:false ~loc g e1 in
-      let t2,n2 = typ_exp ~statics ~sums ~toplevel:(toplevel && is_TyConstr e1) ~loc g e2 in
-      let t = unknown () in
-      let n = unknown () in
-      unify ~loc:(loc_of e1) (T_fun{arg=t2;dur=n;ret=t}) t1; (* t1 in second for subtyping *)
-      check_app_shape ~loc e t;
-      (t, Response_time.(add n (add n1 n2)))
+      (match un_deco e1 with
+      | E_const (Op (TyConstr ty)) ->
+         let t2,n2 = typ_exp ~collect_sig ~statics ~sums ~toplevel:toplevel ~loc:(loc_of e2) g e2 in
+         unify ~loc:(loc_of e2) ty t2;
+         t2,n2
+      | _ ->
+        let t1,n1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc:(loc_of e1) g e1 in
+        let t2,n2 = typ_exp ~collect_sig ~statics ~sums ~toplevel:(toplevel && is_TyConstr e1) ~loc:(loc_of e2) g e2 in
+        let t = unknown () in
+        let n = unknown () in
+        unify ~loc:(loc_of e1) (T_fun{arg=t2;dur=n;ret=t}) t1; (* t1 in second for subtyping *)
+        (* Format.fprintf Format.std_formatter "~~~~~~====> %a\n" pp_ty (t); *)
+        check_base_type ~loc t;
+        if collect_sig then (
+          match e1 with
+          | E_var f -> Hashtbl.add signatures f t1 
+          | E_const _ -> ()
+          | _ -> assert false (* compilation error ! *)
+        );
+        (t, Response_time.(add n (add n1 n2))))
   | E_letIn(p,e1,e2) ->
-      let t1,n1 = typ_exp ~statics ~sums ~toplevel:false ~loc g e1 in
-      let gen = non_expansive e1 in
-      let g' = env_extend ~loc ~gen g p t1 in
+      let t1,n1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
+      let g' = env_extend ~loc ~gen:(not !monomorphic) g p t1 in
       (if toplevel && !print_signature_flag then
        begin
         let open Prelude.Errors in
@@ -483,9 +561,7 @@ let rec typ_exp ~statics ~sums ~toplevel ~loc (g:env) e =
         ) end;
         fprintf std_formatter "val %a : %a\n" Ast_pprint.pp_pat p pp_ty (canon t1);
        end);
-
-      let t2,n2 = typ_exp ~statics ~sums ~toplevel ~loc g' e2 in
-
+      let t2,n2 = typ_exp ~collect_sig ~statics ~sums ~toplevel ~loc:(loc_of e2) g' e2 in
       (t2, Response_time.add n1 n2)
   | E_fix(f,(x,e1)) ->
       let t1 = unknown () in
@@ -494,50 +570,66 @@ let rec typ_exp ~statics ~sums ~toplevel ~loc (g:env) e =
                       dur = Response_time.(add one (unknown()));
                       ret = t2 } in
       let g' = env_extend ~loc g (P_var f) tf in
-      let t,n = typ_exp ~statics ~sums ~toplevel:false ~loc g' (E_fun(x,e1)) in
+      let t,n = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g' (E_fun(x,e1)) in
       (** NB: [t <= tf] (according to the subtyping relation) *)
-      (* unify ~loc t tf; *)
+      unify ~loc:(loc_of e1) tf t; (* fait planter la VM *)
+      check_base_type ~loc t1;
+      check_base_type ~loc t2;
       (tf, n)
   | E_reg((p,e1),e0,_) ->
-     let t0,n0 = typ_exp ~statics ~sums ~toplevel:false ~loc g e0 in
+     let t0,n0 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e0 in
      let g' = env_extend ~loc g p t0 in
-     let t1,n1 = typ_exp ~statics ~sums ~toplevel:false ~loc g' e1 in
+     let t1,n1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g' e1 in
      unify ~loc t0 t1;
      unify ~loc n0 Response_time.zero;
-     (* unify ~loc n1 Response_time.zero;*)
-     (t0, n1(* Response_time.zero*))
+     unify ~loc n1 Response_time.zero;
+     check_base_type ~loc t0;
+     (t0, Response_time.zero)
   | E_exec(e1,e2,_) ->
-     let t1,_ = typ_exp ~statics ~sums ~toplevel:false ~loc g e1 in
-     let t2,n2 = typ_exp ~statics ~sums ~toplevel:false ~loc g e2 in
+     let t1,_ = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
+     let t2,n2 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e2 in
      unify ~loc t1 t2;
      unify ~loc n2 Response_time.zero;
+     check_base_type ~loc:(loc_of e1) t1;
      (T_tuple[t1;tbool], Response_time.zero)
   | E_par(es) ->
     let ts,ns = List.split @@ List.map (fun ei ->
-                    typ_exp ~statics ~sums ~toplevel:false ~loc g ei) es
+                    let ti,n = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g ei in
+                    check_base_type ~loc:(loc_of ei) ti;
+                    ti,n) es
     in
     let n = List.fold_left Response_time.max Response_time.zero ns in
     T_tuple ts,n
-  | E_set (x,e1) ->
-     let t1,n = typ_exp ~statics ~sums ~toplevel:false ~loc g e1 in
-     unify ~loc n Response_time.zero;
-     let t2 = typ_ident g x loc in
-     unify ~loc t1 t2;
-     (T_const TUnit, Response_time.zero)
+  | E_ref(e1) ->
+      let t1,n = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
+      check_base_type ~loc:(loc_of e1) t1;
+      (T_ref(t1),n)
+  | E_get(e1) ->
+     let t1,n = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
+     let t2 = unknown () in
+     unify ~loc:(loc_of e1) (T_ref(t2)) t1;
+     check_base_type ~loc t2;
+     (t2, n)
+  | E_set (e1,e2) ->
+     let t1,n = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
+     let t2,n = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e2 in  
+     unify ~loc:(loc_of e1) (T_ref(t2)) t1;
+     check_base_type ~loc t2;
+     (T_const TUnit, n)
   | E_array_length(x) ->
-     let tx =  typ_ident g x loc in
+     let tx = typ_ident g x loc in
      unify ~loc (T_array{elem=unknown();size=unknown()}) tx;
      (tint (unknown()), Response_time.zero)
   | E_array_get(x,e1) ->
-     let t1,n = typ_exp ~statics ~sums ~toplevel:false ~loc g e1 in
+     let t1,n = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
      unify ~loc t1 (tint (unknown()));
      let tx = typ_ident g x loc in
      let t3 = unknown() in
      unify ~loc (T_array{elem=t3;size=(unknown())}) tx;
      (t3, n)
   | E_array_set(x,e1,e2) ->
-     let t1,n = typ_exp ~statics ~sums ~toplevel:false ~loc g e1 in
-     let t2,m = typ_exp ~statics ~sums ~toplevel:false ~loc g e2 in
+     let t1,n = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
+     let t2,m = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e2 in
      unify ~loc t1 (tint (unknown()));
      let t3 = typ_ident g x loc in
      unify ~loc (T_array{elem=t2;size=(unknown())}) t3;
@@ -550,7 +642,7 @@ let rec typ_exp ~statics ~sums ~toplevel ~loc (g:env) e =
      t, Response_time.zero
   | E_matrix_get(x,es) ->
      let ts,ns = List.split @@ List.map (fun ei ->
-                    typ_exp ~statics ~sums ~toplevel:false ~loc g ei) es in
+                    typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g ei) es in
      List.iter (fun ti -> unify ~loc ti (tint (unknown()))) ts;
      let tx = typ_ident g x loc in
      let t3 = unknown() in
@@ -559,29 +651,22 @@ let rec typ_exp ~statics ~sums ~toplevel ~loc (g:env) e =
      (t3, n)
   | E_matrix_set(x,es,e2) ->
      let ts,ns = List.split @@ List.map (fun ei ->
-                    typ_exp ~statics ~sums ~toplevel:false ~loc g ei) es in
+                    typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g ei) es in
      List.iter (fun ti -> unify ~loc ti (tint (unknown()))) ts;
 
-     let t2,m = typ_exp ~statics ~sums ~toplevel:false ~loc g e2 in
+     let t2,m = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e2 in
      let tx = typ_ident g x loc in
      unify ~loc (T_matrix{elem=t2;size=T_tuple (List.map (fun _ -> unknown()) es)}) tx;
      let n = List.fold_left Response_time.add m ns in
      (T_const TUnit, n)
- | E_lastIn(x,e1,e2) ->
-      let t1,n1 = typ_exp ~statics ~sums ~toplevel:false ~loc g e1 in
-      let g' = env_extend ~loc g (P_var x) t1 in
-      unify ~loc n1 Response_time.zero;
-      let t2,n2 = typ_exp ~statics ~sums ~toplevel:false ~loc g' e2 in
-      unify ~loc n2 Response_time.zero;
-      (t2, Response_time.zero)
   | E_absLabel(l,e1) ->
       let t2 = unknown() in
       let statics' = (l,t2)::statics in
-      let t1,n1 = typ_exp ~statics:statics' ~sums ~toplevel:false ~loc g e1 in
+      let t1,n1 = typ_exp ~collect_sig ~statics:statics' ~sums ~toplevel:false ~loc g e1 in
       T_forall(l,t2,t1), n1
   | E_appLabel(e1,l,lc) -> (* avoir un environnement des variables liées par grand lambda + statics *)
       let tl = typ_lc ~statics g ~loc lc in
-      let t1,n1 = typ_exp ~statics:((l,tl)::statics) 
+      let t1,n1 = typ_exp ~collect_sig ~statics:((l,tl)::statics) 
                            ~sums ~toplevel:false ~loc g e1 in
       let t2 = unknown() in
       unify ~loc t1 (T_forall(l,tl,t2));
@@ -589,24 +674,24 @@ let rec typ_exp ~statics ~sums ~toplevel ~loc (g:env) e =
   | E_for(x,e_st1,e_st2,e3,_) ->
       let v = unknown() in
       let intv = tint v in
-      let t1,n1 = typ_exp ~statics ~sums ~toplevel:false ~loc g e_st1 in
+      let t1,n1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e_st1 in
       unify ~loc t1 intv; 
       unify ~loc n1 Response_time.zero;
-      let t2,n2 = typ_exp ~statics ~sums ~toplevel:false ~loc g e_st2 in
+      let t2,n2 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e_st2 in
       unify ~loc t2 intv; 
       unify ~loc n2 Response_time.zero;
       let g' = env_extend ~loc g (P_var x) intv in
-      typ_exp ~statics ~sums ~toplevel:false ~loc g' e3
+      typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g' e3
   | E_generate((p,e1),e2,e_st3,_) ->
-      let t3,n3 = typ_exp ~statics ~sums ~toplevel:false ~loc g e_st3 in
+      let t3,n3 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e_st3 in
       unify ~loc t3 (tint (unknown())); 
       unify ~loc n3 Response_time.zero;
 
       let v = unknown() in
-      let t2,n = typ_exp ~statics ~sums ~toplevel:false ~loc g e2 in
+      let t2,n = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e2 in
       let intv = tint v in
       let g' = env_extend ~loc g p (T_tuple[intv;t2]) in
-      let t1,n1 = typ_exp ~statics ~sums ~toplevel:false ~loc g' e1 in
+      let t1,n1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g' e1 in
       t2,n1 (* n1+n1+ ... n fois *)
 
 
@@ -630,10 +715,15 @@ let typing_handler ?(msg="") f () =
       Prelude.Errors.raise_error ~loc ~msg:("unbound variable "^x) ()
 
 
-let typing ?(env=SMap.empty) ?(msg="") ~statics ~sums e =
+let typing ?collect_sig ?(env=SMap.empty) ?(msg="") ~statics ~sums e =
+  Hashtbl.clear signatures;
   typing_handler (fun () ->
-    let t,n = typ_exp ~statics ~sums ~toplevel:true ~loc:(loc_of e) env e in
-    canon t, simplify_size_constraints n) ()
+    let t,n = typ_exp ?collect_sig ~statics ~sums ~toplevel:true ~loc:(loc_of e) env e in
+    (match t with 
+    | T_fun{ret=t2} ->
+        check_base_type ~loc:Prelude.dloc t2;
+    | _ -> ());
+    canon t, simplify_response_time n) ()
 
 
 (** [fun_shape ty] returns a type [ty -{'a}-> 'b]
@@ -660,7 +750,7 @@ let typing_static g =
 
    Returns the type of [e] and a type abstraction of its reponse time.
  *)
-let typing_with_argument ({statics;sums;main} : pi) (arg_list : e list) : ty * ty =
+let typing_with_argument ?collect_sig ({statics;sums;main} : pi) (arg_list : e list) : ty * ty =
 
   let t_arg = unknown() in
   let env = SMap.empty in
@@ -677,13 +767,13 @@ let typing_with_argument ({statics;sums;main} : pi) (arg_list : e list) : ty * t
   let e = mk_loc loc @@ ty_annot ~ty:(fun_shape t_arg) main in
   let statics_env = List.map (fun (x,st) -> x,typing_static st) statics in
   let (ty,response_time) =
-    typing ~env ~statics:statics_env ~sums e
+    typing ?collect_sig ~env ~statics:statics_env ~sums e
   in
   (if !relax_flag then () else
     let t = canon ty in
     match t with
     | T_fun{dur} ->
-        if simplify_size_constraints (canon dur) <> T_size 0 then
+        if simplify_response_time (canon dur) <> T_response_time 0 then
           let open Prelude.Errors in
           error (fun fmt ->
           Format.fprintf fmt
@@ -702,6 +792,5 @@ let when_repl : ((p * e) * Prelude.loc) -> unit =
   let r = ref SMap.empty in
   fun ((p,e),loc) ->
     let (ty,_) = typing ~env:!r ~statics:[] ~sums:[] e in
-    let gen = non_expansive e in
-    r := typing_handler (fun () -> (env_extend ~loc ~gen !r p ty)) ();
+    r := typing_handler (fun () -> (env_extend ~loc ~gen:(not !monomorphic) !r p ty)) ();
     Format.fprintf Format.std_formatter "val %a : %a@."  Ast_pprint.pp_pat p pp_ty ty

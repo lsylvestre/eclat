@@ -210,15 +210,11 @@ let rec red (e,r) =
               | Some v -> v in
       let v',r = red (E_letIn(p,v,e1),r) in
       v', add_r l v' r
-  | E_set(x,e1) ->
+  (* | E_set(e1,e2) ->
      (* [Set] *)
-     let v,r' = red (e1,r) in
-     (E_const Unit, add_r x v r')
-  | E_lastIn(x,e1,e2) ->
-     (* [LastIn] *)
-     let v,r' = red (e1,r) in
-     let r'' = add_r x v r' in
-     red (e2,r'')
+     let v1,r1 = red (e1,r) in
+     let v2,r2 = red (e2,r1) in
+     (E_const Unit, add_r x v r') *)
   | E_exec (e1,e2,k) ->
      (* [Exec] *)
      if not (SMap.mem k r.mu) then

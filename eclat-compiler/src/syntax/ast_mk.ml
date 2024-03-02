@@ -35,12 +35,12 @@ let mk_let_fun ~loc ~p_ty_opt ~ty_opt_ret e =
      to the binding {p |-> (fun x -> e)} enforcing (fun x -> e)
      to be instantaneous. *)
 let enforce_node (p,e) =
-  p, ty_annot ~ty:(fun_ty (unknown()) (T_size 0) (unknown())) e
+  p, ty_annot ~ty:(fun_ty (unknown()) (T_response_time 0) (unknown())) e
 
 
 (* [fresh_node ()] returns a fresh type of instantaneous function *)
 let fresh_node () =
-  fun_ty (unknown()) (T_size 0) (unknown())
+  fun_ty (unknown()) (T_response_time 0) (unknown())
 
 let rec mk_fix (f:x) (e:e) loc : e =
   match e with

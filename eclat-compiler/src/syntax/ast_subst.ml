@@ -52,11 +52,10 @@ let subst_e x ex e =
     | E_reg((p,e1),e0,l) ->
         let e1' = if pat_mem x p then e1 else ss e1 in
         E_reg((p,e1'),ss e0,l)
-    | E_lastIn(y,e1,e2) ->
-        if x = y then e else E_lastIn(y,ss e1,ss e2)
-    | E_set(y,e1) ->
-        let z = if x <> y then y else as_ident ex in
-        E_set(z,ss e1)
+    | E_get(e1) ->
+        E_get(ss e1)
+    | E_set(e1,e2) ->
+        E_set(ss e1, ss e2)
     | E_array_length(y) ->
         let z = if x <> y then y else as_ident ex in
         E_array_length(z)
@@ -96,6 +95,7 @@ let subst_p_e p ep o =
   map_subst_p subst_e p ep o
 
 
+(* 
 module OtherVersion = struct
 
   (* variant with simultaneous substitution: seems less efficient
@@ -135,12 +135,10 @@ module OtherVersion = struct
       | E_reg((p,e1),e0,l) ->
         let env' = filter_env p env in
         E_reg((p,ss env' e1),ss env e0,l)
-      | E_lastIn(y,e1,e2) ->
-          let env' = SMap.remove y env in
-          E_lastIn(y,ss env e1,ss env' e2)
       | E_set(y,e1) ->
           let z = as_ident_env y env in
           E_set(z,ss env e1)
+      | ...............................
       | e -> Ast_mapper.map (ss env) e
     in
     ss env e
@@ -148,6 +146,8 @@ module OtherVersion = struct
   let subst_p_e p ep e =
     subst_e_env (bindings p ep) e
 end
+
+*)
 
 
 let subst_lc x lc lc' =

@@ -15,6 +15,7 @@ type ty =                (** type *)
     }
   | T_sum of (x * ty) list
   | T_string of ty (** string parameterized by its size using a the size type [ty] *)
+  | T_ref of ty   (* mutable reference cell *)
   | T_array of {
       elem : ty ; (** static array of elements of type [elem], *)
       size : ty   (** parameterized by its size using a the size type [size] *)
@@ -26,6 +27,7 @@ type ty =                (** type *)
   | T_static of ty
   (* sized types for check response time and static datastructures *)
   | T_size of int      (** n *)
+  | T_response_time of int
   | T_infinity         (** plus infinite *)
   | T_add of ty * ty   (** t + t'  *)
   | T_max of ty * ty   (** max(t,t') *)
@@ -55,7 +57,7 @@ let fun_ty t1 n t2 =
 
 (* instantaneous function type *)
 let (==>) t1 t2 =
-  fun_ty t1 (T_size 0) t2
+  fun_ty t1 (T_response_time 0) t2
 
 let unknown =
   let c = ref 0 in
@@ -64,28 +66,31 @@ let unknown =
     incr c; ty
 
 
-let simplify_size_constraints t =
+let simplify_response_time t =
   let rec simpl t = match t with
-  | T_size _ | T_infinity -> t
+  | T_size _ -> t
+  | T_response_time _ | T_infinity -> t
   | T_add(t1,t2) ->
       (match simpl t1, simpl t2 with
       | T_add(ta,tb),t -> simpl @@ T_add(ta,T_add(tb,t))
-      | T_size n,T_add(T_size m,tb) -> simpl @@ T_add(T_size (n+m),tb)
+      | T_response_time n,T_add(T_response_time m,tb) -> 
+          simpl @@ T_add(T_response_time (n+m),tb)
       | T_var _ as t1',t2'
       | t2',(T_var _ as t1') -> T_add(t2',t1')
-      | T_size n,T_size m -> T_size (n+m)
-      | T_infinity,T_size _
+      | T_response_time n,T_response_time m -> T_response_time (n+m)
+      | T_infinity,T_response_time _
       | T_infinity,T_infinity
-      | T_size _ , T_infinity -> T_infinity
-      | t,T_size 0 | T_size 0,t -> t
+      | T_response_time _ , T_infinity -> T_infinity
+      | t,T_response_time 0 | T_response_time 0,t -> t
       | t1',t2' -> T_add(t1',t2'))
   | T_max(t1,t2) ->
       (match simpl t1, simpl t2 with
-      | T_size n,T_size m -> T_size (max n m)
-      | T_infinity,T_size _
+      | T_response_time n,T_response_time m -> 
+          T_response_time (max n m)
+      | T_infinity,T_response_time _
       | T_infinity,T_infinity
-      | T_size _ , T_infinity -> T_infinity
-      | t,T_size 0 | T_size 0,t -> t
+      | T_response_time _ , T_infinity -> T_infinity
+      | t,T_response_time 0 | T_response_time 0,t -> t
       | t1',t2' -> T_max(t1',t2'))
   | T_le _ -> failwith "todo T_le"
   | T_var({contents=Ty t'} as v) ->
@@ -116,11 +121,13 @@ let rec canon t =
              ret = canon ret }
   | T_string tz -> T_string (canon tz)
   | T_sum cs -> T_sum (List.map (fun (x,t) -> (x,canon t)) cs)
+  | T_ref(t) -> T_ref (canon t)
   | T_array {elem=t;size=tz} -> T_array {elem=canon t;size=canon tz}
   | T_matrix {elem=t;size=tz} -> T_matrix {elem=canon t;size=canon tz}
   | T_static t -> T_static (canon t)
   | T_forall(x,t1,t2) -> T_forall(x,canon t1,canon t2)
-  | (T_size _ | T_infinity | T_add _ | T_max _ | T_le _) as t -> simplify_size_constraints t
+  | T_size _ -> t
+  | (T_response_time _ | T_infinity | T_add _ | T_max _ | T_le _) as t -> simplify_response_time t
 
 
 let find_ctor x sums =
