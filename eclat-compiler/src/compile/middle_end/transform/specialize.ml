@@ -61,6 +61,8 @@ let applyed e =
       aux xs e1
   | E_set(e1,e2) ->
       aux xs e1 ++ aux xs e2
+  | E_local_static_array _ ->
+      SMap.empty
   | E_array_length _ ->
       SMap.empty
   | E_array_get(_,e1) ->

@@ -417,6 +417,10 @@ aexp:
   e=aexp_desc { mk_loc (with_file $loc) e }
 
 aexp_desc:
+| w=const_init_static HAT n=INT_LIT 
+   { let (ce,tyopt) = w in 
+     let c = as_const $loc ce in 
+     E_local_static_array(c,n) }
 | BANG ex=aexp { E_get(ex) }
 | LPAREN e=exp RPAREN { e }
 | LPAREN e=exp COL ty=ty RPAREN { ty_annot ~ty e }

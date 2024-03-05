@@ -59,6 +59,7 @@ let subst_e x ex e =
     | E_array_length(y) ->
         let z = if x <> y then y else as_ident ex in
         E_array_length(z)
+    | E_local_static_array _ -> e
     | E_array_get(y,e1) ->
         let z = if x <> y then y else as_ident ex in
         E_array_get(z, ss e1)
@@ -161,6 +162,7 @@ let subst_label l1 l2 e =
     match e with
     (* 
        E_reg _ | E_exec _ | E_set -> ? *)
+    | E_local_static_array _ -> e
     | E_array_length(l) ->
         E_array_length(subst_l l)
     | E_array_get(l,e1) ->        

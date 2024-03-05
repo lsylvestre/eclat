@@ -218,6 +218,8 @@ let rec anf2 (e:e) : e =
       E_set(xc1,xc2)
   | E_array_length _ ->
       [],e
+  | E_local_static_array _ ->
+      [],e
   | E_array_get(x,e1) ->
       let ds1,e1' = glob e1 in
       ds1,plug e1' @@ fun xc1 ->

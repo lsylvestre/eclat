@@ -29,6 +29,8 @@ let rec map f e =
       E_get(f e1)
   | E_set(e1,e2) ->
       E_set(f e1,f e2)
+  | E_local_static_array _ ->
+      e
   | E_array_length _ ->
       e
   | E_array_get(x,e1) ->
@@ -90,6 +92,8 @@ let rec iter f (e:e) : unit =
       f e1; f e0
   | E_exec(e1,e2,_) ->
       f e1; f e2
+  | E_local_static_array _ ->
+      ()
   | E_array_length _ ->
       ()
   | E_array_get(_,e1) ->
@@ -181,6 +185,8 @@ let accum f (e:e) : ((x * e) list * e) =
             let ds1,e1' = aux e1 in
             let ds2,e2' = aux e2 in
             ds1@ds2,E_set(e1',e2')
+        | E_local_static_array _ ->
+            [],e
         | E_array_length _ ->
             [],e
         | E_array_get(x,e1) ->

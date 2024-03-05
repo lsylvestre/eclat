@@ -58,6 +58,7 @@ type e =                      (** expression     [e]                       *)
   | E_reg of (p * e) * e * l     (** register       [reg^l (fun p -> e) last e] *)
   | E_exec of e * e * l       (** exec           [(exec^l e default e)]    *)
 
+  | E_local_static_array of c * int
   | E_array_get of x * e      (** static array access        [x.(e)]      *)
   | E_array_length of x       (** static array length access [x.length]   *)
   | E_array_set of x * e * e  (** static array assignment    [x.(e) <- e] *)

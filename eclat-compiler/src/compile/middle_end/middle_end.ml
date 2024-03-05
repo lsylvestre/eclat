@@ -73,7 +73,7 @@ let compile ?globalize
 
   (** normalization *)
   let pi = normalize pi in
-
+  let pi = Globalize_arrays.globalize_arrays pi in
   (** optimization *)
   let pi = if propagation then Propagation.propagation_pi pi else pi in
   display_pi Propagation pi;

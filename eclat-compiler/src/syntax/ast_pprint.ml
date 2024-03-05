@@ -285,6 +285,9 @@ let pp_exp (fmt:fmt) (e:e) : unit =
         fprintf fmt "@[<v>%a := %a@]"
           (pp_e ~paren:true) e1
           (pp_e ~paren:true) e2) fmt ()
+  | E_local_static_array(c,n) ->
+     fprintf fmt "%a^d"
+        pp_const c
   | E_array_length(x) ->
       fprintf fmt "@[<v>%a.length@]"
         pp_ident x

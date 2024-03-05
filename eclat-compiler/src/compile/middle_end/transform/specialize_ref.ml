@@ -71,8 +71,9 @@ let wrap_fix_in_fun e =
           in
           let e1_ = aux env e1 in
           let p',e1' = aux2 targ p e1_ in 
-     E_letIn(p,e1_,
-     E_letIn(P_var g, E_fix(f,(p',e0)),E_app(E_var g, e1'))))
+         E_letIn(p,e1_,
+         E_letIn(P_var g, E_fix(f,(p',e0)),E_app(E_var g, e1')))
+     | Some _ -> assert false)
   | e -> Ast_mapper.map (aux env) e
   in aux [] e
 

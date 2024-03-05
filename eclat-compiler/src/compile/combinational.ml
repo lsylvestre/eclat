@@ -47,9 +47,9 @@ let rec combinational (e:e) : bool =
 	    false
 	| E_reg _ | E_exec _ ->
 	    false (* have an internal state *)
-	| E_array_length _ | E_matrix_size _ ->
+  | E_array_length _ | E_matrix_size _ ->
 	    true
-	| E_array_get _ | E_matrix_get _ ->
+	| E_local_static_array _ | E_array_get _ | E_matrix_get _ ->
 	    false
 	| E_array_set _ | E_matrix_set _ ->
 	    false (* side effect *)

@@ -627,6 +627,8 @@ let rec typ_exp ?(collect_sig=false) ~statics ~sums ~toplevel ~loc (g:env) e =
      unify ~loc:(loc_of e1) (T_ref(t2)) t1;
      check_base_type ~loc t2;
      (T_const TUnit, n)
+  | E_local_static_array (c,n) ->
+     ((T_array{elem=typ_const ~loc g c; size=T_size n}),Response_time.zero)
   | E_array_length(x) ->
      let tx = typ_ident g x loc in
      unify ~loc (T_array{elem=unknown();size=unknown()}) tx;
@@ -1035,7 +1037,6 @@ module Typing2 = struct
     | GetTuple{pos;arity} ->
         let tyB_list = List.init arity (fun _ -> new_tyB_unknown ()) in
         assert (0 <= pos && pos <= arity);
-        let tyB = new_tyB_unknown () in
         Ty_fun(Ty_base (group_tyB_list tyB_list),
                Dur_zero,
                List.nth tyB_list pos)
