@@ -142,7 +142,8 @@ let rec list_update (x,v) = function
 
 
 let specialize_pi pi =
-  let pi = Anf.anf_pi pi in
+  let pi = Ast_rename.rename_pi pi in
+  let pi = Anf2.anf_pi pi in
   let main = specialize [] pi.main in
   { pi with main }
   |> Let_floating.let_floating_pi  (* needed *)

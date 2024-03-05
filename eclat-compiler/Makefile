@@ -53,8 +53,11 @@ OBJS= $(SRC_DIR)/prelude.cmo \
       $(SRC_DIR)/compile/middle_end/optim/propagation.cmo \
       \
       $(SRC_DIR)/compile/middle_end/normalize/anf.cmo \
+      $(SRC_DIR)/compile/middle_end/normalize/anf2.cmo \
       \
       $(SRC_DIR)/compile/middle_end/transform/let_floating.cmo \
+      $(SRC_DIR)/compile/middle_end/transform/globalize_ref.cmo \
+      $(SRC_DIR)/compile/middle_end/transform/specialize_ref.cmo \
       $(SRC_DIR)/compile/middle_end/transform/specialize.cmo \
       $(SRC_DIR)/compile/middle_end/transform/lambda_lifting.cmo \
       $(SRC_DIR)/compile/middle_end/transform/macro.cmo \
@@ -68,6 +71,7 @@ OBJS= $(SRC_DIR)/prelude.cmo \
       $(SRC_DIR)/compile/middle_end/rename_main_arg.cmo \
       $(SRC_DIR)/compile/backend/naming_convention.cmo \
       $(SRC_DIR)/compile/inspect/display_internal_steps.cmo \
+      $(SRC_DIR)/compile/middle_end/monomorphize.cmo \
       $(SRC_DIR)/compile/middle_end/middle_end.cmo \
       \
       $(SRC_DIR)/compile/backend/target/fsm_syntax.cmo \

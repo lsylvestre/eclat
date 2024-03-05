@@ -48,17 +48,23 @@ let compile ?globalize
 
   (** make explicit all lexical environments *)
   let pi = Lambda_lifting.lambda_lifting_pi ?globalize pi in
-  display_pi Lambda_lifting pi;
+   (* display_pi Lambda_lifting pi;*)
+(* let pi = Ast_rename.rename_pi pi in *)
+display_pi Lambda_lifting pi;
 
   let pi = Macro.inl_pi pi in (* macro expansion *)
 
   (** inline non-recursive functions *)
   let pi = Inline.inl_pi pi in
+  let pi = Propagation.propagation_pi pi in
   display_pi Inline pi;
-
+  let pi = Specialize_ref.specialize_ref pi in
+  (*  let pi = Let_floating.let_floating_pi pi in
+    let pi = Propagation.propagation_pi pi in*)
+  display_pi Specialize_ref pi;
   (** compile pattern matching *)
   let pi = Matching.matching_pi pi in
-  display_pi Matching pi;
+   display_pi Matching pi;
 
   (** normalization *)
   let pi = normalize pi in

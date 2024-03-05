@@ -52,7 +52,8 @@
        "do", DO;
        "done", DONE;
        "for", FOR;
-       "ref", REF
+       "ref", REF;
+       "immediate", IMMEDIATE;
      ]
 
 

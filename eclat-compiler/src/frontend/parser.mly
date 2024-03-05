@@ -44,6 +44,7 @@
 %token FOR TO DO DONE 
 %token REF COL_EQ BANG
 %token BIG_LAMBDA 
+%token IMMEDIATE
 /* The precedences must be listed from low to high. */
 
 %right    PIPE_PIPE PIPE_COMMA_PIPE /* parallel construct */
@@ -162,10 +163,11 @@ after_let(In_kw):
         {
             let f,ty_opt = f_ty_opt in
             let loc_fun = with_file ($startpos(f_ty_opt),$endpos(e1)) in
-            P_var f, mk_fix f (ty_annot_opt ~ty:ty_opt e1) loc_fun
+            let v = mk_fix f (ty_annot_opt ~ty:ty_opt e1) loc_fun in
+            P_var f, v
         }
 fun_rec_decl(In_kw):
-| REC f=IDENT p_ty_opt=arg_ty_atomic ty_opt=ret_ty_annot_eq e1=exp In_kw
+| REC (* o=IMMEDIATE?*) f=IDENT p_ty_opt=arg_ty_atomic ty_opt=ret_ty_annot_eq e1=exp In_kw
         {
             let p_ty_opt_f =
               let open Types in
@@ -177,7 +179,10 @@ fun_rec_decl(In_kw):
             let (p,ty_f_opt) = p_ty_opt_f in
             let ef = mk_fun_ty_annot p ty_f_opt (ty_annot_opt ~ty:ty_opt e1)
                    |> mk_loc loc_fun in
-            P_var f, mk_fix f ef loc_fun
+            let v = mk_fix f ef loc_fun in
+            (*match o with 
+            | None -> *)P_var f, v
+            (* | Some _ -> P_var f, E_letIn(P_var f,v,e1)*)
         }
 
 
@@ -335,7 +340,7 @@ app_exp:
   e=app_exp_desc { mk_loc (with_file $loc) e }
 
 app_exp_desc:
-| ex=aexp COL_EQ e=aexp { E_set(ex,e) }
+| ex=aexp COL_EQ e=app_exp { E_set(ex,e) }
 | REF e=aexp            { E_ref e }
 | x=IDENT LBRACKET e1=exp RBRACKET
 | x=IDENT DOT LPAREN e1=exp RPAREN

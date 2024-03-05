@@ -16,6 +16,8 @@ let interp_flag = ref false
 let top_flag = ref false
 let simul_flag = ref true
 
+let typing_with_tyB = ref false
+
 let prop_fsm_flag = ref false
 
 let arguments = ref ""
@@ -55,6 +57,8 @@ let () =
 
     ("-ty",       Arg.Set show_ty_and_exit_flag,
                   "type and exit.");
+    ("-tyB",      Arg.Set typing_with_tyB,
+                  "run an additional type checking phase.");
 
     ("-pp",      Arg.String Display_internal_steps.set_print_mode,
                  "display the output of the specified (intermediate)\
@@ -110,6 +114,9 @@ let () =
      "Print inferred interface");
     ("-no-prop-linear", Arg.Clear Propagation.flag_propagate_combinational_linear,
                  "do not propagate linear combinational expression.");
+    ("-no-ref-arg", Arg.Clear Typing.accept_ref_arg_flag,
+     "reject functional argument of type ref<'a>, for better performance (in space)");    
+
     ]
       add_input "Usage:\n  ./mixc file"
 ;;
@@ -131,6 +138,9 @@ let main () : unit =
   end;
 
   (** Typing *)
+  if !typing_with_tyB then
+    (let _,_ = Typing.Typing2.typing ~collect_sig:false ~statics:[] ~sums:[] pi.main in
+     ());
   let (ty,response_time) = Typing.typing_with_argument pi arg_list in
 
   (** Type only, when [show_ty_and_exit_flag] is setted. *)

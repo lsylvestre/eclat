@@ -75,84 +75,90 @@ let plug_n (es:e list) (context : e list -> e) : e =
   plug_n_aux [] es context
 
 (** [anf e] puts expression [e] in ANF-form *)
-let rec anf (e:e) : e =
+let rec anf e =
+  let _,e' = anf_level e in e'
+and anf_level (e:e) =
   match e with
   | E_deco _ ->
       Ast_undecorated.still_decorated e
-  | E_var _ | E_const _ -> e
+  | E_var _ | E_const _ -> 1,e
   | E_fun(x,e1) ->
-      E_fun(x,anf e1)
+      1,E_fun(x,anf e1)
   | E_fix(f,(x,e1)) ->
-      E_fix(f,(x,anf e1))
+      1,E_fix(f,(x,anf e1))
   | E_if(e1,e2,e3) ->
+      1,
       plug (anf e1) @@ fun xc ->
       E_if(xc,anf e2,anf e3)
   | E_case(e,hs,e_els) ->
-      plug (anf e) @@ fun xc ->
+      1,plug (anf e) @@ fun xc ->
       E_case(xc,List.map (fun (c,e) -> c,anf e) hs,anf e_els)
   | E_match(e,hs,eo) ->
-      plug (anf e) @@ fun xc ->
+      1,plug (anf e) @@ fun xc ->
       E_match(xc,List.map (fun (x,(p,e)) -> x,(p,anf e)) hs,Option.map anf eo)
   | E_letIn(P_var f,(E_fix(g,(p,e1))),e2) when f <> g ->
       assert (not (pat_mem f p) && not (pat_mem g p));
-      anf @@ E_letIn(P_var f,E_fix(f,(p,subst_e g (E_var f) e1)),e2)
+      1,anf @@ E_letIn(P_var f,E_fix(f,(p,subst_e g (E_var f) e1)),e2)
   | E_letIn(P_var x,(E_var _ as e1),e2) ->
-      anf @@ subst_e x e1 e2
+      1,anf @@ subst_e x e1 e2
   | E_letIn(p,e1,e2) ->
-      E_letIn(p,anf e1,anf e2)
+      1,E_letIn(p,anf e1,anf e2)
   | E_tuple(es) ->
+      List.length es,
       plug_n (List.map anf es) @@
       fun xs -> E_tuple(xs)
   | E_app(E_const _ as ec,e2) ->
-      plug (anf e2) @@ fun x2 ->
+      1,plug (anf e2) @@ fun x2 ->
       E_app(ec,x2)
   | E_app(e1,e2) ->
-      plug (anf e1) @@ fun xc1 ->
-      plug (anf e2) @@ fun xc2 ->
-      E_app(xc1,xc2)
+      1,plug (anf e1) @@ fun xc1 ->
+      let n,e2' = anf_level e2 in
+      let xs = List.init n (fun x -> gensym ()) in(* plug (anf e2) @@ fun xc2 -> *)
+      E_letIn(group_ps (List.map (fun x -> P_var x) xs),e2',
+      E_app(xc1,group_es (List.map (fun x -> E_var x) xs)))
   | E_reg((p,e1),e0,l) ->
-      plug (anf e0) @@ fun xc0 ->
+      1,plug (anf e0) @@ fun xc0 ->
       E_reg((p,anf e1),xc0,l)
     | E_exec(e1,e0,l) ->
-        plug (anf e0) @@ fun xc0 ->
+        1,plug (anf e0) @@ fun xc0 ->
         E_exec(anf e1,xc0,l)
   | E_ref(e1) ->
-      plug (anf e1) @@ fun xc1 ->
+      1,plug (anf e1) @@ fun xc1 ->
         E_ref(xc1)
   | E_get(e1) ->
-      name_kont_in e1 (fun x -> E_get x)
+      1,name_kont_in e1 (fun x -> E_get x)
   | E_set(e1,e2) ->
-      name_kont_in e1 (fun x -> plug (anf e2) @@ 
+      1,name_kont_in e1 (fun x -> plug (anf e2) @@ 
                            fun xc1 -> E_set(x,xc1))
   | E_array_length _ ->
-      e
+      1,e
   | E_array_get(x,e1) ->
-      plug (anf e1) @@ fun xc1 ->
+      1,plug (anf e1) @@ fun xc1 ->
       E_array_get(x,xc1)
   | E_array_set(x,e1,e2) ->
-      plug (anf e1) @@ fun xc1 ->
+      1,plug (anf e1) @@ fun xc1 ->
       plug (anf e2) @@ fun xc2 ->
       E_array_set(x,xc1,xc2)
   | E_matrix_size _ ->
-      e
+      1,e
   | E_matrix_get(x,es) ->
-      plug_n (List.map anf es) @@ fun xs ->
+      1,plug_n (List.map anf es) @@ fun xs ->
       E_matrix_get(x,xs)
   | E_matrix_set(x,es,e2) ->
-      plug_n (List.map anf es) @@ fun xs -> 
+      1,plug_n (List.map anf es) @@ fun xs -> 
       plug (anf e2) @@ fun xc2 ->
       E_matrix_set(x,xs,xc2)
   | E_par(es) ->
-      E_par(List.map anf es)
+      1,E_par(List.map anf es)
   | E_absLabel(l,e1) ->
-      E_absLabel(l,anf e1)
+      1,E_absLabel(l,anf e1)
   | E_appLabel(e1,l,lc) ->
-      E_appLabel(anf e1,l,lc)
+      1,E_appLabel(anf e1,l,lc)
   | E_for(x,e_st1,e_st2,e3,loc) ->
-      E_for(x,anf e_st1,anf e_st2,anf e3,loc)
+      1,E_for(x,anf e_st1,anf e_st2,anf e3,loc)
       (* NB: [e_st1] and [e_st2] are *not* moved up with `plug` *)
   | E_generate((p,e1),e2,e_st3,loc) ->
-      plug (anf e2) @@ fun xc ->
+      1,plug (anf e2) @@ fun xc ->
       E_generate((p,anf e1),xc,anf e_st3,loc) 
       (* NB: [e_st3] is *not* moved up with `plug` *)
 

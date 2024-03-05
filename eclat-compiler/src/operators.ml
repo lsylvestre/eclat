@@ -63,6 +63,54 @@ let ty_op op =
       let tz_int = T_size 16 in
       (T_string(unknown ())) ==> (tint tz_int)
 
+
+(* improved typing with level of types *)
+let ty_op2 op =
+  let open Types.Ty in
+  match op with
+  | Abs ->
+      let sz = new_size_unknown() in
+      let tyB = TyB_int sz in
+      Ty_fun(Ty_base tyB,Dur_zero,tyB)
+  | Add|Sub|Mult|Div|Mod|Land|Lor|Lxor|Lsl|Lsr|Asr ->
+      let sz = new_size_unknown() in
+      let tyB = TyB_int sz in
+      Ty_fun(Ty_base (TyB_tuple[tyB;tyB]),Dur_zero,tyB)
+  | Lt|Gt|Le|Ge|Eq|Neq ->
+      let sz = new_size_unknown() in
+      let tyB = TyB_int sz in
+      Ty_fun(Ty_base (TyB_tuple[tyB;tyB]),Dur_zero,TyB_bool)
+  | Not ->
+      Ty_fun(Ty_base TyB_bool, Dur_zero, TyB_bool)
+  | And|Or|Xor ->
+      Ty_fun(Ty_base (TyB_tuple[TyB_bool;TyB_bool]), Dur_zero, TyB_bool)
+  | Resize_int k ->
+      let sz = new_size_unknown() in
+      let tyB = TyB_int sz in
+      let tyB_k = TyB_int (Sz_lit k) in
+      Ty_fun(Ty_base tyB,Dur_zero,tyB_k)
+  | Tuple_of_int k ->
+      let tyB = TyB_tuple (List.init k (fun _ -> TyB_unit)) in
+      Ty_fun(Ty_base (TyB_int (Sz_lit k)),Dur_zero,tyB)
+  | Print ->
+      let tyB = new_tyB_unknown() in
+      Ty_fun(Ty_base tyB,Dur_zero,TyB_unit)
+  | Print_string ->
+      let sz = new_size_unknown() in
+      Ty_fun(Ty_base (TyB_string sz),Dur_zero,TyB_unit)
+  | Print_int ->
+      let sz = new_size_unknown() in
+      Ty_fun(Ty_base (TyB_int sz),Dur_zero,TyB_unit)
+  | Print_newline ->
+      Ty_fun(Ty_base TyB_unit,Dur_zero,TyB_unit)
+  | Assert ->
+      Ty_fun(Ty_base TyB_bool,Dur_zero,TyB_unit)
+  | String_length ->
+      (* enforce result to be a 16-bit integer *)
+      let sz = new_size_unknown() in
+      Ty_fun(Ty_base (TyB_string(sz)),Dur_zero,TyB_int (Sz_lit 16))
+
+
 (** pretty printer for operators *)
 let pp_op fmt (op:op) : unit =
   Format.fprintf fmt "%s" @@

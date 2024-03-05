@@ -55,6 +55,7 @@ type token =
   | INT_LIT of (int)
   | IN
   | IMPLY
+  | IMMEDIATE
   | IF
   | IDENT of (string)
   | HAT

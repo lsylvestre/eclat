@@ -110,5 +110,130 @@ let rec iter f (e:e) : unit =
       f e
   | E_generate((_,e1),e2,e_st3,_) ->
       f e1; f e2; f e_st3
+
+
+let declare ds e =
+  List.fold_right (fun (x,v) e -> E_letIn(P_var x,v,e)) ds e
+
+let accum f (e:e) : ((x * e) list * e) =
+  let rec aux e =
+    let open Ast in
+      let auxalize_list es =
+        let rec loop dss es_acc es =
+          match es with
+          | [] -> List.concat (List.rev dss), List.rev es_acc
+          | ei::es' ->
+             let (dsi,ei') = aux ei in
+             loop (dsi::dss) (ei'::es_acc) es'
+      in loop [] [] es
+    in
+    match f aux e with
+    | Some (ds,e') -> (ds,e')
+    | None ->
+        (match e with
+        | E_deco(e1,deco) ->
+            let ds1,e1' = aux e1 in
+            ds1, E_deco(e1',deco)
+        | E_const _ | E_var _ -> [],e
+        | E_tuple es ->
+            let ds,es' = auxalize_list es in
+            ds,E_tuple(es')
+        | E_app(e1,e2) ->
+            let ds1,e1' = aux e1 in
+            let ds2,e2' = aux e2 in
+            ds1@ds2,E_app(e1',e2')
+        | E_letIn(p,e1,e2) ->
+            let ds1,e1' = aux e1 in
+            let ds2,e2' = aux e2 in
+            ds1@ds2,E_letIn(p,e1',e2')
+        | E_fix(f,(p,e1)) ->
+            let ds1,e1' = aux e1 in
+            let v = E_fix(f,(p,e1')) in
+            ds1,v
+        | E_fun(p,e1) ->
+            let ds1,e1' = aux e1 in
+            ds1,E_fun(p,e1')
+        | E_if(e1,e2,e3) ->
+            let ds1,e1' = aux e1 in
+            let ds2,e2' = aux e2 in
+            let ds3,e3' = aux e3 in
+            ds1@ds2@ds3,E_if(e1',e2',e3')
+        | E_case(e1,hs,e_els) ->
+          let ds1,e1' = aux e1 in
+          let dss,hs' = List.split @@ List.map (fun (c,e) -> let ds,e' = aux e in ds,(c,e')) hs in
+          let ds,e_els' = aux e_els in
+          ds1@List.concat dss@ds, E_case(e1',hs',e_els')
+        | E_match(e1,hs,eo) ->
+          let ds1,e1' = aux e1 in
+          let dss,hs' = List.split @@ List.map (fun (x,(p,e)) -> let ds,e' = aux e in ds,(x,(p,e'))) hs in
+          let dsw,eo' = match eo with
+                        | None -> [],eo
+                        | Some ew -> let dsw,ew' = aux ew in
+                                     (dsw,Some ew')
+          in
+          ds1@List.concat dss@dsw, E_match(e1',hs',eo')
+        | E_ref(e1) ->
+            let ds1,e1' = aux e1 in
+            ds1,E_ref(e1')
+        | E_get _ ->
+            [], e
+        | E_set(e1,e2) ->
+            let ds1,e1' = aux e1 in
+            let ds2,e2' = aux e2 in
+            ds1@ds2,E_set(e1',e2')
+        | E_array_length _ ->
+            [],e
+        | E_array_get(x,e1) ->
+            let ds1,e1' = aux e1 in
+            ds1,E_array_get(x,e1')
+        | E_array_set(x,e1,e2) ->
+            let ds1,e1' = aux e1 in
+            let ds2,e2' = aux e2 in
+            ds1@ds2,E_array_set(x,e1',e2')
+        | E_matrix_size _ ->
+            [],e
+        | E_matrix_get(x,es) ->
+            let ds,es' = auxalize_list es in
+            ds,E_matrix_get(x,es')
+        | E_matrix_set(x,es,e2) ->
+            let ds,es' = auxalize_list es in
+            let ds2,e2' = aux e2 in
+            ds@ds2,E_matrix_set(x,es',e2')
+        | E_par(es) ->
+            let ds,es' = auxalize_list es in
+            ds,E_par(es')
+        | E_reg((p,e1),e0,l) ->
+            let ds1,e1' = aux e1 in
+            let ds0,e0' = aux e0 in
+            ds1@ds0,E_reg((p,e1'),e0',l)
+        | E_exec(e1,e0,l) ->
+            let ds1,e1' = aux e1 in
+            let ds0,e0' = aux e0 in
+            ds1@ds0,E_exec(e1',e0',l)
+        | E_absLabel (l, e1) ->
+            let ds1,e1' = aux e1 in
+            ds1,E_absLabel (l,e1')   (* scope is ok ? *)
+        | E_appLabel (e1,l,lc) ->
+            let ds1,e1' = aux e1 in
+            ds1,E_appLabel (e1',l,lc)   (* scope is ok ? *)
+        | E_for(x,e_st1,e_st2,e3,loc) ->
+            let ds1,e_st1' = aux e_st1 in
+            let ds2,e_st2' = aux e_st2 in
+            let ds3,e3' = aux e3 in
+            ds1@ds2@ds3,E_for(x,e_st1',e_st2',e3,loc)
+             (* NB: definitions in [e_st1] and [e_st2] and [e3]
+                are *not* auxalized *)
+        | E_generate((p,e1),e2,e_st3,loc) ->
+          let ds1,e1' = aux e1 in
+          let ds2,e2' = aux e2 in
+          let ds3,e_st3' = aux e_st3 in
+          ds1@ds2@ds3,E_generate((p,e1'),e2',e_st3',loc)
+          (* NB: definitions in [e_st1] are *not* auxalized *)
+  ) 
+  in 
+  aux e
+
+
 let map_pi f pi =
   Map_pi.map (map f) pi
+
