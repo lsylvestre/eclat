@@ -9,6 +9,7 @@ let print_elaborated_code_flag = ref true
 let compile ?(vhdl_comment="") ?(prop_fsm=false) arg_list name ty fmt pi =
 
   let pi = Middle_end.compile arg_list pi in
+  
   D.display_pi D.MiddleEnd pi;
 
   let pi = Rename_main_arg.rename_main_arg_pi pi in

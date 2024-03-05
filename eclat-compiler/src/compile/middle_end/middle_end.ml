@@ -14,7 +14,6 @@ let normalize (pi:pi) : pi =
   let pi = Instantiate.instantiate_pi pi in
   
   let pi = Monomorphize.monomorphize pi in
-
   (** renaming all bindings in the source program *)
   let pi = Ast_rename.rename_pi pi in
   (** enforce each recursive function [fix f (fun p -> e)] is bound to the name [f]
@@ -42,29 +41,35 @@ let compile ?globalize
 
   (** ensure that each function is defined by a let-binding *)
   let pi = Fun_assign_name.name_pi pi in
+  let pi = Anf.anf_pi pi in
+  display_pi Anf pi;
 
   let pi = Specialize.specialize_pi pi in
   display_pi Specialize pi;
 
   (** make explicit all lexical environments *)
   let pi = Lambda_lifting.lambda_lifting_pi ?globalize pi in
-   (* display_pi Lambda_lifting pi;*)
-(* let pi = Ast_rename.rename_pi pi in *)
-display_pi Lambda_lifting pi;
+  let pi = Specialize.specialize_pi pi in
+  display_pi Lambda_lifting pi;
 
   let pi = Macro.inl_pi pi in (* macro expansion *)
 
   (** inline non-recursive functions *)
-  let pi = Inline.inl_pi pi in
-  let pi = Propagation.propagation_pi pi in
+  let rec loop pi =
+    let pi = Inline.inl_pi pi in
+    let pi = Specialize.specialize_pi pi in
+    let pi = Anf.anf_pi pi in
+    if !Inline.has_changed || !Specialize.has_changed then loop pi 
+    else pi
+  in 
+  let pi = loop pi in
   display_pi Inline pi;
+  
   let pi = Specialize_ref.specialize_ref pi in
-  (*  let pi = Let_floating.let_floating_pi pi in
-    let pi = Propagation.propagation_pi pi in*)
   display_pi Specialize_ref pi;
   (** compile pattern matching *)
   let pi = Matching.matching_pi pi in
-   display_pi Matching pi;
+  display_pi Matching pi;
 
   (** normalization *)
   let pi = normalize pi in

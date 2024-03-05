@@ -421,6 +421,12 @@ let rec to_s ~statics ~sums gs e x k =
                      S_continue q*)
 
   | E_for _ -> assert false
+ 
+  | E_fun _ | E_fix _ -> 
+     (* can occur in case of higher order function that does not use its argument,
+        e.g.: [let rec f g = f g in f (fun x -> x)] *)
+  SMap.empty,SMap.empty,return_ (set_ x (A_const Unit))
+ 
 
   | e -> Ast_pprint.pp_exp Format.std_formatter e; assert false (* todo *)
 

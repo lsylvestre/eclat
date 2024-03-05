@@ -43,7 +43,7 @@ let rec combinational (e:e) : bool =
 	    List.for_all combinational es
 	| E_fun _ | E_fix _ ->
 	    false
-	| E_ref _ | E_get _ | E_set _ | E_par _ ->
+  | E_ref _ | E_get _ | E_set _ | E_par _ ->
 	    false
 	| E_reg _ | E_exec _ ->
 	    false (* have an internal state *)

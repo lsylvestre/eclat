@@ -188,21 +188,13 @@ src/compile/middle_end/normalize/anf.cmo : \
     src/syntax/pattern.cmo \
     src/syntax/ast_undecorated.cmo \
     src/syntax/ast_subst.cmo \
+    src/syntax/ast_mapper.cmo \
     src/syntax/ast.cmo
 src/compile/middle_end/normalize/anf.cmx : \
     src/syntax/pattern.cmx \
     src/syntax/ast_undecorated.cmx \
     src/syntax/ast_subst.cmx \
-    src/syntax/ast.cmx
-src/compile/middle_end/normalize/anf2.cmo : \
-    src/syntax/pattern.cmo \
-    src/syntax/ast_undecorated.cmo \
-    src/syntax/ast_subst.cmo \
-    src/syntax/ast.cmo
-src/compile/middle_end/normalize/anf2.cmx : \
-    src/syntax/pattern.cmx \
-    src/syntax/ast_undecorated.cmx \
-    src/syntax/ast_subst.cmx \
+    src/syntax/ast_mapper.cmx \
     src/syntax/ast.cmx
 src/compile/middle_end/normalize/fun_assign_name.cmo : \
     src/syntax/map_pi.cmo \
@@ -279,12 +271,14 @@ src/compile/middle_end/transform/inline.cmx : \
 src/compile/middle_end/transform/lambda_lifting.cmo : \
     src/syntax/pattern.cmo \
     src/syntax/free_vars.cmo \
+    src/syntax/ast_undecorated.cmo \
     src/syntax/ast_subst.cmo \
     src/syntax/ast_mapper.cmo \
     src/syntax/ast.cmo
 src/compile/middle_end/transform/lambda_lifting.cmx : \
     src/syntax/pattern.cmx \
     src/syntax/free_vars.cmx \
+    src/syntax/ast_undecorated.cmx \
     src/syntax/ast_subst.cmx \
     src/syntax/ast_mapper.cmx \
     src/syntax/ast.cmx
@@ -315,27 +309,369 @@ src/compile/middle_end/transform/matching.cmx : \
     src/syntax/ast_mapper.cmx \
     src/syntax/ast.cmx
 src/compile/middle_end/transform/specialize.cmo : \
+    src/typing/typing.cmo \
+    src/typing/types.cmo \
     src/compile/middle_end/optim/propagation.cmo \
-    src/compile/middle_end/transform/let_floating.cmo \
+    src/syntax/pattern.cmo \
     src/syntax/ast_subst.cmo \
-    src/syntax/ast_rename.cmo \
     src/syntax/ast_mapper.cmo \
     src/syntax/ast.cmo \
-    src/compile/middle_end/normalize/anf2.cmo
+    src/compile/middle_end/normalize/anf.cmo
 src/compile/middle_end/transform/specialize.cmx : \
+    src/typing/typing.cmx \
+    src/typing/types.cmx \
     src/compile/middle_end/optim/propagation.cmx \
-    src/compile/middle_end/transform/let_floating.cmx \
+    src/syntax/pattern.cmx \
     src/syntax/ast_subst.cmx \
-    src/syntax/ast_rename.cmx \
     src/syntax/ast_mapper.cmx \
     src/syntax/ast.cmx \
-    src/compile/middle_end/normalize/anf2.cmx
+    src/compile/middle_end/normalize/anf.cmx
 src/compile/middle_end/transform/specialize_ref.cmo : \
     src/typing/typing.cmo \
     src/typing/types.cmo \
     src/syntax/ast_mapper.cmo \
     src/syntax/ast.cmo
 src/compile/middle_end/transform/specialize_ref.cmx : \
+    src/typing/typing.cmx \
+    src/typing/types.cmx \
+    src/syntax/ast_mapper.cmx \
+    src/syntax/ast.cmx
+src/compile2/backend/flat_let_atom.cmo : \
+    src/compile/backend/target/fsm_syntax.cmo
+src/compile2/backend/flat_let_atom.cmx : \
+    src/compile/backend/target/fsm_syntax.cmx
+src/compile2/backend/fsm_comp.cmo : \
+    src/typing/types.cmo \
+    src/prelude.cmo \
+    src/compile/backend/naming_convention.cmo \
+    src/compile/backend/target/fsm_typing.cmo \
+    src/compile/backend/target/fsm_syntax.cmo \
+    src/compile/combinational.cmo \
+    src/syntax/ast_subst.cmo \
+    src/syntax/ast_pprint.cmo \
+    src/syntax/ast.cmo
+src/compile2/backend/fsm_comp.cmx : \
+    src/typing/types.cmx \
+    src/prelude.cmx \
+    src/compile/backend/naming_convention.cmx \
+    src/compile/backend/target/fsm_typing.cmx \
+    src/compile/backend/target/fsm_syntax.cmx \
+    src/compile/combinational.cmx \
+    src/syntax/ast_subst.cmx \
+    src/syntax/ast_pprint.cmx \
+    src/syntax/ast.cmx
+src/compile2/backend/gen_vhdl.cmo : \
+    src/prelude.cmo \
+    src/operators.cmo \
+    src/compile/backend/naming_convention.cmo \
+    src/compile/backend/list_machines.cmo \
+    src/compile/backend/target/fsm_typing.cmo \
+    src/compile/backend/target/fsm_syntax.cmo \
+    src/compile/backend/fsm_comp.cmo
+src/compile2/backend/gen_vhdl.cmx : \
+    src/prelude.cmx \
+    src/operators.cmx \
+    src/compile/backend/naming_convention.cmx \
+    src/compile/backend/list_machines.cmx \
+    src/compile/backend/target/fsm_typing.cmx \
+    src/compile/backend/target/fsm_syntax.cmx \
+    src/compile/backend/fsm_comp.cmx
+src/compile2/backend/list_machines.cmo : \
+    src/compile/backend/target/fsm_syntax.cmo \
+    src/syntax/ast.cmo
+src/compile2/backend/list_machines.cmx : \
+    src/compile/backend/target/fsm_syntax.cmx \
+    src/syntax/ast.cmx
+src/compile2/backend/naming_convention.cmo :
+src/compile2/backend/naming_convention.cmx :
+src/compile2/backend/optim/remove_assigned_but_not_read_vars.cmo : \
+    src/compile/backend/target/fsm_syntax.cmo
+src/compile2/backend/optim/remove_assigned_but_not_read_vars.cmx : \
+    src/compile/backend/target/fsm_syntax.cmx
+src/compile2/backend/optim/target_propagation.cmo : \
+    src/compile/backend/target/fsm_syntax.cmo \
+    src/syntax/ast.cmo
+src/compile2/backend/optim/target_propagation.cmx : \
+    src/compile/backend/target/fsm_syntax.cmx \
+    src/syntax/ast.cmx
+src/compile2/backend/target/fsm_syntax.cmo : \
+    src/operators.cmo \
+    src/syntax/ast_pprint.cmo
+src/compile2/backend/target/fsm_syntax.cmx : \
+    src/operators.cmx \
+    src/syntax/ast_pprint.cmx
+src/compile2/backend/target/fsm_typing.cmo : \
+    src/typing/types.cmo \
+    src/prelude.cmo \
+    src/operators.cmo \
+    src/compile/backend/target/fsm_syntax.cmo \
+    src/frontend/fix_int_lit_size.cmo
+src/compile2/backend/target/fsm_typing.cmx : \
+    src/typing/types.cmx \
+    src/prelude.cmx \
+    src/operators.cmx \
+    src/compile/backend/target/fsm_syntax.cmx \
+    src/frontend/fix_int_lit_size.cmx
+src/compile2/combinational.cmo : \
+    src/operators.cmo \
+    src/syntax/ast.cmo
+src/compile2/combinational.cmx : \
+    src/operators.cmx \
+    src/syntax/ast.cmx
+src/compile2/compile.cmo : \
+    src/compile/backend/optim/target_propagation.cmo \
+    src/compile/middle_end/rename_main_arg.cmo \
+    src/compile/backend/optim/remove_assigned_but_not_read_vars.cmo \
+    src/compile/middle_end/middle_end.cmo \
+    src/compile/backend/list_machines.cmo \
+    src/compile/backend/gen_vhdl.cmo \
+    src/compile/backend/target/fsm_typing.cmo \
+    src/compile/backend/target/fsm_syntax.cmo \
+    src/compile/backend/fsm_comp.cmo \
+    src/compile/backend/flat_let_atom.cmo \
+    src/compile/inspect/display_target.cmo \
+    src/compile/inspect/display_internal_steps.cmo \
+    src/syntax/ast.cmo
+src/compile2/compile.cmx : \
+    src/compile/backend/optim/target_propagation.cmx \
+    src/compile/middle_end/rename_main_arg.cmx \
+    src/compile/backend/optim/remove_assigned_but_not_read_vars.cmx \
+    src/compile/middle_end/middle_end.cmx \
+    src/compile/backend/list_machines.cmx \
+    src/compile/backend/gen_vhdl.cmx \
+    src/compile/backend/target/fsm_typing.cmx \
+    src/compile/backend/target/fsm_syntax.cmx \
+    src/compile/backend/fsm_comp.cmx \
+    src/compile/backend/flat_let_atom.cmx \
+    src/compile/inspect/display_target.cmx \
+    src/compile/inspect/display_internal_steps.cmx \
+    src/syntax/ast.cmx
+src/compile2/gen_testbench/gen_testbench.cmo : \
+    src/compile/backend/gen_vhdl.cmo \
+    src/compile/backend/target/fsm_typing.cmo \
+    src/compile/backend/target/fsm_syntax.cmo \
+    src/compile/backend/fsm_comp.cmo \
+    src/compile/backend/flat_let_atom.cmo \
+    src/syntax/ast.cmo
+src/compile2/gen_testbench/gen_testbench.cmx : \
+    src/compile/backend/gen_vhdl.cmx \
+    src/compile/backend/target/fsm_typing.cmx \
+    src/compile/backend/target/fsm_syntax.cmx \
+    src/compile/backend/fsm_comp.cmx \
+    src/compile/backend/flat_let_atom.cmx \
+    src/syntax/ast.cmx
+src/compile2/gen_top/gen_top.cmo : \
+    src/prelude.cmo \
+    src/compile/backend/target/fsm_typing.cmo
+src/compile2/gen_top/gen_top.cmx : \
+    src/prelude.cmx \
+    src/compile/backend/target/fsm_typing.cmx
+src/compile2/inspect/display_internal_steps.cmo : \
+    src/syntax/ast_pprint.cmo
+src/compile2/inspect/display_internal_steps.cmx : \
+    src/syntax/ast_pprint.cmx
+src/compile2/inspect/display_target.cmo : \
+    src/compile/backend/target/fsm_syntax.cmo
+src/compile2/inspect/display_target.cmx : \
+    src/compile/backend/target/fsm_syntax.cmx
+src/compile2/middle_end/middle_end.cmo : \
+    src/typing/typing.cmo \
+    src/compile/middle_end/transform/specialize_ref.cmo \
+    src/compile/middle_end/transform/specialize.cmo \
+    src/syntax/rename_fix.cmo \
+    src/compile/middle_end/optim/propagation.cmo \
+    src/compile/middle_end/normalize/move_down_gfun_under_exec_and_par.cmo \
+    src/compile/middle_end/monomorphize.cmo \
+    src/compile/middle_end/transform/matching.cmo \
+    src/compile/middle_end/transform/macro.cmo \
+    src/compile/middle_end/transform/lambda_lifting.cmo \
+    src/compile/middle_end/normalize/instantiate.cmo \
+    src/compile/middle_end/transform/inline.cmo \
+    src/compile/middle_end/normalize/fun_shape_entry_point.cmo \
+    src/compile/middle_end/normalize/fun_assign_name.cmo \
+    src/compile/inspect/display_internal_steps.cmo \
+    src/syntax/ast_rename.cmo \
+    src/syntax/ast.cmo \
+    src/compile/middle_end/normalize/anf.cmo
+src/compile2/middle_end/middle_end.cmx : \
+    src/typing/typing.cmx \
+    src/compile/middle_end/transform/specialize_ref.cmx \
+    src/compile/middle_end/transform/specialize.cmx \
+    src/syntax/rename_fix.cmx \
+    src/compile/middle_end/optim/propagation.cmx \
+    src/compile/middle_end/normalize/move_down_gfun_under_exec_and_par.cmx \
+    src/compile/middle_end/monomorphize.cmx \
+    src/compile/middle_end/transform/matching.cmx \
+    src/compile/middle_end/transform/macro.cmx \
+    src/compile/middle_end/transform/lambda_lifting.cmx \
+    src/compile/middle_end/normalize/instantiate.cmx \
+    src/compile/middle_end/transform/inline.cmx \
+    src/compile/middle_end/normalize/fun_shape_entry_point.cmx \
+    src/compile/middle_end/normalize/fun_assign_name.cmx \
+    src/compile/inspect/display_internal_steps.cmx \
+    src/syntax/ast_rename.cmx \
+    src/syntax/ast.cmx \
+    src/compile/middle_end/normalize/anf.cmx
+src/compile2/middle_end/monomorphize.cmo : \
+    src/typing/typing.cmo \
+    src/typing/types.cmo \
+    src/syntax/ast_mapper.cmo \
+    src/syntax/ast.cmo
+src/compile2/middle_end/monomorphize.cmx : \
+    src/typing/typing.cmx \
+    src/typing/types.cmx \
+    src/syntax/ast_mapper.cmx \
+    src/syntax/ast.cmx
+src/compile2/middle_end/normalize/anf.cmo : \
+    src/syntax/pattern.cmo \
+    src/syntax/ast_undecorated.cmo \
+    src/syntax/ast_subst.cmo \
+    src/syntax/ast.cmo
+src/compile2/middle_end/normalize/anf.cmx : \
+    src/syntax/pattern.cmx \
+    src/syntax/ast_undecorated.cmx \
+    src/syntax/ast_subst.cmx \
+    src/syntax/ast.cmx
+src/compile2/middle_end/normalize/anf2.cmo : \
+    src/syntax/pattern.cmo \
+    src/syntax/ast_undecorated.cmo \
+    src/syntax/ast_subst.cmo \
+    src/syntax/ast.cmo
+src/compile2/middle_end/normalize/anf2.cmx : \
+    src/syntax/pattern.cmx \
+    src/syntax/ast_undecorated.cmx \
+    src/syntax/ast_subst.cmx \
+    src/syntax/ast.cmx
+src/compile2/middle_end/normalize/fun_assign_name.cmo : \
+    src/syntax/map_pi.cmo \
+    src/syntax/ast_subst.cmo \
+    src/syntax/ast_mapper.cmo \
+    src/syntax/ast.cmo
+src/compile2/middle_end/normalize/fun_assign_name.cmx : \
+    src/syntax/map_pi.cmx \
+    src/syntax/ast_subst.cmx \
+    src/syntax/ast_mapper.cmx \
+    src/syntax/ast.cmx
+src/compile2/middle_end/normalize/fun_shape_entry_point.cmo : \
+    src/syntax/ast.cmo
+src/compile2/middle_end/normalize/fun_shape_entry_point.cmx : \
+    src/syntax/ast.cmx
+src/compile2/middle_end/normalize/instantiate.cmo : \
+    src/syntax/ast_subst.cmo \
+    src/syntax/ast_rename.cmo \
+    src/syntax/ast_mapper.cmo \
+    src/syntax/ast.cmo
+src/compile2/middle_end/normalize/instantiate.cmx : \
+    src/syntax/ast_subst.cmx \
+    src/syntax/ast_rename.cmx \
+    src/syntax/ast_mapper.cmx \
+    src/syntax/ast.cmx
+src/compile2/middle_end/normalize/move_down_gfun_under_exec_and_par.cmo : \
+    src/syntax/ast_subst.cmo \
+    src/syntax/ast_mapper.cmo \
+    src/syntax/ast.cmo
+src/compile2/middle_end/normalize/move_down_gfun_under_exec_and_par.cmx : \
+    src/syntax/ast_subst.cmx \
+    src/syntax/ast_mapper.cmx \
+    src/syntax/ast.cmx
+src/compile2/middle_end/optim/propagation.cmo : \
+    src/compile/combinational.cmo \
+    src/syntax/ast_subst.cmo \
+    src/syntax/ast_mapper.cmo \
+    src/syntax/ast.cmo
+src/compile2/middle_end/optim/propagation.cmx : \
+    src/compile/combinational.cmx \
+    src/syntax/ast_subst.cmx \
+    src/syntax/ast_mapper.cmx \
+    src/syntax/ast.cmx
+src/compile2/middle_end/rename_main_arg.cmo : \
+    src/syntax/ast_subst.cmo \
+    src/syntax/ast_pprint.cmo \
+    src/syntax/ast.cmo
+src/compile2/middle_end/rename_main_arg.cmx : \
+    src/syntax/ast_subst.cmx \
+    src/syntax/ast_pprint.cmx \
+    src/syntax/ast.cmx
+src/compile2/middle_end/transform/globalize_ref.cmo : \
+    src/syntax/ast_subst.cmo \
+    src/syntax/ast_mapper.cmo \
+    src/syntax/ast.cmo
+src/compile2/middle_end/transform/globalize_ref.cmx : \
+    src/syntax/ast_subst.cmx \
+    src/syntax/ast_mapper.cmx \
+    src/syntax/ast.cmx
+src/compile2/middle_end/transform/inline.cmo : \
+    src/typing/types.cmo \
+    src/prelude.cmo \
+    src/syntax/ast_subst.cmo \
+    src/syntax/ast_pprint.cmo \
+    src/syntax/ast_mapper.cmo \
+    src/syntax/ast.cmo
+src/compile2/middle_end/transform/inline.cmx : \
+    src/typing/types.cmx \
+    src/prelude.cmx \
+    src/syntax/ast_subst.cmx \
+    src/syntax/ast_pprint.cmx \
+    src/syntax/ast_mapper.cmx \
+    src/syntax/ast.cmx
+src/compile2/middle_end/transform/lambda_lifting.cmo : \
+    src/syntax/pattern.cmo \
+    src/syntax/free_vars.cmo \
+    src/syntax/ast_subst.cmo \
+    src/syntax/ast_mapper.cmo \
+    src/syntax/ast.cmo
+src/compile2/middle_end/transform/lambda_lifting.cmx : \
+    src/syntax/pattern.cmx \
+    src/syntax/free_vars.cmx \
+    src/syntax/ast_subst.cmx \
+    src/syntax/ast_mapper.cmx \
+    src/syntax/ast.cmx
+src/compile2/middle_end/transform/let_floating.cmo : \
+    src/syntax/map_pi.cmo \
+    src/syntax/ast_undecorated.cmo \
+    src/syntax/ast_subst.cmo \
+    src/syntax/ast.cmo
+src/compile2/middle_end/transform/let_floating.cmx : \
+    src/syntax/map_pi.cmx \
+    src/syntax/ast_undecorated.cmx \
+    src/syntax/ast_subst.cmx \
+    src/syntax/ast.cmx
+src/compile2/middle_end/transform/macro.cmo : \
+    src/syntax/ast_subst.cmo \
+    src/syntax/ast.cmo
+src/compile2/middle_end/transform/macro.cmx : \
+    src/syntax/ast_subst.cmx \
+    src/syntax/ast.cmx
+src/compile2/middle_end/transform/matching.cmo : \
+    src/syntax/map_pi.cmo \
+    src/syntax/ast_subst.cmo \
+    src/syntax/ast_mapper.cmo \
+    src/syntax/ast.cmo
+src/compile2/middle_end/transform/matching.cmx : \
+    src/syntax/map_pi.cmx \
+    src/syntax/ast_subst.cmx \
+    src/syntax/ast_mapper.cmx \
+    src/syntax/ast.cmx
+src/compile2/middle_end/transform/specialize.cmo : \
+    src/compile/middle_end/optim/propagation.cmo \
+    src/compile/middle_end/transform/let_floating.cmo \
+    src/syntax/ast_subst.cmo \
+    src/syntax/ast_rename.cmo \
+    src/syntax/ast_mapper.cmo \
+    src/syntax/ast.cmo
+src/compile2/middle_end/transform/specialize.cmx : \
+    src/compile/middle_end/optim/propagation.cmx \
+    src/compile/middle_end/transform/let_floating.cmx \
+    src/syntax/ast_subst.cmx \
+    src/syntax/ast_rename.cmx \
+    src/syntax/ast_mapper.cmx \
+    src/syntax/ast.cmx
+src/compile2/middle_end/transform/specialize_ref.cmo : \
+    src/typing/typing.cmo \
+    src/typing/types.cmo \
+    src/syntax/ast_mapper.cmo \
+    src/syntax/ast.cmo
+src/compile2/middle_end/transform/specialize_ref.cmx : \
     src/typing/typing.cmx \
     src/typing/types.cmx \
     src/syntax/ast_mapper.cmx \

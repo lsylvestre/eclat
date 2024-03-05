@@ -1249,13 +1249,13 @@ module Typing2 = struct
         (Ty_base TyB_unit, Dur_max(d1,d2))
 
 
-     | E_matrix_size(x,n) ->
+    (* | E_matrix_size(x,n) ->
          let tyx = typ_ident g x loc in
          let tz = new_size_unknown() in
          unify_ty ~loc (Ty_matrix(new_size_unknown (), new_tyB_unknown())) tyx;
          let ty = TyB_int (new_size_unknown()) in
          ty, Response_time.zero
-
+*)
     | E_matrix_get(x,es) ->
        let ty_list,d_list = List.split @@ List.map (fun ei ->
                       typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g ei) es in

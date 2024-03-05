@@ -1,6 +1,8 @@
 open Ast
 open Ast_subst
 
+let has_changed = ref false
+
 let applyed e =
   let open Ast in
 
@@ -53,12 +55,12 @@ let applyed e =
       aux xs' e1 ++ aux xs e0
   | E_exec(e1,e2,_) ->
       aux xs e1 ++ aux xs e2
-  | E_ref e1 ->
+  | E_ref(e1) ->
       aux xs e1
-  | E_get(x) ->
-      SMap.empty
-  | E_set(x,e1) ->
+  | E_get(e1) ->
       aux xs e1
+  | E_set(e1,e2) ->
+      aux xs e1 ++ aux xs e2
   | E_array_length _ ->
       SMap.empty
   | E_array_get(_,e1) ->
@@ -100,6 +102,20 @@ let hof x e =
       vars_of_p p |> SMap.filter (fun y _ -> y <> g && y <> x && SMap.mem y xs) |> SMap.is_empty |> not
   | _ -> false
 
+let p_without_fun f p =
+  let t = try Hashtbl.find Typing.signatures f with Not_found -> Types.unknown() (*TODO : check *) in
+                     let open Types in
+                     let targ = match canon t with T_fun{arg} -> arg | _ -> Types.unknown() (* assert false*) in
+                     let rec remove_fun t p = match canon t,p with 
+                      | _,P_unit -> P_unit
+                      | T_tuple ts,P_tuple ps -> P_tuple (List.map2 remove_fun ts ps)
+                      | T_fun{arg},_ -> P_unit
+                      | T_var{contents=Ty t},p -> remove_fun t p
+                      | _ -> p in
+  remove_fun targ p
+
+
+
 let specialize ds e =
   let open Ast in
   let rec spec funcs e =
@@ -108,25 +124,58 @@ let specialize ds e =
     | E_app(E_var f,xc2) ->
         (match SMap.find_opt f funcs with
         | None -> e
-        | Some (E_fun(p,e1)) -> E_letIn(p,xc2,e1)
-        | Some (E_fix(x,_) as phi) ->
-              let z = gensym ~prefix:x () in
-              E_letIn(P_var z, phi, E_app(E_var z,xc2))
-             (* TODO: recursive HOF not yet supported *)
+        | Some (E_tuple[E_var g;E_fix(_,(p,_))]) ->
+           let p' = p_without_fun f p in
+           let rec aux xc2 p =
+             match xc2,p with
+             | _,P_unit -> E_const Unit
+             | E_var _, _ -> xc2
+             | E_tuple es, P_tuple ps -> E_tuple (List.map2 aux es ps)
+             | e,_ -> e
+            in E_app(E_var f,aux xc2 p')
+        (* | Some ((E_var _ | E_tuple _) as pat_e) ->  Ast_subst.subst_p_e (exp2pat pat_e) E_app(E_var x,xc2)*)
+        | Some (E_fun(p,e1)) -> Anf.anf2 @@ E_letIn(p,xc2,e1)
+        | Some (E_fix(x,(p,e1))) ->
+              let p' = p_without_fun f p in
+              E_letIn(p,xc2,
+                let z = gensym ~prefix:x () in
+                let e1' = (* Ast_subst.subst_p_e p (Pattern.pat2exp p')*) e1 in
+                E_letIn(P_var z, E_fix(x,(p',e1')), E_app(E_var z,Pattern.pat2exp p')))
 
         | Some _ ->
             assert false (* ill typed *)
       )
     | E_app(e1,xc) ->
         E_app(spec funcs e1,xc)
-    | E_letIn(P_var x,((E_var _ (*
-     | E_tuple _ *)
-     ) as xc1),e2) ->
+    | E_letIn(P_var x,((E_var _ | E_tuple _) as xc1),e2) ->
         (* copy propagation to remove aliasing of global functions *)
         spec funcs (Ast_subst.subst_e x xc1 e2)
-    | E_letIn(P_var x,((E_fun _| E_fix _) as e1),e2) ->
-        let e1' = spec funcs e1 in
+   (*  | E_letIn(P_var x,(E_fix(f,(p,e1))),e2) ->
+        let p' = 
+                let t = try Hashtbl.find Typing.signatures f with Not_found -> Types.unknown() (*TODO : check *) in
+                     let open Types in
+                     let targ = match canon t with T_fun{arg} -> arg | _ -> Types.unknown() (* assert false*) in
+                     let rec keep_fun t p = match canon t,p with 
+                      | _,P_unit -> P_unit
+                      | T_tuple ts,P_tuple ps -> P_tuple (List.map2 keep_fun ts ps)
+                      | T_fun{arg},P_var x -> P_var x
+                      | T_var{contents=Ty t},p -> keep_fun t p
+                      | _ -> P_unit in
+                      keep_fun targ p
+              in
+
+        let e1' = spec (SMap.add x (Pattern.pat2exp p') funcs) e1 in
         if hof x e1 then spec (SMap.add x e1' funcs) e2 else
+        E_letIn(P_var x,e1',spec funcs e2)*)
+    | E_letIn(P_var x,(E_fix(x',(p,_)) as e1),e2) ->
+        let e1' = spec (SMap.add x' (E_tuple[E_var x;e1]) funcs) e1 in
+        if hof x e1 then (has_changed := true; spec (SMap.add x e1' funcs) e2) 
+        else
+        E_letIn(P_var x,e1',spec funcs e2)
+    | E_letIn(P_var x,((E_fun _) as e1),e2) ->
+        let e1' = spec funcs e1 in
+        if hof x e1 then (has_changed := true; spec (SMap.add x e1' funcs) e2)
+        else
         E_letIn(P_var x,e1',spec funcs e2)
     | E_letIn(p,e1,e2) ->
         E_letIn(p,spec funcs e1,spec funcs e2)
@@ -142,11 +191,9 @@ let rec list_update (x,v) = function
 
 
 let specialize_pi pi =
-  let pi = Ast_rename.rename_pi pi in
-  let pi = Anf2.anf_pi pi in
+  has_changed := false;
+  let _ = Typing.typing_with_argument ~collect_sig:true pi [] in
+  (* let pi = Anf.anf_pi pi in*) (* already in anf-form *)
   let main = specialize [] pi.main in
   { pi with main }
-  |> Let_floating.let_floating_pi  (* needed *)
   |> Propagation.propagation_pi    (* needed *)
-
-  (* todo: repeat until fixpoint *)

@@ -20,7 +20,7 @@ open Pattern
 (** [fv ~statics ~decls e] returns the free variables of [e] that are not
     global definitions (bound in ~static and ~decls) *)
 let fv ~statics e =
-  SMap.filter (fun x _ -> not (SMap.mem x statics)) (Free_vars.fv ~get_arrays:true e)
+  SMap.filter (fun x _ -> not (SMap.mem x statics)) (Free_vars.fv ~get_arrays:false e)
 
 (** [has_changed] boolean flag setted to true each time a [lift] pass modifies
     the input expression *)
@@ -30,26 +30,15 @@ let has_changed = ref false
     (as a collection of name grouped in a pattern) *)
 type env = p smap
 
+let declare ds e =
+  List.fold_right (fun (x,v) e -> E_letIn(P_var x,v,e)) ds e
+
 let rec rename_fun_e = function
   | E_letIn(P_var f,((E_fun _ | E_fix _) as phi),e2) ->
       let g = gensym ~prefix:f () in
       E_letIn(P_var g,rename_fun_e @@ phi,rename_fun_e @@ Ast_subst.subst_e f (E_var g) e2)
   | e -> Ast_mapper.map rename_fun_e e
 
-let wrap_fix_in_fun e =
-  let rec aux env e = match e with
-  | E_fix(f,((P_tuple[p;penv] as pp),e1)) ->
-        (match penv with
-        | P_unit -> e
-        | _ ->
-            E_fun(pp,
-              E_letIn(P_var f,
-                 E_fix(f,(p,aux (f::env) e1)), 
-                 E_app(E_var f,pat2exp p))))
-  | E_app(E_var g,E_tuple[e1;e2]) when List.mem g env ->
-       E_app(E_var g,e1)
-    | e -> Ast_mapper.map (aux env) e
-  in aux [] e
 
 (** [lifting ~statics ~decls e] lifts expression [e]
     considering [~statics] and [~decls] as toplevel definitions
@@ -118,7 +107,6 @@ let lifting ~statics (env:env) (e:e) : e =
     | E_letIn(p,e1,e2) ->
         let env' = env_filter env p in  (* todo: idem with E_match to avoid capture *)
         E_letIn(p,lift env e1,lift env' e2)
-  
     | E_match(e1,hs,eo) ->
         let e1' = lift env e1 in
         let hs' = List.map (fun (inj,(p,ei)) ->
@@ -129,8 +117,7 @@ let lifting ~statics (env:env) (e:e) : e =
     | E_reg((p,e1),e0,l) ->
         let env' = env_filter env p in
         E_reg((p,lift env' e1),lift env e0,l)
-
-
+    
     (* | E_absLabel(l,e1) -> 
         let env' = env_filter env (P_var l) in
         E_absLabel(l,lift env' e1)*)
@@ -148,81 +135,132 @@ let rec lift_until ~statics (e:e) =
   if !has_changed then lift_until ~statics e' else e'
 
 
-(** since recursive functions cannot have functions or references as parameters,
-    [fix(f,fun (p,p_env) -> e)] is rewritten as 
-    [fun (p,p_env) -> let f = fix f (fun p -> e) in f p]
-    and function applications are rewritten accordingly.
-*)
-(*
-let wrap_fix_in_fun e =
-  let rec aux env e = match e with
-  | E_fix(f,((P_tuple[p;penv] as pp),e1)) ->
-        (match penv with
-        | P_unit -> e
-        | _ ->
-            E_fun(pp,
-              E_letIn(P_var f,
-                 E_fix(f,(p,aux (f::env) e1)), 
-                 E_app(E_var f,pat2exp p))))
-  | E_app(E_var g,E_tuple[e1;e2]) when List.mem g env ->
-       E_app(E_var g,e1)
-    | e -> Ast_mapper.map (aux env) e
-  in aux [] e
-*)
-
 
 (** [globalize e] globalizes all local *close* functions in expression [e] *)
-let rec globalize_e ?(wrap_fix=true) (e:e) : ((x * e) list * e) =
-    let open Ast_mapper in 
-    accum (fun glob e ->
+let globalize_e (e:e) : ((x * e) list * e) =
+  let rec glob e =
+    let open Ast in
+      let globalize_list es =
+        let rec loop dss es_acc es =
+          match es with
+          | [] -> List.concat (List.rev dss), List.rev es_acc
+          | ei::es' ->
+             let (dsi,ei') = glob ei in
+             loop (dsi::dss) (ei'::es_acc) es'
+      in loop [] [] es
+    in
     match e with
+    | E_deco _ ->
+        Ast_undecorated.still_decorated e
+    | E_const _ | E_var _ -> [],e
+    | E_tuple es ->
+        let ds,es' = globalize_list es in
+        ds,E_tuple(es')
+    | E_app(e1,e2) ->
+        let ds1,e1' = glob e1 in
+        let ds2,e2' = glob e2 in
+        ds1@ds2,E_app(e1',e2')
     | E_letIn(P_var f,(E_fix _ | E_fun _ as v),e2) ->
         let dsv,v = glob v in
         let ds,e2' = glob e2 in
-        Some ((dsv@[(f,v)]@ds),e2') 
-    (* | E_fix(f,(p,e1)) ->
+        (dsv@[(f,v)]@ds),e2'
+    | E_fix(f,(p,e1)) ->
         let ds1,e1' = glob e1 in
-        let v = E_fix(f,(p,e1')) in
-        let v' = if (* !Typing.accept_ref_arg_flag || *) wrap_fix 
-                 then wrap_fix_in_fun v else v in
-        Some (ds1,v')*)
+        ds1,E_fix(f,(p,e1'))
+    | E_fun(p,e1) ->
+        let ds1,e1' = glob e1 in
+        ds1,E_fun(p,e1')
+    | E_if(e1,e2,e3) ->
+        let ds1,e1' = glob e1 in
+        let ds2,e2' = glob e2 in
+        let ds3,e3' = glob e3 in
+        ds1@ds2@ds3,E_if(e1',e2',e3')
+    | E_case(e1,hs,e_els) ->
+      let ds1,e1' = glob e1 in
+      let dss,hs' = List.split @@ List.map (fun (c,e) -> let ds,e' = glob e in ds,(c,e')) hs in
+      let ds,e_els' = glob e_els in
+      ds1@List.concat dss@ds, E_case(e1',hs',e_els')
+    | E_match(e1,hs,eo) ->
+      let ds1,e1' = glob e1 in
+      let dss,hs' = List.split @@ List.map (fun (x,(p,e)) -> let ds,e' = glob e in ds,(x,(p,e'))) hs in
+      let dsw,eo' = match eo with
+                    | None -> [],eo
+                    | Some ew -> let dsw,ew' = glob ew in
+                                 (dsw,Some ew')
+      in
+      ds1@List.concat dss@dsw, E_match(e1',hs',eo')
+    | E_letIn(p,e1,e2) ->
+        let ds1,e1' = glob e1 in
+        let ds2,e2' = glob e2 in
+        ds1@ds2,E_letIn(p,e1',e2')
+    | E_set(x,e1) ->
+        let ds1,e1' = glob e1 in
+        ds1,E_set(x,e1')
+    | E_array_length _ ->
+        [],e
+    | E_array_get(x,e1) ->
+        let ds1,e1' = glob e1 in
+        ds1,E_array_get(x,e1')
+    | E_array_set(x,e1,e2) ->
+        let ds1,e1' = glob e1 in
+        let ds2,e2' = glob e2 in
+        ds1@ds2,E_array_set(x,e1',e2')
+    | E_matrix_size _ ->
+        [],e
+    | E_matrix_get(x,es) ->
+        let ds,es' = globalize_list es in
+        ds,E_matrix_get(x,es')
+    | E_matrix_set(x,es,e2) ->
+        let ds,es' = globalize_list es in
+        let ds2,e2' = glob e2 in
+        ds@ds2,E_matrix_set(x,es',e2')
+    | E_par(es) ->
+        let ds,es' = globalize_list es in
+        ds,E_par(es')
     | E_reg((p,e1),e0,l) ->
         let ds1,e1' = glob e1 in
         let ds0,e0' = glob e0 in
-        Some (ds0,E_reg((p,declare ds1 e1'),e0',l))
+        ds0,E_reg((p,declare ds1 e1'),e0',l)
     | E_exec(e1,e0,l) ->
         let ds1,e1' = glob e1 in
         let ds0,e0' = glob e0 in
-        Some (ds0,E_exec(declare ds1 e1',e0',l))
+        ds0,E_exec(declare ds1 e1',e0',l)
     | E_absLabel (l, e1) ->
         let ds1,e1' = glob e1 in
-        Some ([],E_absLabel (l, declare ds1 e1'))   (* scope is ok ? *)
+        [],E_absLabel (l, declare ds1 e1')   (* scope is ok ? *)
     | E_appLabel (e1,l,lc) ->
         let ds1,e1' = glob e1 in
-        Some ([],E_appLabel (declare ds1 e1',l,lc))   (* scope is ok ? *)
+        [],E_appLabel (declare ds1 e1',l,lc)   (* scope is ok ? *)
     | E_for(x,e_st1,e_st2,e3,loc) ->
         let ds1,e_st1' = glob e_st1 in
         let ds2,e_st2' = glob e_st2 in
         let ds3,e3' = glob e3 in
-        Some ([],E_for(x,declare ds1 e_st1',
-                       declare ds2 e_st2',
-                       declare ds3 e3',loc))
-    | _ -> None
-  ) e
+        [],E_for(x,declare ds1 e_st1',
+                   declare ds2 e_st2',
+                   declare ds3 e3',loc)
+         (* NB: definitions in [e_st1] and [e_st2] and [e3]
+            are *not* globalized *)
+    | E_generate((p,e1),e2,e_st3,loc) ->
+      let ds1,e1' = glob e1 in
+      let ds2,e2' = glob e2 in
+      let ds3,e_st3' = glob e_st3 in
+      ds2,E_generate((p,declare ds1 e1'),e2',declare ds3 e_st3',loc)
+      (* NB: definitions in [e_st1] are *not* globalized *)
+  in glob e
+
+
 
 (** [lambda_lifting ~statics e] lambda-lifts expression [e],
     considering [~statics] as toplevel definitions
     that should not be added to lexical environments. *)
 let lambda_lifting ~statics ~globalize (e:e) : ((x * e) list * e) =
     let e_lifted = (lift_until ~statics e) in
-    (* Format.(fprintf std_formatter "---> %a\n" Ast_pprint.pp_exp e_lifted); *)
     if globalize then globalize_e (rename_fun_e e_lifted) else ([],e_lifted)
 
 
 (** [lambda_lifting_pi ~globalize:true pi] lambda-lifts program [pi]. *)
-let lambda_lifting_pi ?(globalize=true) (pi:pi) : pi =
+let lambda_lifting_pi ?(globalize=false) (pi:pi) : pi =
   let statics = smap_of_list pi.statics in
-  (* let ds_ref,e = Globalize_ref.globalize_ref_e pi.main in *)
   let (ds,e) = lambda_lifting ~statics ~globalize pi.main in
-  let main = Ast_mapper.declare [] @@ Ast_mapper.declare ds e in
+  let main = declare ds e in
   {pi with main}

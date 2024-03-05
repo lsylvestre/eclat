@@ -1,6 +1,8 @@
 open Ast
 open Ast_subst
 
+let has_changed = ref false
+
 let eval_static_exp_int ~loc ~statics e =
   let exception Cannot in 
   let rec eval e =
@@ -51,15 +53,19 @@ let inline_with_statics ~statics e =
     match e with
     | E_letIn(p,e1,e2) ->
         (match p,e1 with
-        | P_var x,E_fun _ -> inline @@ subst_e x e1 e2
+        | P_var x,E_fun _ -> 
+            has_changed := true;
+            inline @@ subst_e x e1 e2
         | _ -> E_letIn(p,inline e1,inline e2))
 
     | E_app(E_fun(p,e1),e2) ->
+        has_changed := true;
         (* substitution is needed (rather than a let-binding)
            since e2 could be a function (fun x -> e3)       (* no, first order now *) (* ah ? *) *)
         inline @@ E_letIn(p,e2,e1)
 
     | E_generate((p,e1),init,e_st3,loc) ->
+        has_changed := true;
         let (n,w) = eval_static_exp_int ~loc ~statics e_st3 in
         inline @@
         let rec loop i =
@@ -69,6 +75,7 @@ let inline_with_statics ~statics e =
          in loop 0
 
     | E_for(x,e_st1,e_st2,e3,loc) ->
+        has_changed := true;
         let (n,w) = eval_static_exp_int ~loc ~statics e_st1 in
         let (m,w') = eval_static_exp_int ~loc ~statics e_st2 in
         (* assert(w = w'); *)
@@ -81,6 +88,7 @@ let inline_with_statics ~statics e =
                 E_const Unit)
 
     | E_appLabel(e1,l,lc) ->
+        has_changed := true;
         inline (app_labelC e1 l lc)
    
     | e -> Ast_mapper.map inline e
@@ -88,5 +96,6 @@ let inline_with_statics ~statics e =
   inline e
 
 let inl_pi pi =
+  has_changed := false;
   let main = inline_with_statics ~statics:pi.statics pi.main in
   { pi with main }

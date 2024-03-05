@@ -53,8 +53,6 @@ OBJS= $(SRC_DIR)/prelude.cmo \
       $(SRC_DIR)/compile/middle_end/optim/propagation.cmo \
       \
       $(SRC_DIR)/compile/middle_end/normalize/anf.cmo \
-      $(SRC_DIR)/compile/middle_end/normalize/anf2.cmo \
-      \
       $(SRC_DIR)/compile/middle_end/transform/let_floating.cmo \
       $(SRC_DIR)/compile/middle_end/transform/globalize_ref.cmo \
       $(SRC_DIR)/compile/middle_end/transform/specialize_ref.cmo \

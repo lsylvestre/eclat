@@ -39,9 +39,6 @@ let linear_bindings (e:e) : set =
       aux e1; aux e0
   | E_exec(e1,e2,_) ->
       aux e1; aux e2
-  | E_ref(e1) ->
-      aux e1
-  | E_get _ -> ()
   | E_set(_,e1) ->
       aux e1
   | E_array_length _ ->
@@ -89,7 +86,7 @@ let propagation e =
   let rec prop e =
     match e with
     | E_letIn(P_tuple ps,E_tuple es,e2) ->
-        prop @@ List.fold_left2 (fun e pi ei -> subst_p_e pi (prop ei) e) (* (prop e2)*) e2 ps es
+        List.fold_left2 (fun e pi ei -> subst_p_e pi (prop ei) e) (prop e2) ps es
     | E_letIn(P_var x as p,e1,e2) ->
         let e1' = prop e1 in
         if propagable e1'

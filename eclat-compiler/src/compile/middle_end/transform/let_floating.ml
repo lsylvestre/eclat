@@ -64,22 +64,13 @@ and glob (e:e) : ((p * e) list * e) =
       dsw@ds1,E_match(e1',hs',eo')
   | E_letIn(p,e1,e2) ->
       let ds1,e1' = glob e1 in
-      let ds2,e2' = glob e2 in
-      ds1@[(p,e1')]@ds2,e2'  (* ok with side effects ? *)
-  (* | E_letIn(p,e1,e2) ->
-      let ds1,e1' = glob e1 in
-      ds1@[(p,e1')],let_floating e2 *)
+      ds1@[(p,e1')],let_floating e2
   | E_reg((p,e1),e0,l) ->
       let ds0,e0' = glob e0 in
       ds0,E_reg((p,let_floating e1),e0',l)
   | E_exec(e1,e0,l) ->
       let ds0,e0' = glob e0 in
       ds0,E_exec(let_floating e1,e0',l)
-  | E_ref e1 ->
-      let ds1,e1' = glob e1 in
-      ds1,E_ref e1'
-  | E_get _ ->
-      [],e
   | E_set(x,e1) ->
       let ds1,e1' = glob e1 in
       ds1,E_set(x,e1')
