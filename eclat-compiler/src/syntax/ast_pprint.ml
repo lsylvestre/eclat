@@ -285,9 +285,10 @@ let pp_exp (fmt:fmt) (e:e) : unit =
         fprintf fmt "@[<v>%a := %a@]"
           (pp_e ~paren:true) e1
           (pp_e ~paren:true) e2) fmt ()
-  | E_local_static_array(c,n) ->
-     fprintf fmt "%a^d"
-        pp_const c
+  | E_local_static_array(e1,e2,_) ->
+     fprintf fmt "%a^%a"
+        (pp_e ~paren:true) e1
+        (pp_e ~paren:true) e2
   | E_array_length(x) ->
       fprintf fmt "@[<v>%a.length@]"
         pp_ident x
@@ -301,6 +302,9 @@ let pp_exp (fmt:fmt) (e:e) : unit =
           pp_ident x
           (pp_e ~paren:false) e1
           (pp_e ~paren:false) e2) fmt ()
+  | E_local_static_matrix(e1,es,_) ->
+     fprintf fmt "%a" (pp_e ~paren:true) e1;
+     List.iter (fun e -> fprintf fmt "^%a" (pp_e ~paren:true) e) es
   | E_matrix_size(x,n) ->
       fprintf fmt "@[<v>%a.(%d).size@]"
         pp_ident x n

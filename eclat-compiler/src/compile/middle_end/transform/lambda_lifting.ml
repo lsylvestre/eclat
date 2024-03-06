@@ -193,10 +193,21 @@ let globalize_e (e:e) : ((x * e) list * e) =
         let ds1,e1' = glob e1 in
         let ds2,e2' = glob e2 in
         ds1@ds2,E_letIn(p,e1',e2')
-    | E_set(x,e1) ->
+    | E_ref(e1) ->
         let ds1,e1' = glob e1 in
-        ds1,E_set(x,e1')
-    | E_array_length _ ->
+        ds1,E_ref(e1')
+    | E_get(e1) ->
+        let ds1,e1' = glob e1 in
+        ds1,E_get(e1')
+    | E_set(e1,e2) ->
+        let ds1,e1' = glob e1 in
+        let ds2,e2' = glob e2 in
+        ds1@ds2,E_set(e1',e2)
+    | E_local_static_array(e1,e2,loc) ->
+        let ds1,e1' = glob e1 in
+        let ds2,e2' = glob e2 in
+        ds1@ds2,E_local_static_array(e1',e2',loc)
+   | E_array_length _ ->
         [],e
     | E_array_get(x,e1) ->
         let ds1,e1' = glob e1 in
@@ -205,6 +216,10 @@ let globalize_e (e:e) : ((x * e) list * e) =
         let ds1,e1' = glob e1 in
         let ds2,e2' = glob e2 in
         ds1@ds2,E_array_set(x,e1',e2')
+    | E_local_static_matrix(e1,es,loc) ->
+        let ds1,e1' = glob e1 in
+        let ds,es' = globalize_list es in
+        ds1@ds,E_local_static_matrix(e1',es',loc)
     | E_matrix_size _ ->
         [],e
     | E_matrix_get(x,es) ->

@@ -4,7 +4,6 @@
 type token = 
   | XOR
   | WITH
-  | VAR
   | UP_IDENT of (string)
   | TYPE
   | TVAR_IDENT of (string)
@@ -31,7 +30,6 @@ type token =
   | PIPE_PIPE
   | PIPE_COMMA_PIPE
   | PIPE
-  | PAR
   | OR
   | OF
   | NOT

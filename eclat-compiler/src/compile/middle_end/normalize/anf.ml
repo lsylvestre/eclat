@@ -218,8 +218,12 @@ let rec anf2 (e:e) : e =
       E_set(xc1,xc2)
   | E_array_length _ ->
       [],e
-  | E_local_static_array _ ->
-      [],e
+  | E_local_static_array(e1,e2,loc) ->
+      let ds1,e1' = glob e1 in
+      let ds2,e2' = glob e2 in
+      ds1@ds2,plug e1' @@ fun xc1 ->
+              plug e2' @@ fun xc2 ->
+              E_local_static_array(xc1,xc2,loc)
   | E_array_get(x,e1) ->
       let ds1,e1' = glob e1 in
       ds1,plug e1' @@ fun xc1 ->
@@ -230,6 +234,13 @@ let rec anf2 (e:e) : e =
       ds1@ds2,plug e1' @@ fun xc1 ->
               plug e2' @@ fun xc2 ->
               E_array_set(x,xc1,xc2)
+  | E_local_static_matrix(e1,es,loc) ->
+      let ds1,e1' = glob e1 in
+      let dss,es' = List.split (List.map glob es) in
+      List.concat dss@ds1,
+      plug e1' @@ fun xc1 ->
+      plug_n es' @@ fun xs ->
+      E_local_static_matrix(xc1,xs,loc)
   | E_matrix_size _ ->
       [],e
   | E_matrix_get(x,es) ->

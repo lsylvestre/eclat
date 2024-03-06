@@ -29,14 +29,16 @@ let rec map f e =
       E_get(f e1)
   | E_set(e1,e2) ->
       E_set(f e1,f e2)
-  | E_local_static_array _ ->
-      e
+  | E_local_static_array(e1,e2,deco) ->
+      E_local_static_array(f e1,f e2,deco)
   | E_array_length _ ->
       e
   | E_array_get(x,e1) ->
       E_array_get(x,f e1)
   | E_array_set(x,e1,e2) ->
       E_array_set(x,f e1, f e2)
+  | E_local_static_matrix(e1,es,deco) ->
+      E_local_static_matrix(f e1,List.map f es,deco)
   | E_matrix_size _ ->
       e
   | E_matrix_get(x,es) ->
@@ -92,14 +94,16 @@ let rec iter f (e:e) : unit =
       f e1; f e0
   | E_exec(e1,e2,_) ->
       f e1; f e2
-  | E_local_static_array _ ->
-      ()
+  | E_local_static_array(e1,e2,_) ->
+      f e1; f e2
   | E_array_length _ ->
       ()
   | E_array_get(_,e1) ->
       f e1
   | E_array_set(_,e1,e2) ->
       f e1; f e2
+  | E_local_static_matrix(e1,es,_) ->
+      f e1; List.iter f es  
   | E_matrix_size _ ->
       ()
   | E_matrix_get(_,es) ->
@@ -122,7 +126,7 @@ let declare ds e =
 let accum f (e:e) : ((x * e) list * e) =
   let rec aux e =
     let open Ast in
-      let auxalize_list es =
+      let aux_list es =
         let rec loop dss es_acc es =
           match es with
           | [] -> List.concat (List.rev dss), List.rev es_acc
@@ -140,7 +144,7 @@ let accum f (e:e) : ((x * e) list * e) =
             ds1, E_deco(e1',deco)
         | E_const _ | E_var _ -> [],e
         | E_tuple es ->
-            let ds,es' = auxalize_list es in
+            let ds,es' = aux_list es in
             ds,E_tuple(es')
         | E_app(e1,e2) ->
             let ds1,e1' = aux e1 in
@@ -185,8 +189,10 @@ let accum f (e:e) : ((x * e) list * e) =
             let ds1,e1' = aux e1 in
             let ds2,e2' = aux e2 in
             ds1@ds2,E_set(e1',e2')
-        | E_local_static_array _ ->
-            [],e
+        | E_local_static_array(e1,e2,deco) ->
+            let ds1,e1' = aux e1 in
+            let ds2,e2' = aux e2 in
+            ds1@ds2,E_local_static_array(e1',e2',deco)
         | E_array_length _ ->
             [],e
         | E_array_get(x,e1) ->
@@ -196,17 +202,21 @@ let accum f (e:e) : ((x * e) list * e) =
             let ds1,e1' = aux e1 in
             let ds2,e2' = aux e2 in
             ds1@ds2,E_array_set(x,e1',e2')
+        | E_local_static_matrix(e1,es,deco) ->
+            let ds1,e1' = aux e1 in
+            let ds,es' = aux_list es in
+            ds1@ds,E_local_static_matrix(e1',es',deco)
         | E_matrix_size _ ->
             [],e
         | E_matrix_get(x,es) ->
-            let ds,es' = auxalize_list es in
+            let ds,es' = aux_list es in
             ds,E_matrix_get(x,es')
         | E_matrix_set(x,es,e2) ->
-            let ds,es' = auxalize_list es in
+            let ds,es' = aux_list es in
             let ds2,e2' = aux e2 in
             ds@ds2,E_matrix_set(x,es',e2')
         | E_par(es) ->
-            let ds,es' = auxalize_list es in
+            let ds,es' = aux_list es in
             ds,E_par(es')
         | E_reg((p,e1),e0,l) ->
             let ds1,e1' = aux e1 in

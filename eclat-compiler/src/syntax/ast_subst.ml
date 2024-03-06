@@ -59,13 +59,16 @@ let subst_e x ex e =
     | E_array_length(y) ->
         let z = if x <> y then y else as_ident ex in
         E_array_length(z)
-    | E_local_static_array _ -> e
+    | E_local_static_array(e1,e2,deco) ->
+        E_local_static_array(ss e1,ss e2,deco)
     | E_array_get(y,e1) ->
         let z = if x <> y then y else as_ident ex in
         E_array_get(z, ss e1)
     | E_array_set(y,e1,e2) ->
         let z = if x <> y then y else as_ident ex in
         E_array_set(z, ss e1, ss e2)
+    | E_local_static_matrix(e1,es,deco) ->
+        E_local_static_matrix(ss e1,List.map ss es,deco)
     | E_matrix_size(y,n) ->
         let z = if x <> y then y else as_ident ex in
         E_matrix_size(z,n)
@@ -162,13 +165,16 @@ let subst_label l1 l2 e =
     match e with
     (* 
        E_reg _ | E_exec _ | E_set -> ? *)
-    | E_local_static_array _ -> e
+    | E_local_static_array(e1,e2,deco) ->
+        E_local_static_array(ss e1,ss e2,deco)
     | E_array_length(l) ->
         E_array_length(subst_l l)
     | E_array_get(l,e1) ->        
         E_array_get(subst_l l,ss e1)
     | E_array_set(l,e1,e2) ->
         E_array_set(subst_l l,ss e1,ss e2)
+    | E_local_static_matrix(e1,es,deco) ->
+        E_local_static_matrix(ss e1,List.map ss es,deco)
     | E_matrix_size(x,n) ->
         E_matrix_size(subst_l x,n)
     | E_matrix_get(l,es) ->        

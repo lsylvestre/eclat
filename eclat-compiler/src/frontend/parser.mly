@@ -10,14 +10,14 @@
   let with_file loc =
     (!Current_filename.current_file_name, loc)
 
-
   let alias_types = Hashtbl.create 10
 
   let rec as_const loc e =
     match un_annot e with
     | E_const c -> c
     | E_tuple es -> C_tuple(List.map (as_const loc) es)
-    | _ -> Prelude.Errors.raise_error ~loc:(with_file loc)
+    | _ -> Format.fprintf Format.std_formatter "--->%a\n" Ast_pprint.pp_exp e;
+    Prelude.Errors.raise_error ~loc:(with_file loc)
               ~msg:"this expression should be a constant" ()
 
 %}
@@ -28,7 +28,7 @@
 %token NODE IMPLY
 %token MATCH WITH PIPE END
 %token OF
-%token LET REC AND IN IF THEN ELSE FIX VAR
+%token LET REC AND IN IF THEN ELSE FIX
 %token <string> IDENT UP_IDENT TVAR_IDENT
 %token <bool> BOOL_LIT
 %token <int> INT_LIT
@@ -40,7 +40,7 @@
 %token EXIT_REPL
 %token <string> STRING_LIT
 %token QUOTE TYPE
-%token TILDE PAR GENERATE
+%token TILDE GENERATE
 %token FOR TO DO DONE 
 %token REF COL_EQ BANG
 %token BIG_LAMBDA 
@@ -78,24 +78,39 @@ pi:
 | EOF { [],[],[] }
 
 static: /* todo: add loc and type annotation [tyopt] */
-| LET STATIC x=IDENT EQ w=const_init_static n=static_dim SEMI_SEMI {
-      let (ce,tyopt) = w in
-      let c = as_const $loc ce in 
-      (x,Static_array(c,n)) 
+| LET STATIC x=IDENT EQ e=app_exp SEMI_SEMI {
+      match un_deco e with
+      | E_local_static_array(e1,e2,loc) ->
+         let c1 = try e2c e1 with Not_a_constant -> 
+                Prelude.Errors.raise_error ~loc
+                   ~msg:("default element for array "^x^" should be a constant") () in
+         let c2 = try e2c e2 with Not_a_constant -> 
+                Prelude.Errors.raise_error ~loc
+                   ~msg:("size for array "^x^" should be an integer") () in
+         (match c2 with
+         | Int(n2,_) ->
+             (x,Static_array(c1,n2))
+         | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
+                   ~msg:("size for array "^x^" should be an integer") ())
+      | E_local_static_matrix(e1,es,loc) ->
+         let c1 = try e2c e1 with Not_a_constant -> 
+                Prelude.Errors.raise_error ~loc:(with_file $loc)
+                   ~msg:("default element for matrix "^x^" should be a constant") () in
+         let cs = try List.map e2c es with Not_a_constant -> 
+                Prelude.Errors.raise_error ~loc:(with_file $loc)
+                   ~msg:("dimensions for matrix "^x^" should be integers") () in
+         let ns = List.map (function Int(n,_) -> n 
+                            | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
+                                     ~msg:("dimensions for matrix "^x^" should be integers") ()) cs in
+         x,Static_matrix(c1,ns)
+      | E_const c -> (x,Static_const(c))
+      | e -> Prelude.Errors.raise_error ~loc:(with_file $loc)
+               ~msg:("static variable "^x^
+                     " should be constant, an array or a matrice") ()
   }
-| LET STATIC x=IDENT EQ w=const_init_static n=static_dim n_list=static_dim+ SEMI_SEMI {
-      let (ce,tyopt) = w in
-      let c = as_const $loc ce in
-      (x,Static_matrix(c,n::n_list)) 
-  }
-| LET STATIC x=IDENT EQ ec=aexp SEMI_SEMI {
-      let c = as_const $loc ec in
-      (x,Static_const c)
 
-}
 
-static_dim: HAT n=INT_LIT { n }
-
+static_dim_exp: HAT e=aexp { e }
 
 const_init_static:
 | ce=aexp { (ce,None) }
@@ -340,6 +355,11 @@ app_exp:
   e=app_exp_desc { mk_loc (with_file $loc) e }
 
 app_exp_desc:
+| e1=aexp es=static_dim_exp+
+   { match es with
+     | [] -> assert false
+     | [e2] -> E_local_static_array(e1,e2, with_file $loc)
+     | es' -> E_local_static_matrix(e1,es', with_file $loc) }
 | ex=aexp COL_EQ e=app_exp { E_set(ex,e) }
 | REF e=aexp            { E_ref e }
 | x=IDENT LBRACKET e1=exp RBRACKET
@@ -417,10 +437,6 @@ aexp:
   e=aexp_desc { mk_loc (with_file $loc) e }
 
 aexp_desc:
-| w=const_init_static HAT n=INT_LIT 
-   { let (ce,tyopt) = w in 
-     let c = as_const $loc ce in 
-     E_local_static_array(c,n) }
 | BANG ex=aexp { E_get(ex) }
 | LPAREN e=exp RPAREN { e }
 | LPAREN e=exp COL ty=ty RPAREN { ty_annot ~ty e }

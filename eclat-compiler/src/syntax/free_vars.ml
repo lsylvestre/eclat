@@ -60,7 +60,8 @@ let fv ?(get_arrays=true) ?(xs=SMap.empty) e =
   | E_set(e1,e2) ->
       (if get_arrays then aux xs e1 else SMap.empty) 
       ++ aux xs e2
-  | E_local_static_array _ -> SMap.empty
+  | E_local_static_array(e1,e2,_) ->
+      aux xs e1 ++ aux xs e2
   | E_array_length(x) ->
       if get_arrays 
       then SMap.singleton x () 
@@ -75,6 +76,8 @@ let fv ?(get_arrays=true) ?(xs=SMap.empty) e =
       if get_arrays 
       then SMap.add x () vs 
       else vs
+  | E_local_static_matrix(e1,es,_) ->
+      aux xs e1 ++ fv_list xs es
   | E_matrix_size(x,_) ->
       if get_arrays 
       then SMap.singleton x () 

@@ -30,7 +30,6 @@
        "mod",   MOD;
        "last",  LAST;
        "default",  DEFAULT;
-       "var", VAR;
        "static", STATIC;
        "match", MATCH;
        "with", WITH;
@@ -45,8 +44,6 @@
        "resize_int", RESIZE_INT;
        "tuple_of_int",TUPLE_OF_INT;
        "type", TYPE;
-       "par",  PAR;
-       "spawn", PAR;
        "generate", GENERATE;
        "to", TO;
        "do", DO;

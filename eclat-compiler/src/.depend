@@ -249,11 +249,15 @@ src/compile/middle_end/rename_main_arg.cmx : \
     src/syntax/ast_pprint.cmx \
     src/syntax/ast.cmx
 src/compile/middle_end/transform/globalize_arrays.cmo : \
+    src/prelude.cmo \
     src/syntax/ast_subst.cmo \
+    src/syntax/ast_pprint.cmo \
     src/syntax/ast_mapper.cmo \
     src/syntax/ast.cmo
 src/compile/middle_end/transform/globalize_arrays.cmx : \
+    src/prelude.cmx \
     src/syntax/ast_subst.cmx \
+    src/syntax/ast_pprint.cmx \
     src/syntax/ast_mapper.cmx \
     src/syntax/ast.cmx
 src/compile/middle_end/transform/inline.cmo : \
@@ -283,16 +287,6 @@ src/compile/middle_end/transform/lambda_lifting.cmx : \
     src/syntax/ast_undecorated.cmx \
     src/syntax/ast_subst.cmx \
     src/syntax/ast_mapper.cmx \
-    src/syntax/ast.cmx
-src/compile/middle_end/transform/let_floating.cmo : \
-    src/syntax/map_pi.cmo \
-    src/syntax/ast_undecorated.cmo \
-    src/syntax/ast_subst.cmo \
-    src/syntax/ast.cmo
-src/compile/middle_end/transform/let_floating.cmx : \
-    src/syntax/map_pi.cmx \
-    src/syntax/ast_undecorated.cmx \
-    src/syntax/ast_subst.cmx \
     src/syntax/ast.cmx
 src/compile/middle_end/transform/macro.cmo : \
     src/syntax/ast_subst.cmo \

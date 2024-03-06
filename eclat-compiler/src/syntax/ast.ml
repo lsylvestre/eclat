@@ -58,10 +58,11 @@ type e =                      (** expression     [e]                       *)
   | E_reg of (p * e) * e * l     (** register       [reg^l (fun p -> e) last e] *)
   | E_exec of e * e * l       (** exec           [(exec^l e default e)]    *)
 
-  | E_local_static_array of c * int
+  | E_local_static_array of e * e * deco (* c^n, should be resolved at compile time *)
   | E_array_get of x * e      (** static array access        [x.(e)]      *)
   | E_array_length of x       (** static array length access [x.length]   *)
   | E_array_set of x * e * e  (** static array assignment    [x.(e) <- e] *)
+  | E_local_static_matrix of e * e list * deco (* c^n^ ... n, should be resolved at compile time *)
   | E_matrix_get of x * e list (** static matrix access       [x.(e).(e). ...]  *)
   | E_matrix_size of x * int   (** static matrix size         [x.(n).size]     *)
   | E_matrix_set of x * e list * e (** static matrix assignment   [x.(e).(e) ... <- e]  *)
@@ -216,3 +217,15 @@ let ty_annot_opt ~(ty:ty option) (e:e) : e =
   | None -> e
   | Some ty ->ty_annot ~ty e
 
+
+exception Not_a_constant
+
+let rec e2c e = 
+  match e with
+  | E_deco (e,_) -> e2c e
+  | E_const c -> c
+  | E_app(e1,e2) -> (match un_deco e1 with
+                    | E_const(Op(TyConstr _)) -> e2c e2 (* todo : warning *)
+                    | _ -> raise Not_a_constant)
+  | E_tuple es -> C_tuple (List.map e2c es)
+  | _ -> raise Not_a_constant

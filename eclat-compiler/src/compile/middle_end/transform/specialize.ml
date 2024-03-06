@@ -61,14 +61,16 @@ let applyed e =
       aux xs e1
   | E_set(e1,e2) ->
       aux xs e1 ++ aux xs e2
-  | E_local_static_array _ ->
-      SMap.empty
+  | E_local_static_array(e1,e2,_) ->
+      aux xs e1 ++ aux xs e2
   | E_array_length _ ->
       SMap.empty
   | E_array_get(_,e1) ->
       aux xs e1
   | E_array_set(_,e1,e2) ->
       aux xs e1 ++ aux xs e2
+  | E_local_static_matrix(e1,es,_) ->
+      aux xs e1 ++ applied_list xs es
   | E_matrix_size _ ->
       SMap.empty
   | E_matrix_get(_,es) ->

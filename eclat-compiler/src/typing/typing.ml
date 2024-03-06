@@ -627,8 +627,13 @@ let rec typ_exp ?(collect_sig=false) ~statics ~sums ~toplevel ~loc (g:env) e =
      unify ~loc:(loc_of e1) (T_ref(t2)) t1;
      check_base_type ~loc t2;
      (T_const TUnit, n)
-  | E_local_static_array (c,n) ->
-     ((T_array{elem=typ_const ~loc g c; size=T_size n}),Response_time.zero)
+  | E_local_static_array(e1,e2,_) ->
+      let t1,n1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
+      let t2,n2 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e2 in
+      unify ~loc n1 Response_time.zero;
+      unify ~loc n2 Response_time.zero;
+      unify ~loc t2 (tint (unknown()));
+     ((T_array{elem=t1; size=unknown ()}),Response_time.zero)
   | E_array_length(x) ->
      let tx = typ_ident g x loc in
      unify ~loc (T_array{elem=unknown();size=unknown()}) tx;
@@ -647,6 +652,15 @@ let rec typ_exp ?(collect_sig=false) ~statics ~sums ~toplevel ~loc (g:env) e =
      let t3 = typ_ident g x loc in
      unify ~loc (T_array{elem=t2;size=(unknown())}) t3;
      (T_const TUnit, T_add(n,m))
+  | E_local_static_matrix(e1,es,_) ->
+      let t1,n1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
+      let ts,ns = List.split @@ List.map (fun ei ->
+                    typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g ei) es
+      in
+      unify ~loc n1 Response_time.zero;
+      List.iter (fun n -> unify ~loc n Response_time.zero) ns;
+      List.iter (fun t -> unify ~loc t (tint (unknown()))) ts;
+     ((T_matrix{elem=t1; size=unknown ()}),Response_time.zero)
   | E_matrix_size(x,n) -> (* TODO: error if n >= dim(x) *)
      let tx = typ_ident g x loc in
      let tz = unknown() in
@@ -1068,6 +1082,7 @@ module Typing2 = struct
     | C_tuple(cs) -> TyB_tuple(List.map (typ_const g) cs)
   (* | Inj x ->
       typ_ident g x loc *)
+    | _ -> assert false
 
   let rec typ_exp ?(collect_sig=false) ~statics ~sums ?(toplevel=false) ~loc g e =
     match e with
