@@ -78,11 +78,7 @@ let applyed e =
   | E_matrix_set(_,es,e2) ->
       applied_list xs es ++ aux xs e2
   | E_par(es) ->
-      applied_list xs es
-  | E_absLabel(_,e) ->
-      aux xs e
-  | E_appLabel(e,_,_) ->
-      aux xs e  
+      applied_list xs es 
   | E_for(i,e_st1,e_st2,e3,_) ->
       aux xs e_st1 ++ aux xs e_st2 ++
       (let xs' = SMap.add i () xs in
@@ -138,7 +134,7 @@ let specialize ds e =
              | e,_ -> e
             in E_app(E_var f,aux xc2 p')
         (* | Some ((E_var _ | E_tuple _) as pat_e) ->  Ast_subst.subst_p_e (exp2pat pat_e) E_app(E_var x,xc2)*)
-        | Some (E_fun(p,e1)) -> Anf.anf2 @@ E_letIn(p,xc2,e1)
+        | Some (E_fun(p,e1)) -> Anf.anf @@ E_letIn(p,xc2,e1)
         | Some (E_fix(x,(p,e1))) ->
               let p' = p_without_fun f p in
               E_letIn(p,xc2,

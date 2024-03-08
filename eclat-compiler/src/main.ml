@@ -16,7 +16,7 @@ let interp_flag = ref false
 let top_flag = ref false
 let simul_flag = ref true
 
-let typing_with_tyB = ref false
+let typing_with_tyB = ref true
 
 let prop_fsm_flag = ref false
 
@@ -107,8 +107,8 @@ let () =
                                  clock_top := "clk48"),
      "synthesis for Intel MAX 10 FPGA");
 
-    ("-rw-lock", Arg.Set Gen_vhdl.single_read_write_lock_flag,
-     "use a same lock per array to protect read and write memory accesses");
+    ("-rw-locks", Arg.Clear Gen_vhdl.single_read_write_lock_flag,
+     "use two different locks per array to protect read and write memory accesses");
 
     ("-i", Arg.Set Typing.print_signature_flag,
      "Print inferred interface");
@@ -139,7 +139,7 @@ let main () : unit =
 
   (** Typing *)
   if !typing_with_tyB then
-    (let _,_ = Typing.Typing2.typing ~collect_sig:false ~statics:[] ~sums:[] pi.main in
+    (let _,_ = Typing.Typing2.typing ~collect_sig:false ~statics:pi.statics ~sums:[] pi.main in
      ());
   let (ty,response_time) = Typing.typing_with_argument pi arg_list in
 

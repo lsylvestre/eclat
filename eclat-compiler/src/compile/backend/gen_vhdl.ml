@@ -3,7 +3,7 @@ open Format
 
 let ram_inference = ref false
 let intel_max10_target = ref false
-let single_read_write_lock_flag = ref false
+let single_read_write_lock_flag = ref true
 
 
 let size_ty t =

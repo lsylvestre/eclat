@@ -44,12 +44,14 @@
        "resize_int", RESIZE_INT;
        "tuple_of_int",TUPLE_OF_INT;
        "type", TYPE;
-       "generate", GENERATE;
+       
        "to", TO;
        "do", DO;
        "done", DONE;
        "for", FOR;
        "ref", REF;
+       "macro_for", MACRO_FOR;
+       "macro_generate", MACRO_GENERATE;
        "immediate", IMMEDIATE;
      ]
 
@@ -84,8 +86,6 @@ rule token = parse
 | "|"                 { PIPE }
 | "||"                { PIPE_PIPE }
 | "|,|"               { PIPE_COMMA_PIPE }
-| "~"                 { TILDE }
-| "/\\"               { BIG_LAMBDA }
 | ['0'-'9']+ as s
 | ('0'('b'|'x')['0'-'9']['0'-'9''_']*) as s { INT_LIT (int_of_string s) }
 | "+"                 { PLUS }

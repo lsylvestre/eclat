@@ -1,5 +1,6 @@
 (* ./eclat ../examples/demi_pipe.ecl
    make simul NS=60000 *)
+   
 let static a1 = (10,false)^100 ;;
 let static a2 = (0,false)^100 ;;
 
@@ -53,7 +54,7 @@ let counter () =
 let print_cy cy =
   print_string "cy="; print_int cy; print_newline () ;;
 
-let pipelined = true ;; 
+let pipelined = false ;; 
 
 let main () =
   let cy = counter () in

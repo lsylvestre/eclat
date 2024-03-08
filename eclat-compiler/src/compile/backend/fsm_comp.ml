@@ -292,36 +292,38 @@ let rec to_s ~statics ~sums gs e x k =
       let a = to_a ~sums idx in
       let q1 = Ast.gensym ~prefix:"pause_getI" () in
       let q2 = Ast.gensym ~prefix:"pause_getII" () in
-      let ts = SMap.add q1 (seq_ (S_ptr_take(y,false)) (S_continue q2)) @@
-               SMap.add q2 (return_ @@ (set_ x (A_buffer_get(y)))) SMap.empty in
+      let ts = SMap.add q1 (S_continue q2) @@
+               SMap.add q2 (seq_ (S_ptr_take(y,false))
+                                 (return_ @@ (set_ x (A_buffer_get(y))))) SMap.empty in 
       let s = seq_ (S_setptr_read(y,a)) (S_continue q1) in
         let q_wait = Ast.gensym ~prefix:"q_wait" () in
         let s' = let_plug_s (A_ptr_taken(y)) @@ fun z ->
                  S_if(z, (S_continue q_wait),
-                           Some (seq_ (S_ptr_take(y,true)) @@
-                                 seq_ s (S_continue q1))) in
+                           Some (seq_ (S_ptr_take(y,true)) @@ s)) in
         (SMap.empty, SMap.add q_wait s' ts, s')
   | E_array_set(y,idx,e_upd) ->
       let a = to_a ~sums idx in
       let a_upd = to_a ~sums e_upd in
-      let q = Ast.gensym ~prefix:"pause_setI" () in
-      let ts = SMap.add q (seq_ (S_ptr_write_take(y,false)) @@
-                           seq_ (S_buffer_set(y))
-                                (return_ @@ (set_ x (A_const Unit)))) SMap.empty  in
+      let q1 = Ast.gensym ~prefix:"pause_setI" () in
+      let q2 = Ast.gensym ~prefix:"pause_setII" () in
+      let ts = SMap.add q1 (seq_ (S_buffer_set(y)) (S_continue q2)) @@
+               SMap.add q2 (seq_ (S_ptr_write_take(y,false)) @@
+                                 (return_ @@ (set_ x (A_const Unit)))) SMap.empty  in
       let q_wait = Ast.gensym ~prefix:"q_wait" () in
       let s' = let_plug_s (A_ptr_write_taken(y)) @@ fun z ->
                  S_if(z, (S_continue q_wait),
                            Some (seq_ (S_ptr_write_take(y,true)) @@
                                  seq_ (S_setptr_write(y,a,a_upd)) @@
-                                 (S_continue q))) in
+                                 (S_continue q1))) in
       (SMap.empty, SMap.add q_wait s' ts, s')
 
-  | E_matrix_get(y,idx_list) ->
+  | E_matrix_get(y,idx_list) -> (* TODO: adapt, same as array_get *)
       let a_list = List.map (to_a ~sums) idx_list in
       let q1 = Ast.gensym ~prefix:"pause_getI" () in
       let q2 = Ast.gensym ~prefix:"pause_getII" () in
-      let ts = SMap.add q1 (seq_ (S_ptr_take(y,false)) (S_continue q2)) @@
-               SMap.add q2 (return_ @@ (set_ x (A_buffer_get(y)))) SMap.empty in
+      let ts = SMap.add q1 (S_continue q2) @@
+               SMap.add q2 (seq_ (S_ptr_take(y,false))
+                                 (return_ @@ (set_ x (A_buffer_get(y))))) SMap.empty in 
       let s = seq_ (S_setptr_matrix_read(y,a_list)) (S_continue q1) in
         let q_wait = Ast.gensym ~prefix:"q_wait" () in
         let s' = let_plug_s (A_ptr_taken(y)) @@ fun z ->
@@ -330,19 +332,20 @@ let rec to_s ~statics ~sums gs e x k =
                                  seq_ s (S_continue q1))) in
         (SMap.empty, SMap.add q_wait s' ts, s')
 
-  | E_matrix_set(y,idx_list,e_upd) ->
+  | E_matrix_set(y,idx_list,e_upd) -> (* TODO: adapt, same as array_set *)
       let a_list = List.map (to_a ~sums) idx_list in
       let a_upd = to_a ~sums e_upd in
-      let q = Ast.gensym ~prefix:"pause_setI" () in
-      let ts = SMap.add q (seq_ (S_ptr_write_take(y,false)) @@
-                           seq_ (S_buffer_set(y))
-                                (return_ @@ (set_ x (A_const Unit)))) SMap.empty  in
+      let q1 = Ast.gensym ~prefix:"pause_setI" () in
+      let q2 = Ast.gensym ~prefix:"pause_setII" () in
+      let ts = SMap.add q1 (seq_ (S_buffer_set(y)) (S_continue q2)) @@
+               SMap.add q2 (seq_ (S_ptr_write_take(y,false)) @@
+                                 (return_ @@ (set_ x (A_const Unit)))) SMap.empty  in
       let q_wait = Ast.gensym ~prefix:"q_wait" () in
       let s' = let_plug_s (A_ptr_write_taken(y)) @@ fun z ->
                  S_if(z, (S_continue q_wait),
                            Some (seq_ (S_ptr_write_take(y,true)) @@
                                  seq_ (S_setptr_matrix_write(y,a_list,a_upd)) @@
-                                 (S_continue q))) in
+                                 (S_continue q1))) in
       (SMap.empty, SMap.add q_wait s' ts, s')
 
   | E_reg((p,e2),e0,_) ->

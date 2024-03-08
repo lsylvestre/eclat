@@ -117,10 +117,6 @@ let lifting ~statics (env:env) (e:e) : e =
     | E_reg((p,e1),e0,l) ->
         let env' = env_filter env p in
         E_reg((p,lift env' e1),lift env e0,l)
-    
-    (* | E_absLabel(l,e1) -> 
-        let env' = env_filter env (P_var l) in
-        E_absLabel(l,lift env' e1)*)
     | E_for(x,lc1,lc2,e1,loc) ->
         let env' = env_filter env (P_var x) in
         E_for(x,lc1,lc2,lift env' e1,loc)
@@ -240,12 +236,6 @@ let globalize_e (e:e) : ((x * e) list * e) =
         let ds1,e1' = glob e1 in
         let ds0,e0' = glob e0 in
         ds0,E_exec(declare ds1 e1',e0',l)
-    | E_absLabel (l, e1) ->
-        let ds1,e1' = glob e1 in
-        [],E_absLabel (l, declare ds1 e1')   (* scope is ok ? *)
-    | E_appLabel (e1,l,lc) ->
-        let ds1,e1' = glob e1 in
-        [],E_appLabel (declare ds1 e1',l,lc)   (* scope is ok ? *)
     | E_for(x,e_st1,e_st2,e3,loc) ->
         let ds1,e_st1' = glob e_st1 in
         let ds2,e_st2' = glob e_st2 in

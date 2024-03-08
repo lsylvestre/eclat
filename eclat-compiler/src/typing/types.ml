@@ -384,6 +384,9 @@ let rec occur_ty v ty =
       occur_tyB v tyB
   in occ ty
 
+let test_occur occ o =
+  try occ o; false with Found -> true
+
 let vars_of_size ?(s=Vs.empty) sz =
   let rec vars s = function
     | Sz_var {contents=Unknown n} -> Vs.add n s

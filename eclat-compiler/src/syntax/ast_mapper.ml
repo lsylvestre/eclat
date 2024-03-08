@@ -51,10 +51,6 @@ let rec map f e =
       E_reg((p,f e1),f e0,l)
   | E_exec(e1,e2,k) ->
       E_exec(f e1,f e2,k)
-  | E_absLabel(l,e1) ->
-      E_absLabel(l, f e1)
-  | E_appLabel(e1,l,lc') ->
-      E_appLabel(f e1,l,lc')
   | E_for(x,e_st1,e_st2,e,loc) ->
       E_for(x,f e_st1,f e_st2,f e,loc)
   | E_generate((p,e1),e2,e_st1,loc) ->
@@ -110,10 +106,6 @@ let rec iter f (e:e) : unit =
       List.iter f es
   | E_matrix_set(_,es,e2) ->
       List.iter f es; f e2
-  | E_absLabel(_,e1) ->
-      f e1
-  | E_appLabel(e1,_,_) ->
-      f e1
   | E_for(_,_,_,e,_) ->
       f e
   | E_generate((_,e1),e2,e_st3,_) ->
@@ -226,12 +218,6 @@ let accum f (e:e) : ((x * e) list * e) =
             let ds1,e1' = aux e1 in
             let ds0,e0' = aux e0 in
             ds1@ds0,E_exec(e1',e0',l)
-        | E_absLabel (l, e1) ->
-            let ds1,e1' = aux e1 in
-            ds1,E_absLabel (l,e1')   (* scope is ok ? *)
-        | E_appLabel (e1,l,lc) ->
-            let ds1,e1' = aux e1 in
-            ds1,E_appLabel (e1',l,lc)   (* scope is ok ? *)
         | E_for(x,e_st1,e_st2,e3,loc) ->
             let ds1,e_st1' = aux e_st1 in
             let ds2,e_st2' = aux e_st2 in

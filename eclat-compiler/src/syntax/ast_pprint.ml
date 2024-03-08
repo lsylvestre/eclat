@@ -328,10 +328,6 @@ let pp_exp (fmt:fmt) (e:e) : unit =
         ~pp_sep:(fun fmt () -> fprintf fmt " || ")
           (pp_e ~paren:false) fmt es;
       fprintf fmt ")"
-  | E_absLabel(l,e1) ->
-      fprintf fmt "(/\\ ~%s . %a)" l (pp_e ~paren:false) e1
-  | E_appLabel(e1,l,lc) ->
-      fprintf fmt "%a ~%s:%a" (pp_e ~paren:true) e1 l pp_lc lc
   | E_for(x,e_st1,e_st2,e3,_) ->
       fprintf fmt "for %s = %a to %a do %a done" x 
         (pp_e ~paren:false) e_st1

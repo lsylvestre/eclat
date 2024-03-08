@@ -10,7 +10,6 @@ type token =
   | TUPLE_OF_INT
   | TO
   | TIMES
-  | TILDE
   | THEN
   | STRING_LIT of (string)
   | STATIC
@@ -38,6 +37,8 @@ type token =
   | MOD
   | MINUS
   | MATCH
+  | MACRO_GENERATE
+  | MACRO_FOR
   | LXOR
   | LT
   | LSR
@@ -58,7 +59,6 @@ type token =
   | IDENT of (string)
   | HAT
   | GT
-  | GENERATE
   | GE
   | FUN
   | FOR
@@ -80,7 +80,6 @@ type token =
   | COL_EQ
   | COL
   | BOOL_LIT of (bool)
-  | BIG_LAMBDA
   | BANG
   | ASR
   | AND

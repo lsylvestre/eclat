@@ -94,11 +94,6 @@ let fv ?(get_arrays=true) ?(xs=SMap.empty) e =
       else vs
   | E_par(es) ->
       fv_list xs es
-  | E_absLabel(l,e1) ->
-      let xs' = SMap.add l () @@ xs in
-      aux xs' e1
-  | E_appLabel(e1,_,l) ->
-      aux xs e1
   | E_for(i,e_st1,e_st2,e,_) ->
       aux xs e_st1 ++ aux xs e_st2 ++
         (let xs' = SMap.add i () @@ xs in

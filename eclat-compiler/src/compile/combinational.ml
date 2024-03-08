@@ -49,12 +49,13 @@ let rec combinational (e:e) : bool =
 	    false (* have an internal state *)
   | E_array_length _ | E_matrix_size _ ->
 	    true
-	| E_local_static_array _ | E_local_static_matrix _ | E_array_get _ | E_matrix_get _ ->
+	| E_local_static_array _ ->
+      false
+	| E_local_static_matrix _ ->
 	    false
+	| E_array_get _ | E_matrix_get _
 	| E_array_set _ | E_matrix_set _ ->
 	    false (* side effect *)
-	| E_absLabel(_,e1) -> combinational e1
-	| E_appLabel(e1,_,_) -> combinational e1
 	| E_for(_,e_st1,e_st2,e3,_) ->
 	   combinational e_st1 && combinational e_st2 && combinational e3
 	| E_generate((_,e1),e2,e_st3,_) ->

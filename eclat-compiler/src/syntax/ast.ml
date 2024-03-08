@@ -71,9 +71,6 @@ type e =                      (** expression     [e]                       *)
   | E_get of e 
   | E_set of e * e
 
-  | E_absLabel of l * e       (** big lambda for binding labels *)
-  | E_appLabel of e * l * lc  (** label application *)
-
   | E_generate of (p * e) * e * e_static * deco
   | E_for of x * e_static * e_static * e * deco
 
@@ -188,7 +185,7 @@ let as_variable (e:e) : x =
 (** [evaluated e] returns [true] iff [e] is a value *)
 let rec evaluated (e:e) : bool =
   match un_annot e with
-  | E_const _ | E_fun _ | E_fix _ | E_absLabel _ -> true
+  | E_const _ | E_fun _ | E_fix _ -> true
   | E_tuple es -> List.for_all evaluated es
   | E_app(E_const(Op(TyConstr _)),e) -> evaluated e
   | _ -> false

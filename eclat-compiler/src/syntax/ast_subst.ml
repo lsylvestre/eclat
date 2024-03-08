@@ -52,10 +52,6 @@ let subst_e x ex e =
     | E_reg((p,e1),e0,l) ->
         let e1' = if pat_mem x p then e1 else ss e1 in
         E_reg((p,e1'),ss e0,l)
-    | E_get(e1) ->
-        E_get(ss e1)
-    | E_set(e1,e2) ->
-        E_set(ss e1, ss e2)
     | E_array_length(y) ->
         let z = if x <> y then y else as_ident ex in
         E_array_length(z)
@@ -78,9 +74,6 @@ let subst_e x ex e =
     | E_matrix_set(y,es,e2) ->
         let z = if x <> y then y else as_ident ex in
         E_matrix_set(z,List.map ss es, ss e2)
-    | E_appLabel(e1,l,lc) ->
-        let lc' = subst_lc x ex lc in
-        E_appLabel(ss e1,l,lc')
     | E_for(y,e_st1,e_st2,e3,loc) ->
        E_for(y,ss e_st1,ss e_st2,
              (if x = y then e3 else ss e3),loc)
@@ -152,92 +145,5 @@ module OtherVersion = struct
 end
 
 *)
-
-
-let subst_lc x lc lc' =
-  match lc with
-  | St_var l2 -> if l2 = x then lc' else lc
-  | _ -> lc
-
-let subst_label l1 l2 e =
-  let subst_l l = if l = l1 then l2 else l in
-  let rec ss e =
-    match e with
-    (* 
-       E_reg _ | E_exec _ | E_set -> ? *)
-    | E_local_static_array(e1,e2,deco) ->
-        E_local_static_array(ss e1,ss e2,deco)
-    | E_array_length(l) ->
-        E_array_length(subst_l l)
-    | E_array_get(l,e1) ->        
-        E_array_get(subst_l l,ss e1)
-    | E_array_set(l,e1,e2) ->
-        E_array_set(subst_l l,ss e1,ss e2)
-    | E_local_static_matrix(e1,es,deco) ->
-        E_local_static_matrix(ss e1,List.map ss es,deco)
-    | E_matrix_size(x,n) ->
-        E_matrix_size(subst_l x,n)
-    | E_matrix_get(l,es) ->        
-        E_matrix_get(subst_l l,List.map ss es)
-    | E_matrix_set(l,es,e2) ->        
-        E_matrix_set(subst_l l,List.map ss es, ss e2)
-    | E_absLabel(l,e1) -> if l = l1 then e else E_absLabel(l,ss e1)
-    | E_appLabel(e1,l,St_var l') -> 
-        E_appLabel(ss e1,l,St_var (subst_l l'))
-    | E_appLabel(e1,l,(St_const _ as lc)) -> 
-        if l = l1 then e else E_appLabel(ss e1,l,lc)
-    | E_for(x,e_st1,e_st2,e3,loc) ->
-        E_for(x,ss e_st1, ss e_st2, ss e3,loc)
-    | E_generate((p,e1),e2,e_st3,loc) ->
-        (* assume l not in p ? *)
-        E_generate((p,ss e1),ss e2,ss e_st3,loc)
-    | e -> Ast_mapper.map ss e
-  in
-  ss e
-
-
-let subst_const l1 c e =
-  let rec ss e =
-    match e with
-    | E_var x -> if l1 = x then E_const c else e
-    | E_absLabel(l,e1) -> if l = l1 then e else E_absLabel(l,ss e1)
-    | E_appLabel(e1,l,lc) -> 
-        let lc' = subst_lc l1 lc (St_const c) in
-        E_appLabel(ss e1,l,lc')
-    | E_for(x,e_st1,e_st2,e1,loc) ->
-        E_for(x,ss e_st1, ss e_st2,ss e1,loc)
-    | E_generate((p,e1),e2,e_st3,loc) ->
-        (* assume l not in p ? *)
-        E_generate((p,ss e1),ss e2,ss e_st3,loc)
-    | e -> Ast_mapper.map ss e
-  in
-  ss e
-
-let rec app_label e l l' =
-  match e with
-  | E_letIn(p,e1,e2) -> E_letIn(p,subst_label l l' e1,app_label e2 l l')
-  | E_if(e,e1,e2) -> E_if(subst_label l l' e,app_label e1 l l',app_label e2 l l')
-  | E_absLabel(l2,e1) -> 
-      if l <> l2 then failwith ("app_label") else subst_label l l' e1
-  | E_appLabel(e1,l1,lc) ->
-     app_label (app_labelC e1 l1 lc) l l'
-  | e -> Ast_mapper.map (fun e -> app_label e l l') e
-
-
-and app_const e l c =
-  match e with
-  | E_letIn(p,e1,e2) -> E_letIn(p,subst_const l c e1,app_const e2 l c)
-  | E_if(e,e1,e2) -> E_if(subst_const l c e,app_const e1 l c,app_const e2 l c)
-  | E_absLabel(l2,e1) -> 
-      if l <> l2 then failwith "app_const" else subst_const l2 c e1
-  | E_appLabel(e1,l1,lc) ->
-     app_const (app_labelC e1 l1 lc) l c
-  | e -> Ast_mapper.map (fun e -> app_const e l c) e
-
-
-and app_labelC e l lc =
-  match lc with
-  | St_var l' -> app_label e l l'
-  | St_const c -> app_const e l c
 
 

@@ -87,10 +87,6 @@ let inline_with_statics ~statics e =
                 E_par(es)),
                 E_const Unit)
 
-    | E_appLabel(e1,l,lc) ->
-        has_changed := true;
-        inline (app_labelC e1 l lc)
-   
     | e -> Ast_mapper.map inline e
   in 
   inline e

@@ -136,7 +136,7 @@ let rec red (e,r) =
   in
   match e with
   | E_deco(e1,_) -> red (e1,r)
-  | E_const _ | E_fun (_, _) | E_fix (_, _) | E_absLabel _ ->
+  | E_const _ | E_fun (_, _) | E_fix (_, _) ->
       assert (evaluated e);
       (e,r)
   | E_var x -> (match SMap.find x r.mu with
@@ -263,16 +263,7 @@ let rec red (e,r) =
       let es',r1 = red_list es r in
       let ev',r2 = red (ev,r1) in
       E_matrix_set (x,es',ev'),r2
-  | E_appLabel(e1,l,lc) -> 
-      let e1',r' = red (e1,r) in
-      if not (evaluated e1')
-      then (E_appLabel(e1',l,lc), r')
-      else (match e1' with
-            | E_absLabel(l2,e2) -> 
-                if l2 <> l then failwith "ill-typed reference passing" (* todo: error *) 
-                else red (app_labelC e1 l lc,r')
-            | _ -> assert false) (* error *)
-  
+
   | E_generate _ 
   | E_for _ -> assert false (* todo *)
 

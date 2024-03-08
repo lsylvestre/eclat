@@ -40,10 +40,9 @@
 %token EXIT_REPL
 %token <string> STRING_LIT
 %token QUOTE TYPE
-%token TILDE GENERATE
-%token FOR TO DO DONE 
+%token MACRO_GENERATE
+%token MACRO_FOR FOR TO DO DONE 
 %token REF COL_EQ BANG
-%token BIG_LAMBDA 
 %token IMMEDIATE
 /* The precedences must be listed from low to high. */
 
@@ -143,30 +142,17 @@ ty_case:
 | x=UP_IDENT OF ty=ty { x,ty }
 
 fun_decl(In_kw):
-| f=IDENT p_ty_opt=arg_ty_atomic ls_opt=labels_fun_decl
+| f=IDENT p_ty_opt=arg_ty_atomic
                   ty_opt_ret=ret_ty_annot_eq
     e1=exp In_kw
         {
             let ef = mk_let_fun ~loc:(with_file ($startpos(f),$endpos(e1)))
                                 ~p_ty_opt
                                 ~ty_opt_ret
-                (match ls_opt with
-                 | None -> e1
-                 | Some ls -> List.fold_right (fun l e -> E_absLabel(l,e)) ls e1)
+                        e1
             in
             (P_var f,ef)
         }
-
-labels_fun_decl:
-| { None }
-| ls=nonempty_list(lbl) { Some (ls) }
-
-lbl:
-TILDE x=IDENT { x }
-
-lblapp:
-| TILDE x=IDENT COL y=IDENT { (x,St_var y) }
-| TILDE x=IDENT COL c=const { (x,St_const c) }
 
 after_let(In_kw):
 | b=bindings(apat,exp) In_kw { b }
@@ -224,7 +210,9 @@ aty:
 | x=IDENT { match x with
             | "unit" -> T_const TUnit
             | "bool" -> T_const TBool
-            | "int" -> T_const (TInt (T_size 32))
+            | "int" -> Prelude.Errors.warning ~loc:(with_file $loc) (fun fmt ->
+                         Format.fprintf fmt "unspecified integer size; replaced by 32");
+                       T_const (TInt (T_size 32))
             | s -> (match Hashtbl.find_opt alias_types s with
                     | Some t -> t
                     | None -> Prelude.Errors.raise_error ~loc:(with_file $loc)
@@ -315,8 +303,6 @@ lexp_desc:
 | NODE b=fun_decl(IN) e2=exp
         { let (p,e1) = enforce_node b in
           E_letIn(p,e1,e2) }
-| BIG_LAMBDA TILDE x=IDENT /* COL ty */
-DOT e=exp { E_absLabel(x,e) }
 
 if_end:
 | e2=lexp { e2,E_const Unit }
@@ -377,18 +363,15 @@ app_exp_desc:
   { E_array_set(x,e1,e2) }
 | x=IDENT e1=dot_get es=dot_get+ LEFT_ARROW e2=app_exp 
   { E_matrix_set(x,e1::es,e2) }
-| e=aexp  es=aexp+ ls=list(lblapp)
+| e=aexp  es=aexp+
       { match e::es with
         | [e1;e2] -> (match un_annot e1 with
-                      | E_var _ | E_const _ | E_appLabel _ -> 
-                          let e = E_app(e1,e2) in
-                          List.fold_left (fun e (l,lc) -> 
-                            E_appLabel(e,l,lc)) e ls
+                      | E_var _ | E_const _ -> 
+                        E_app(e1,e2)
                       | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
                    ~msg:"expression in functional position should be a variable or a constante" ())
         | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
                    ~msg:"All functions and primitives should be unary. Hints: use a tuple as argument" () }
-| e=aexp ll=lblapp { let (l,lc) = ll in E_appLabel(e,l,lc) } 
 | MINUS e1=aexp %prec prec_unary_minus { E_app(E_const(Op(Runtime(Sub))),E_tuple[E_const(Int(0,unknown()));e1]) }
 | e1=app_exp op=binop e2=app_exp
         { E_app (mk_loc (with_file $loc) @@ E_const (Op (Runtime(op))),
@@ -415,13 +398,8 @@ app_exp_desc:
        }
 | EXEC e1=exp DEFAULT e2=lexp
        { E_exec(e1,e2,"") }
-| FUN ls=nonempty_list(lbl) RIGHT_ARROW e=exp
-    { List.fold_right (fun l e -> E_absLabel(l,e)) ls e }
-| GENERATE ef1=aexp e_init2=aexp lbl=lbl COL e_st3=aexp
+| MACRO_GENERATE ef1=aexp e_init2=aexp e_st3=aexp
   { let z = Ast.gensym () in
-    (if lbl = "depth" then () 
-     else Prelude.Errors.raise_error ~loc:(with_file $loc)
-             ~msg:"keyword ~depth expected." ());
     E_generate((P_var z,E_app(ef1,E_var z)),e_init2,e_st3,with_file $loc) }
 
 | e=aexp { e }
@@ -468,6 +446,9 @@ aexp_desc:
       { let (hs,eo) = rev_cases in
         E_match(e,List.rev hs,eo) }
 | FOR x=IDENT EQ e_st1=exp TO e_st2=exp DO e=exp DONE 
+      { E_for(x,e_st1,e_st2,e,with_file $loc) }
+
+| MACRO_FOR x=IDENT EQ e_st1=exp TO e_st2=exp DO e=exp DONE 
       { E_for(x,e_st1,e_st2,e,with_file $loc) }
 
 match_case_const:

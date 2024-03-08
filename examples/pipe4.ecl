@@ -20,7 +20,7 @@ let demi_pipe(id,f,src,dst) =
   let rec loop(i) =
     if i >= dst.length then () else
     let (v,b) = src.(i) in
-    if b then ((* print_id(id,i); *)
+    if b then ((* print_id(id,i);*)
          let () = src.(i) <- (v,false)
          and () = dst.(i) <- f v in
          loop(i+1)) else loop(i)
@@ -85,9 +85,9 @@ let display_array a =
 let rec wait(n) =
   if n <= 1 then () else wait(n-1) ;;
 
-let f1 x = wait(10); x + 2 ;;
-let f2 x = wait(2); x * 2 ;;
-let f3 x = wait(5); x - 1 ;;
+let f1 x = wait(1); x + 2 ;;
+let f2 x = wait(1); x * 2 ;;
+let f3 x = wait(1); x - 1 ;;
 let f4 x = wait(1); x * 10 ;;
 
 let counter () =
@@ -106,11 +106,11 @@ let main () =
     print_cy cy;
     (* ************** *)
     
-     pipe4(1,(f1,f2,f3,f4),(0,0,0),(a1,a2))
+     version_naive4(1,(f1,f2,f3,f4),(0,0,0),(a1,a2))
      (* pipe4_bis
      version_naive4*)
     (* ************** *)
     
-    (* ; display_array(a2) *)
+     (* ; display_array(a2) *)
   default () in
   (if rdy then print_cy cy else ()) ;;
