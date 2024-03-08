@@ -103,14 +103,14 @@ let stop_and_copy (sp,acc,env,from_space,to_space) =
   let rec copy_root_in_ram(i,section_end,next) =
     if i >= section_end then next else
     (print_string "racine:"; print_int i; print_newline ();
-    let (w,next) = copy (from_space, to_space, ram[i], next) in
-    ram[i] <- w;
+    let (w,next) = copy (from_space, to_space, ram.(i), next) in
+    ram.(i) <- w;
     print_string " next="; print_int next; print_newline ();
     copy_root_in_ram(i+1,section_end,next))
   in
 
   let next = copy_root_in_ram(stack_start,sp,next) in
-  let next = copy_root_in_ram(global_start,global_end[0],next) in
+  let next = copy_root_in_ram(global_start,global_end.(0),next) in
 
   message_gc_middle ();
 
@@ -120,13 +120,13 @@ let stop_and_copy (sp,acc,env,from_space,to_space) =
     print_string "     scan="; print_int scan ;  print_string " | next="; print_int next; print_newline ();
 
     if scan >= next then next else
-    let sz = size_hd (as_long (ptr_val (ram[scan]))) + 1 in
+    let sz = size_hd (as_long (ptr_val (ram.(scan)))) + 1 in
     let rec loop(i,next) =
       (* print_string " ~~ scan"; print_newline (); *)
       if i >= sz then next else
       let scan_plus_i = scan + i in
-      let (w,next) = copy (from_space, to_space, ram[scan_plus_i],next) in
-      ram[scan_plus_i] <- w;
+      let (w,next) = copy (from_space, to_space, ram.(scan_plus_i),next) in
+      ram.(scan_plus_i) <- w;
       loop(i+1,next)
     in
     let next = loop(1,next) in
@@ -210,4 +210,5 @@ let make_closure ((sp,acc,env, pc,size) : (short * value * value * short * short
   let (next_acc,next_env,res) = make_block(sp, acc,env, closure_tag,size) in
   set_field(res,0,val_int (as_long(pc)));
   (next_acc,next_env,res) ;;
+
 

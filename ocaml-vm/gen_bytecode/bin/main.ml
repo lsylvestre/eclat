@@ -18,11 +18,11 @@ let rec add_val oc i v =
            let len = Array.length vs+1 in
            let x_num = gensym () in
            Printf.fprintf oc "(* ========= *)\n";
-           Printf.fprintf oc "ram[x%d] <- val_long(make_header(%d,%d));\n" x_num tag (len-1);
+           Printf.fprintf oc "ram.(x%d) <- val_long(make_header(%d,%d));\n" x_num tag (len-1);
            Printf.fprintf oc "let x%d = x%d+%d in\n" (x_num+1) x_num len;
            Array.iteri (fun j v ->
               let res = add_val oc i v in
-              Printf.fprintf oc "ram[x%d+%d] <- %s;\n" x_num (j+1) res) vs;
+              Printf.fprintf oc "ram.(x%d+%d) <- %s;\n" x_num (j+1) res) vs;
          
            "val_ptr(x" ^ string_of_int(x_num) ^ ")"
         | String s -> 
@@ -39,10 +39,10 @@ let write_data oc data =
       if !i >= 12 then
         (let n = !i in
         Printf.fprintf oc "(* ADD GLOBAL %d *)\n" n;
-        Printf.fprintf oc "ram[global_start + %d] <- %s;\n" n (add_val oc n v));
+        Printf.fprintf oc "ram.(global_start + %d) <- %s;\n" n (add_val oc n v));
         incr i;
     ) data;
-  Printf.fprintf oc "  global_end[0] <- global_start + %d\n ;;\n\n" (Array.length data)
+  Printf.fprintf oc "  global_end.(0) <- global_start + %d\n ;;\n\n" (Array.length data)
 
 (* ********************************** *)
 
@@ -79,7 +79,7 @@ let write_code ~version oc code =
     ~pre:(fun oc len -> Printf.fprintf oc "let static code = (0:long)^%d ;;\n\nlet load_code () =\n" (len/4))
     (fun oc i b ->
         let n = Int32.to_int (Bytes.get_int32_le b 0) in
-        Printf.fprintf oc "  code[%d] <- %d;\n" i n)
+        Printf.fprintf oc "  code.(%d) <- %d;\n" i n)
     ~post:(fun oc -> Printf.fprintf oc "  ()\n ;;\n\n")
     ()
 

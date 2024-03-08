@@ -76,7 +76,7 @@ let caml_obj_dup((arg,_),st) =
   
   let (pc,acc,sp, (env, extra_args, trap_sp), others) = st in
   
-  let (acc,env,blk) = make_block(tag,sz) in
+  let (acc,env,blk) = make_block(sp,acc,env,tag,sz) in
   
   let st = (pc,acc,sp, (env, extra_args, trap_sp), others) in
   
