@@ -14,15 +14,22 @@ let read_phrase () =
         loop new_acc
   in loop ""
 
+let syntax_error_handler f lexbuf =
+    try f(lexbuf)
+    with Parser.Error -> 
+           Prelude.Errors.syntax_error (Lexer.get_loc lexbuf)
+
 let frontend ~(inputs : string list) repl ?(when_repl=(fun _ -> ())) ?(relax=false) main str_arg : pi * e list =
   let gss_from_files,tss_from_files,dss_from_files =
     Prelude.map_split3 (fun path ->
                 let ic = open_in path in
                 begin try
                       Current_filename.current_file_name := path;
-                      let gs,ts,ds = Parser.pi Lexer.token (Lexing.from_channel ic) in
+                      let lexbuf = Lexing.from_channel ic in
+                      syntax_error_handler (fun lexbuf ->
+                      let gs,ts,ds = Parser.pi Lexer.token lexbuf in
                       close_in ic;
-                      gs,ts,ds
+                      gs,ts,ds) lexbuf
                     with excp ->
                       close_in_noerr ic;
                       (match excp with
@@ -30,7 +37,7 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ -> ())) ?(relax=fal
                           error (fun fmt ->
                             Format.fprintf fmt "Syntax error (file %s)" path)
                       | _ -> ());
-                      raise excp
+                      raise excp 
                 end
                ) inputs in
   let gs_from_files,ts_from_files, ds_from_files =
@@ -38,14 +45,16 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ -> ())) ?(relax=fal
   let ds = (if repl || ds_from_files = [] then
             let () = List.iter when_repl ds_from_files in
             (Current_filename.current_file_name := "%stdin";
-             Printf.printf "=== mixc ===";
+             Printf.printf "=== eclat (experimental toploop, do not support type declaration) ===.\nEnter phrases (separated by ';;') then compile (or run) with ``#exit.''\n";
              flush stdout;
              let rec loop ds =
                Printf.printf "\n> ";
                let l = read_phrase () in
                if String.contains l '#' then ds else
                try
-                 (match Parser.decl_opt Lexer.token (Lexing.from_string l) with
+                 (let lexbuf = (Lexing.from_string l) in
+                  syntax_error_handler (fun lexbuf ->
+                  match Parser.decl_opt Lexer.token lexbuf with
                  | Some d -> begin
                     caml_error_handler ~on_error:(fun _ ->
                       Format.print_flush ();
@@ -55,7 +64,7 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ -> ())) ?(relax=fal
                     )
                     (fun () -> when_repl d; loop (d::ds)) ()
                   end
-                 | None -> loop ds)
+                 | None -> loop ds) lexbuf)
                 with End_of_file -> ds
             in
              loop (List.rev ds_from_files))
@@ -68,7 +77,10 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ -> ())) ?(relax=fal
     (function | [""] -> [] | l -> l) |>
     List.mapi (fun i s ->
         Current_filename.current_file_name := "%command-line-argument-"^string_of_int (i+1)^" (input: "^s^")";
-        Parser.exp_eof Lexer.token (Lexing.from_string s))
+        let lexbuf = Lexing.from_string s in
+        syntax_error_handler (fun lexbuf ->
+        Parser.exp_eof Lexer.token lexbuf)
+        lexbuf)
   in
   let entry_point = (* if relax then (E_var main) else (Ast.ty_annot ~ty:(Ast_mk.fresh_node ())*) (E_var main) in
   let ds = List.concat @@

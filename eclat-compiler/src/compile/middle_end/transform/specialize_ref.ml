@@ -10,7 +10,7 @@ let wrap_fix_in_fun e =
        let open Types in
        let targ = match canon t with T_fun{arg} -> arg | _ -> Types.unknown() (* assert false*) in
        let rec has_ref t = match canon t with 
-        | T_ref _ -> true 
+        | T_ref _ | T_array _ -> true 
         | T_tuple ts -> List.exists has_ref ts
         | T_fun{arg} -> has_ref arg (* warning: should not happen *)
         | T_var{contents=Ty t} -> has_ref t
@@ -28,12 +28,14 @@ let wrap_fix_in_fun e =
      | None -> E_app(E_var g,e1)
      | Some (None, targ) -> 
        let open Types in
-            let rec aux2 t e = 
+            let rec aux2 t e = (* Printf.printf "====>--\n"; *)
              let t = match canon t with T_var{contents=Ty t} -> t | t -> t in  
-             (* Format.fprintf Format.std_formatter "%s -- /////////////// %a\n" g Ast_pprint.pp_ty t; *)
+             (* Format.fprintf Format.std_formatter "%s -- /////////////// %a\n" g Ast_pprint.pp_ty t;
+             Format.fprintf Format.std_formatter "%s -- /////////////// %a\n" g Ast_pprint.pp_exp e;*)
              match (t,e) with
              | _,E_const _ -> e
-             | T_ref _,E_var _ -> E_const Unit
+             | (T_ref _ | T_array _),E_var _ -> E_const Unit
+             | (T_ref _ | T_array _),_ -> assert false
              | T_tuple ts, E_tuple es ->
                 let rec loop acce ts es =
                   match ts,es with
@@ -53,7 +55,7 @@ let wrap_fix_in_fun e =
              (* Format.fprintf Format.std_formatter "-- /////////////// %a\n" Ast_pprint.pp_ty t; *)
              match (t,p,e) with
              | _,P_unit,_ -> P_unit,e
-             | T_ref _,P_var x,E_var y -> P_unit, E_const Unit
+             | (T_ref _ | T_array _ ),P_var x,E_var y -> P_unit, E_const Unit
              | T_tuple ts, P_tuple ps, E_tuple es ->
                 let rec loop accp acce ts ps es =
                   match ts,ps,es with
@@ -63,10 +65,11 @@ let wrap_fix_in_fun e =
                       let p',e' = aux2 t p e in
                       loop (p'::accp) (e'::acce) ts' ps' es'
                    in loop [] [] ts ps es  
-             | T_tuple ts,P_tuple _,_ -> 
-                  assert false
-                  (* let p',e' = aux2 t p (* (E_letIn(p,e,*)(Pattern.pat2exp p) in
-                  (p',E_letIn(p,e,e'))*)
+             (*| T_tuple ts,P_tuple _,_ -> 
+                  let xs = List.map (fun _ -> Ast.gensym ()) ts in
+                  let p',e' = aux2 t p (E_tuple (List.map (fun x -> E_var x) xs)) in
+                  p', E_letIn(P_tuple (List.map (fun x -> P_var x) xs),e,e')
+                  (* let p',e' = aux2 t p (* (E_letIn(p,e,*)(Pattern.pat2exp p) in*)*)
              | _,p,e -> p,e
           in
           let e1_ = aux env e1 in
@@ -80,7 +83,7 @@ let wrap_fix_in_fun e =
 let specialize_ref pi =
   has_changed := false;
   let _ = Typing.typing_with_argument ~collect_sig:true pi [] in
-  let e = wrap_fix_in_fun pi.main in
+  let e = wrap_fix_in_fun (Propagation.propagation pi.main) in
           (* Format.fprintf Format.std_formatter "---=> %a\n" Ast_pprint.pp_exp e; *)
   (* if !has_changed then Rename *)
   { pi with main =  e }

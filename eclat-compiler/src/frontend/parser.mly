@@ -12,6 +12,17 @@
 
   let alias_types = Hashtbl.create 10
 
+  let add_alias x ty loc =
+    match Hashtbl.find_opt alias_types x with
+    | Some (_,loc') ->
+        let open Errors in
+        error ~loc
+              (fun fmt -> 
+                 Format.fprintf fmt "type %s cannot be redefined. Previous definition at %a"
+                    x (fun fmt -> emph_pp bold pp_loc fmt) loc')
+    | _ ->
+      Hashtbl.add alias_types x (ty,loc)
+
   let rec as_const loc e =
     match un_annot e with
     | E_const c -> c
@@ -19,11 +30,10 @@
     | _ -> Format.fprintf Format.std_formatter "--->%a\n" Ast_pprint.pp_exp e;
     Prelude.Errors.raise_error ~loc:(with_file loc)
               ~msg:"this expression should be a constant" ()
-
 %}
 
-%token LPAREN RPAREN LBRACKET RBRACKET COMMA PIPE_PIPE PIPE_COMMA_PIPE EQ EQ_EQ COL SEMI HAT STATIC DOT_LENGTH
-%token SHARP_PIPE_LBRACKET PIPE_RBRACKET
+%token LPAREN RPAREN LBRACKET RBRACKET COMMA PIPE_PIPE PIPE_COMMA_PIPE EQ EQ_EQ COL SEMI HAT STATIC DOT_LENGTH ARRAY_LENGTH
+%token SHARP_PIPE_LBRACKET LBRACKET_PIPE PIPE_RBRACKET
 %token FUN AMP DOT REGISTER EXEC LAST DEFAULT
 %token NODE IMPLY
 %token MATCH WITH PIPE END
@@ -33,7 +43,12 @@
 %token <bool> BOOL_LIT
 %token <int> INT_LIT
 %token PLUS MINUS TIMES LT LE GT GE NEQ NOT MOD DIV AMP_AMP OR
-%token XOR LAND LOR LXOR LSL LSR ASR RESIZE_INT TUPLE_OF_INT
+%token XOR LAND LOR LXOR LSL LSR ASR RESIZE_INT TUPLE_OF_INT INT_OF_TUPLE
+%token TUPLE_GET TUPLE_UPDATE
+%token UNROLL AT AT_AT
+%token GET SET LENGTH CREATE
+%token SIZE_CREATE VECTOR_CREATE
+
 %token EOF
 %token SEMI_SEMI
 %token LEFT_ARROW RIGHT_ARROW
@@ -41,9 +56,12 @@
 %token <string> STRING_LIT
 %token QUOTE TYPE
 %token MACRO_GENERATE
-%token MACRO_FOR FOR TO DO DONE 
+%token MACRO_FOR PARFOR FOR TO DO DONE
 %token REF COL_EQ BANG
 %token IMMEDIATE
+%token ARRAY_CREATE
+%token INIT_TUPLE INIT_INT
+%token VECTOR_MAPI INT_MAPI
 /* The precedences must be listed from low to high. */
 
 %right    PIPE_PIPE PIPE_COMMA_PIPE /* parallel construct */
@@ -53,7 +71,8 @@
 %nonassoc IF THEN ELSE
 %right    LEFT_ARROW
 %left     COMMA
-%right    AMP AMP_AMP OR
+%right    OR
+%right    AMP AMP_AMP
 %left     LT LE GT GE NEQ EQ EQ_EQ
 %left     PLUS MINUS
 %right    LSL LSR ASR
@@ -77,36 +96,30 @@ pi:
 | EOF { [],[],[] }
 
 static: /* todo: add loc and type annotation [tyopt] */
-| LET STATIC x=IDENT EQ e=app_exp SEMI_SEMI {
-      match un_deco e with
-      | E_local_static_array(e1,e2,loc) ->
-         let c1 = try e2c e1 with Not_a_constant -> 
-                Prelude.Errors.raise_error ~loc
-                   ~msg:("default element for array "^x^" should be a constant") () in
-         let c2 = try e2c e2 with Not_a_constant -> 
-                Prelude.Errors.raise_error ~loc
-                   ~msg:("size for array "^x^" should be an integer") () in
-         (match c2 with
-         | Int(n2,_) ->
-             (x,Static_array(c1,n2))
-         | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
-                   ~msg:("size for array "^x^" should be an integer") ())
-      | E_local_static_matrix(e1,es,loc) ->
-         let c1 = try e2c e1 with Not_a_constant -> 
-                Prelude.Errors.raise_error ~loc:(with_file $loc)
-                   ~msg:("default element for matrix "^x^" should be a constant") () in
-         let cs = try List.map e2c es with Not_a_constant -> 
-                Prelude.Errors.raise_error ~loc:(with_file $loc)
-                   ~msg:("dimensions for matrix "^x^" should be integers") () in
-         let ns = List.map (function Int(n,_) -> n 
-                            | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
-                                     ~msg:("dimensions for matrix "^x^" should be integers") ()) cs in
-         x,Static_matrix(c1,ns)
-      | E_const c -> (x,Static_const(c))
-      | e -> Prelude.Errors.raise_error ~loc:(with_file $loc)
-               ~msg:("static variable "^x^
-                     " should be constant, an array or a matrice") ()
+| LET STATIC x=IDENT EQ ec=aexp es=static_dim_exp+ SEMI_SEMI
+    { let to_int e =
+        match un_annot e with
+        | E_const (Int(n,_)) -> n
+        | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
+                          ~msg:("dimension for "^x^" should be an integer") ()
+      in
+      match List.map to_int es with
+      | [n] -> x,Static_array(e2c ec,n)
+      | ns -> x,Static_matrix(e2c ec,ns) 
   }
+
+| LET STATIC x=IDENT COL ty=ty SEMI_SEMI
+    {
+      let loc = with_file $loc in
+      if Types.no_unknown_in_ty ty then (
+         Prelude.Errors.raise_error ~loc
+           ~msg:"this type annotation should not contain type unknowns"
+      ) ();
+      x,Static_array_of (ty,loc)
+    }
+
+
+
 
 
 static_dim_exp: HAT e=aexp { e }
@@ -133,10 +146,12 @@ decl:
 | EOF { E_var (!Ast_mk.main_symbol) }*/
 
 type_alias: /* todo: avoid side effect, which depends on the left-to-right evaluation order */
-| TYPE x=IDENT EQ ty=ty SEMI_SEMI { Hashtbl.add alias_types x ty }
+| TYPE x=IDENT EQ ty=ty SEMI_SEMI? { add_alias x ty (with_file $loc) }
 
 typ_sum:
-| TYPE x=IDENT EQ ts=separated_nonempty_list(PIPE,ty_case) { x,ts }
+| TYPE x=IDENT EQ ts=separated_nonempty_list(PIPE,ty_case) SEMI_SEMI? 
+   { add_alias x (T_sum ts) (with_file $loc);
+     x,ts }
 
 ty_case:
 | x=UP_IDENT OF ty=ty { x,ty }
@@ -211,17 +226,27 @@ aty:
             | "unit" -> T_const TUnit
             | "bool" -> T_const TBool
             | "int" -> Prelude.Errors.warning ~loc:(with_file $loc) (fun fmt ->
-                         Format.fprintf fmt "unspecified integer size; replaced by 32");
+                         Format.fprintf fmt "unspecified integer size; replaced by 32\n");
                        T_const (TInt (T_size 32))
+            | "string" -> T_string (unknown())
             | s -> (match Hashtbl.find_opt alias_types s with
-                    | Some t -> t
+                    | Some (t,_) -> t
                     | None -> Prelude.Errors.raise_error ~loc:(with_file $loc)
                               ~msg:("unbound type constructor "^s) ()) }
 | x=IDENT LT tz=ty GT { match x with
                         | "string" -> T_string tz
                         | "int" -> T_const (TInt tz)
-                        | s -> Prelude.Errors.raise_error ~loc:(with_file $loc) ~msg:("unbound type constructor "^s) () }
-| at=aty STATIC LT tz=ty GT { T_array{elem=at;size=tz} }
+                        | s -> (match Hashtbl.find_opt alias_types s with
+                                | Some (t,_) -> t
+                                | None -> Prelude.Errors.raise_error ~loc:(with_file $loc) ~msg:("unbound unary type constructor "^s) ()) }
+| at=aty x=IDENT LT tz=ty GT 
+    { match x with
+      | "array" -> T_array{elem=at;size=tz}
+      | "vector" -> T_vector{elem=at;size=tz}
+      | _ -> (match Hashtbl.find_opt alias_types x with
+              | Some (t,_) -> t
+              | None -> Prelude.Errors.raise_error ~loc:(with_file $loc) ~msg:("unbound binary type constructor "^x) ()) }
+     
 | n=INT_LIT           { T_size n }
 | x=TVAR_IDENT { unknown () } /* TODO: hashmap to constrain occurrences */
 | LPAREN ty=ty RPAREN { ty }
@@ -255,7 +280,7 @@ exp:
 /* expression description
    with decorated sub-expression */
 exp_desc:
-| e1=app_exp SEMI e2=exp
+| e1=lexp SEMI e2=exp
         {
             E_letIn(P_unit,e1,e2)
         }
@@ -263,13 +288,8 @@ exp_desc:
         {
             E_tuple (e::es)
         }
-| e1=lexp PIPE_PIPE e2=lexp
-| e1=lexp PIPE_COMMA_PIPE e2=lexp
-        {
-            E_par[e1;e2]
-        }
-| e=lexp {e}
 
+| e=lexp { e }
 
 arg_ty_unparen:
 | p=pat { p, None }
@@ -300,9 +320,19 @@ lexp_desc:
 | LET b=after_let(IN) e2=exp
         { let (p,e1) = b in
           E_letIn(p,e1,e2) }
-| NODE b=fun_decl(IN) e2=exp
+| NODE b=fun_decl(IN) e2=exp 
+    /* variant of LET enforcing the defined function to be instantaneous */
         { let (p,e1) = enforce_node b in
           E_letIn(p,e1,e2) }
+| LPAREN e1=lexp PIPE_PIPE 
+         es=separated_nonempty_list(PIPE_PIPE,lexp) 
+  RPAREN
+| LPAREN e1=lexp PIPE_COMMA_PIPE 
+         es=separated_nonempty_list(PIPE_COMMA_PIPE,lexp)
+  RPAREN
+        {
+            E_par(e1::es)
+        }
 
 if_end:
 | e2=lexp { e2,E_const Unit }
@@ -341,13 +371,28 @@ app_exp:
   e=app_exp_desc { mk_loc (with_file $loc) e }
 
 app_exp_desc:
+| ARRAY_CREATE e1=aexp
+| CREATE e1=aexp { E_local_static_array(e1,with_file $loc) }
 | e1=aexp es=static_dim_exp+
    { match es with
      | [] -> assert false
-     | [e2] -> E_local_static_array(e1,e2, with_file $loc)
+     (* | [e2] -> E_local_static_array(e1,e2, with_file $loc) *)
      | es' -> E_local_static_matrix(e1,es', with_file $loc) }
+| e1=aexp e2=aexp AT v=lvalue
+| e1=aexp e2=aexp AT_AT v=lvalue 
+    { 
+        E_app(e1,E_tuple[e2;v]) 
+    }
 | ex=aexp COL_EQ e=app_exp { E_set(ex,e) }
 | REF e=aexp            { E_ref e }
+/* | GET e=lexp { match Ast_undecorated.remove_deco e with 
+               | E_tuple[E_var x;e1] -> E_array_get(x,e1) 
+               | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
+                   ~msg:"array get" () } */
+| SET e=lexp { match Ast_undecorated.remove_deco e with 
+               | E_tuple[E_var x;e1;e2] -> E_array_set(x,e1,e2) 
+               | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
+                   ~msg:"... array set" () }
 | x=IDENT LBRACKET e1=exp RBRACKET
 | x=IDENT DOT LPAREN e1=exp RPAREN
    { E_array_get(x,e1) }
@@ -358,15 +403,21 @@ app_exp_desc:
 /* | x=IDENT e1=dot_get es=dot_get+ DOT_LENGTH 
   { E_matrix_size(x,List.length es - 1) }*/
 | x=IDENT DOT_LENGTH { E_array_length x }
+| ARRAY_LENGTH a=aexp
+| LENGTH a=aexp { match un_annot a with
+                  | E_var x -> E_array_length x 
+                  | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
+                          ~msg:"array length: should be a variable......" () }
 | x=IDENT LBRACKET e1=exp RBRACKET LEFT_ARROW e2=app_exp
 | x=IDENT e1=dot_get LEFT_ARROW e2=app_exp 
   { E_array_set(x,e1,e2) }
 | x=IDENT e1=dot_get es=dot_get+ LEFT_ARROW e2=app_exp 
   { E_matrix_set(x,e1::es,e2) }
+| SIZE_CREATE n=INT_LIT { E_const(C_size n) }
 | e=aexp  es=aexp+
       { match e::es with
         | [e1;e2] -> (match un_annot e1 with
-                      | E_var _ | E_const _ -> 
+                      | E_var _ | E_const _ | E_fun _ -> 
                         E_app(e1,e2)
                       | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
                    ~msg:"expression in functional position should be a variable or a constante" ())
@@ -385,7 +436,7 @@ app_exp_desc:
         { let e2 = mk_loc (with_file $loc) @@ E_const (Bool true) in
           E_if(e1,e2,e3)
         }
-| REGISTER ev=avalue LAST e0=aexp
+| REGISTER ev=exp LAST e0=aexp
        { match un_annot ev with
          | E_fun(p,e1) -> E_reg((p,e1),e0,Ast.gensym ())
          | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
@@ -402,14 +453,40 @@ app_exp_desc:
   { let z = Ast.gensym () in
     E_generate((P_var z,E_app(ef1,E_var z)),e_init2,e_st3,with_file $loc) }
 
+| EXEC e1=exp 
+    {
+        Prelude.Errors.raise_error ~loc:(with_file $loc)
+            ~msg:"missing ``default'' close; `exec e default e` expected" ()
+    }
+| EXEC e1=exp DEFAULT
+    {
+        Prelude.Errors.raise_error ~loc:(with_file $loc)
+            ~msg:"missing expression after keyword ``default''; `exec e default e` expected" ()
+    }
+| REGISTER e1=exp LAST
+    {
+        Prelude.Errors.raise_error ~loc:(with_file $loc)
+            ~msg:"missing expression after keyword ``last''; `reg e last e` expected" ()
+    }
+| INIT_TUPLE LT k=INT_LIT GT e=exp 
+    { 
+        E_tuple (List.init k (fun i ->  E_app(e,E_const(Int(i,unknown()))))) 
+    }
+| INIT_INT LT k=INT_LIT GT e=exp 
+    { 
+        E_app(E_const (Op(Runtime(Int_of_tuple k))),
+              E_tuple (List.init k (fun i -> E_app(e,E_const(Int(i,unknown()))))))
+    }
+
+
 | e=aexp { e }
+
+
+
 
 dot_get:
 DOT LPAREN e=exp RPAREN { e }
 
-lc:
-| x=IDENT { St_var x }
-| c=const { St_const c }
 
 aexp:
   e=aexp_desc { mk_loc (with_file $loc) e }
@@ -420,9 +497,36 @@ aexp_desc:
 | LPAREN e=exp COL ty=ty RPAREN { ty_annot ~ty e }
 | c=const { E_const c }
 
-| x=RESIZE_INT LT k=INT_LIT GT { E_const (Op(Runtime(Resize_int k))) }
-| x=TUPLE_OF_INT LT k=INT_LIT GT { E_const (Op(Runtime(Tuple_of_int k))) }
+| RESIZE_INT LT k=INT_LIT GT { E_const (Op(Runtime(Resize_int k))) }
+| TUPLE_OF_INT LT k=INT_LIT GT { E_const (Op(Runtime(Tuple_of_int k))) }
+| INT_OF_TUPLE LT k=INT_LIT GT { E_const (Op(Runtime(Int_of_tuple k))) }
+| VECTOR_MAPI e=aexp {
+                match Ast_undecorated.remove_deco e with
+                | E_tuple[v;e] -> assert (is_variable v || evaluated v); (* todo: error *)
+                                  let x = Ast.gensym () in
+                                  E_vector_mapi(false,(P_var x,E_app(v,E_var x)), e, unknown ())
+                | _ -> assert false (* todo error *) }
+| INT_MAPI e=aexp {
+                match Ast_undecorated.remove_deco e with
+                | E_tuple[v;e] -> assert (is_variable v || evaluated v); (* todo: error *)
+                                  let x = Ast.gensym () in
+                                  E_int_mapi(false,(P_var x,E_app(v,E_var x)), e, unknown ())
+                | _ -> assert false (* todo error *) }
+| VECTOR_CREATE e=exp {
+                match Ast_undecorated.remove_deco e with
+                | E_tuple[v;e] -> (match Ast_undecorated.remove_deco v with
+                                   | E_const(Int(n,_)) ->
+                                      E_app(E_const(Op(Runtime(Vector_make))),
+                                            E_tuple[E_const(C_size n);e])
+                                   | _ -> assert false)
+                | _ -> assert false (* todo error *) 
+            }
+| x=UNROLL AT k=INT_LIT { E_const (Op(Runtime(Unroll k))) }
 | x=IDENT { match x with
+            | "vect_make" -> E_const (Op(Runtime(Vector_make)))
+            | "vect_size" | "vector_length" -> E_const (Op(Runtime(Vector_length(unknown(),unknown()))))
+            | "vect_nth"| "vector_get" -> E_const (Op(Runtime(Vector_get(unknown()))))
+            | "vect_copy_with" -> E_const (Op(Runtime(Vector_update (unknown()))))
             | "abs" -> E_const (Op(Runtime(Abs)))
             | "print" -> E_const (Op(Runtime(Print)))
             | "print_string" -> E_const (Op(Runtime(Print_string)))
@@ -430,6 +534,11 @@ aexp_desc:
             | "print_newline" -> E_const (Op(Runtime(Print_newline)))
             | "string_length" -> E_const (Op(Runtime(String_length)))
             | "assert" -> E_const (Op(Runtime(Assert)))
+            | "get_bit"| "nth_bit" -> E_const (Op(Runtime(GetBit)))
+            | "update_bit" -> E_const (Op(Runtime(UpdateBit)))
+            | "size_of_val" -> E_const (Op(Runtime(Size_of_val (unknown(),unknown()))))
+            | "get" -> let x = gensym () in let y = gensym () in
+                       E_fun(P_tuple[P_var x;P_var y], E_array_get(x,E_var y))
             | "_" -> Prelude.Errors.raise_error ~loc:(with_file $loc)
                          ~msg:"wildcard \"_\" not expected." ()
             | _ -> E_var x }
@@ -445,8 +554,18 @@ aexp_desc:
     PIPE? rev_cases=match_cases END
       { let (hs,eo) = rev_cases in
         E_match(e,List.rev hs,eo) }
-| FOR x=IDENT EQ e_st1=exp TO e_st2=exp DO e=exp DONE 
-      { E_for(x,e_st1,e_st2,e,with_file $loc) }
+| FOR i=IDENT EQ e1=exp TO e2=exp DO e=exp DONE
+      { let loop = gensym ~prefix:"loop" () in
+        let n0 = gensym ~prefix:"n0" () in
+        let n = gensym ~prefix:"n" () in
+        E_letIn(P_var n0, e1,
+        E_letIn(P_var n, e2,
+        E_letIn(P_var loop,E_fix(loop,(P_var i,
+                              E_if(E_app(E_const(Op(Runtime(Gt))),E_tuple[E_var i;E_var n]),
+                                   E_const(Unit),
+                                   E_letIn(P_unit,e,E_app(E_var loop,E_app(E_const(Op(Runtime(Add))),E_tuple[E_var i;E_const (Int (1,unknown()))])))))), 
+                 E_app(E_var loop,E_var n0))))
+                }
 
 | MACRO_FOR x=IDENT EQ e_st1=exp TO e_st2=exp DO e=exp DONE 
       { E_for(x,e_st1,e_st2,e,with_file $loc) }
@@ -503,6 +622,8 @@ const:
 | NOT                    { Op(Runtime(Not)) }
 | x=UP_IDENT             { Inj x }
 | LPAREN op=binop RPAREN { Op(Runtime(op)) }
+| LBRACKET_PIPE cs=separated_nonempty_list(SEMI,const) PIPE_RBRACKET
+    { C_vector cs }
 
 %inline binop:
 | PLUS       { Add }

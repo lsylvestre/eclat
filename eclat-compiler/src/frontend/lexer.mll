@@ -43,6 +43,7 @@
        "asr", ASR;
        "resize_int", RESIZE_INT;
        "tuple_of_int",TUPLE_OF_INT;
+       "int_of_tuple",INT_OF_TUPLE;
        "type", TYPE;
        
        "to", TO;
@@ -51,12 +52,33 @@
        "for", FOR;
        "ref", REF;
        "macro_for", MACRO_FOR;
+       "parfor", PARFOR;
        "macro_generate", MACRO_GENERATE;
        "immediate", IMMEDIATE;
+       "array_create",ARRAY_CREATE;
+       "init_tuple",INIT_TUPLE;
+       "init_int",INIT_INT;
+       "array_length", ARRAY_LENGTH;
+       "unroll", UNROLL;
+       "set", SET;
+       "create", CREATE;
+       "length", LENGTH;
+       "size_create", SIZE_CREATE;
+       "vect_create", VECTOR_CREATE;
+       "vect_mapi", VECTOR_MAPI;
+       "int_mapi", INT_MAPI
      ]
 
 
   let nested_comment_depth = ref 0
+
+let paren_lvl = ref 0 
+let brack_lvl = ref 0 
+
+let get_loc lexbuf =
+  let startp = Lexing.lexeme_start_p lexbuf in
+  let endp = Lexing.lexeme_end_p lexbuf in
+  (!Current_filename.current_file_name,(startp,endp))
 
 }
 
@@ -70,13 +92,24 @@ rule token = parse
                         | Not_found -> IDENT id }
 | up_ident as id      { UP_IDENT id }
 | tvar_ident as lxm   { TVAR_IDENT lxm }
-| '('                 { LPAREN }
-| ')'                 { RPAREN }
-| '['                 { LBRACKET }
-| ']'                 { RBRACKET }
+| '('                 { incr paren_lvl; LPAREN }
+| ')'                 { if !paren_lvl <= 0 then
+                           Prelude.Errors.raise_error ~loc:(get_loc lexbuf)
+                              ~msg:"unbalanced parenthesis" ()
+                        else ();
+                        decr paren_lvl; RPAREN }
+| '['                 { incr brack_lvl; LBRACKET }
+| ']'                 { if !brack_lvl <= 0 then
+                           Prelude.Errors.raise_error ~loc:(get_loc lexbuf)
+                              ~msg:"unbalanced bracket" ()
+                        else ();
+                        decr brack_lvl; RBRACKET }
 | "#exit"             { EXIT_REPL }
 | "#[|"               { SHARP_PIPE_LBRACKET }
 | "|]"                { PIPE_RBRACKET }
+| "[|"                { LBRACKET_PIPE }
+| '@'                 { AT }
+| "@@"                { AT_AT }
 | ','                 { COMMA }
 | ':'                 { COL }
 | '''                 { QUOTE }
@@ -106,14 +139,15 @@ rule token = parse
 | "^"                 { HAT }
 | ".length"           { DOT_LENGTH }
 | ['"']([^'"']* as s)['"'] { STRING_LIT s }
-| ['\n' ]             { (Lexing.new_line lexbuf) ; (token lexbuf) }
+| ['\n' '\r']         { (Lexing.new_line lexbuf) ; (token lexbuf) }
 | [' ' '\t']          { token lexbuf }
 | ';'                 { SEMI }
 | '.'                 { DOT }
 | ";;"                { SEMI_SEMI }
 | eof | "%eof"        { EOF }
 | "(*"                { incr nested_comment_depth; comment lexbuf }
-| _  as lxm           { failwith (Printf.sprintf "Unexpected character: %c"  lxm) }
+| _  as lxm           { Prelude.Errors.raise_error ~loc:(get_loc lexbuf)
+                              ~msg:(Printf.sprintf "Unexpected character: %c"  lxm) () }
 
 and comment = parse
 | "(*"                { incr nested_comment_depth; comment lexbuf }
@@ -122,4 +156,6 @@ and comment = parse
                         if !nested_comment_depth <= 0 (* comments can be nested *)
                         then token lexbuf
                         else comment lexbuf }
+| eof                 { Prelude.Errors.raise_error ~loc:(get_loc lexbuf)
+                              ~msg:("unclosed comment at the end of file"^ !Current_filename.current_file_name) () }
 | _                   { comment lexbuf }

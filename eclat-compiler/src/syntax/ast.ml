@@ -12,10 +12,12 @@ type c =                (** constant [c] *)
   | Int of int * ty     (** integer literal [n] of given size *)
   | String of string    (** string literal [s] *)
   | Op of op            (** primitive [op] *)
-  | V_loc of l          (** pointer [l], only for the interpreter, not in source programs *)
-  | C_tuple of c list   (** tuple literal *)
+  | V_loc of l          (** pointer [l], only in the semantics, 
+                            does not occur in source programs *)
+  | C_tuple of c list   (** tuple literal  [(e1, .. en)]    *)
+  | C_vector of c list  (** vector literal [{ e1, ... en }] *)
+  | C_size of int       (** integer constant used only at compile time *)
   | Inj of x            (* constructor (data type) *)
-
 
 and op = (** primitives *)
        (* instantaneous primitives *)
@@ -24,17 +26,8 @@ and op = (** primitives *)
             pos : int ;   (* indice of the projection to access *)
             arity : int   (* size (i.e. number of projections) of the tuple *)
          }
-        (* instantaneous primitives *)
        | Wait of int
        | TyConstr of ty
-
-
-(** asynchronous primitives manipulating data structures in shared memoy *)
-and extern =
-  | Array_make   (** dynamically allocate an array *)
-  | Array_set    (** modify a dynamic array *)
-  | Array_get    (** read one element in a dynamic array *)
-  | Array_length (** read the size of a a dynamic array *)
 
 type p =                     (** pattern [p] *)
     P_unit                   (** constant unit [()] *)
@@ -53,12 +46,12 @@ type e =                      (** expression     [e]                       *)
   | E_match of e * (x * (p * e)) list * e option (* sum type projection [match e with inj1 p1 -> e1 | ... ] *)
   | E_fun of p * e            (** function       [fun p -> e]              *)
   | E_fix of x * (p * e)      (** recursive function [fix (fun p -> e)]    *)
-  | E_par of e list           (** parallel tuple             [e1 || e2 ... en] *)
+  | E_par of e list           (** parallel tuple             [(e1 || e2 ... en)] *)
 
   | E_reg of (p * e) * e * l     (** register       [reg^l (fun p -> e) last e] *)
   | E_exec of e * e * l       (** exec           [(exec^l e default e)]    *)
 
-  | E_local_static_array of e * e * deco (* c^n, should be resolved at compile time *)
+  | E_local_static_array of e * deco (* [array_crate n], should be resolved at compile time *)
   | E_array_get of x * e      (** static array access        [x.(e)]      *)
   | E_array_length of x       (** static array length access [x.length]   *)
   | E_array_set of x * e * e  (** static array assignment    [x.(e) <- e] *)
@@ -71,16 +64,19 @@ type e =                      (** expression     [e]                       *)
   | E_get of e 
   | E_set of e * e
 
+  | E_vector of e list
+  | E_vector_mapi of bool * (p * e) * e * ty
+  | E_int_mapi of bool * (p * e) * e * ty
+
   | E_generate of (p * e) * e * e_static * deco
   | E_for of x * e_static * e_static * e * deco
 
 and e_static = e
 
-and lc = St_const of c | St_var of l
-
-type static =                 (* static toplevel data *)
-  | Static_array of c * int   (** static global array [c^n] *)
-  | Static_matrix of c * int list (** static global array [c^n^...] *)
+type static =                       (* static toplevel data *)
+  | Static_array_of of (ty * deco)  (** [let static x : ty array<n> ;;] *)
+  | Static_array of c * int         (** static global array [c^n] *)
+  | Static_matrix of c * int list   (** static global array [c^n^...] *)
   | Static_const of c
 
 (** each program is a sequence of toplevel definitions (static arrays
@@ -221,8 +217,8 @@ let rec e2c e =
   match e with
   | E_deco (e,_) -> e2c e
   | E_const c -> c
-  | E_app(e1,e2) -> (match un_deco e1 with
-                    | E_const(Op(TyConstr _)) -> e2c e2 (* todo : warning *)
-                    | _ -> raise Not_a_constant)
   | E_tuple es -> C_tuple (List.map e2c es)
+  | E_app(e1,e2) -> (match e2c e1 with
+                     | Op(TyConstr _) -> e2c e2  (* todo : warning ? lost of precision *)
+                     | _ -> raise Not_a_constant)
   | _ -> raise Not_a_constant

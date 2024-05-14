@@ -28,9 +28,9 @@ module Deadcode_elimination = struct
         let xs' = xs++ys in
         aux xs' e1
     | E_reg((p,e1),e0,_) ->
-        let ys = vars_of_p p in
+        (* let ys = vars_of_p p in
         let xs' = xs++ys in
-        aux xs' e1;
+        aux xs' e1;*)
         aux xs e0
     | E_fix(f,(p,e)) ->
         let ys = vars_of_p p in
@@ -69,10 +69,12 @@ let rec map_under_exec_and_par e =
     match e with
     | E_letIn(P_var f,(E_fix(g,(p,e1))),e2) ->
         let e1' = aux env e1 in (* assume [env] disjoint of [g] and [p] *)
-        let phi' = E_fix(g,(p,aux env e1')) in
+        let phi' = E_fix(g,(p,(* aux env*) e1')) in   (* was [aux env e1'] before: a bug ? *)
         E_letIn(P_var f,phi',aux ((f,phi')::env) e2)
     | E_par(es) ->
         E_par(List.map (fun e -> map_under_exec_and_par (decl env e)) es)
+    (* | E_reg((p,e1),e0,l) ->
+        E_reg((p,map_under_exec_and_par (decl env e1)), aux env e0,l) *)
     | E_exec(e1,e0,l) ->
         E_exec(map_under_exec_and_par (decl env e1), aux env e0,l)
     | e -> Ast_mapper.map (aux env) e

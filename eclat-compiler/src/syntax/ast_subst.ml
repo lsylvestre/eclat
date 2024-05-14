@@ -17,20 +17,7 @@ let rec subst_p x ex = function
 let as_ident ex =
   match ex with
   | E_var z -> z
-  | _ -> assert false (* todo: better error message *)
-
-let subst_lc x ex lc = 
-  match lc with
-  | St_var l' -> if x = l' 
-                 then (match un_deco ex with
-                       | E_const c -> St_const c
-                       | E_var y -> St_var y
-                       | _ -> let open Prelude.Errors in
-                               error (* ~loc*) (fun fmt ->
-                               Format.fprintf fmt
-                                "@[<v>value %s should be statically known.@]" x))
-                 else lc 
-  | St_const _ -> lc
+  | _ -> Ast_pprint.pp_exp Format.std_formatter ex; assert false (* todo: better error message *)
 
 let subst_e x ex e =
   let rec ss e =
@@ -55,8 +42,8 @@ let subst_e x ex e =
     | E_array_length(y) ->
         let z = if x <> y then y else as_ident ex in
         E_array_length(z)
-    | E_local_static_array(e1,e2,deco) ->
-        E_local_static_array(ss e1,ss e2,deco)
+    | E_local_static_array(e1,deco) ->
+        E_local_static_array(ss e1,deco)
     | E_array_get(y,e1) ->
         let z = if x <> y then y else as_ident ex in
         E_array_get(z, ss e1)
@@ -80,6 +67,12 @@ let subst_e x ex e =
     | E_generate((p,e1),e2,e_st3,loc) ->
         let e1' = if pat_mem x p then e1 else ss e1 in
         E_generate((p,e1'),ss e2,ss e_st3,loc)
+    | E_vector_mapi(is_par,(p,e1),e2,ty) ->
+        let e1' = if pat_mem x p then e1 else ss e1 in
+        E_vector_mapi(is_par,(p,e1'),ss e2,ty)
+    | E_int_mapi(is_par,(p,e1),e2,ty) ->
+        let e1' = if pat_mem x p then e1 else ss e1 in
+        E_int_mapi(is_par,(p,e1'),ss e2,ty)
     | e -> Ast_mapper.map ss e
   in
   ss e

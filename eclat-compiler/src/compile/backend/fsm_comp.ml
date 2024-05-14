@@ -1,7 +1,6 @@
 open Fsm_syntax
 
-let allow_heap_access = ref false
-let allow_heap_assign = ref false
+let ref_set_lock_flag = ref true
 
 module NameC = Naming_convention
 
@@ -120,8 +119,11 @@ let rec to_c = function
 | Ast.Bool b -> Bool b
 | Ast.String s -> String s
 | Ast.C_tuple cs -> CTuple (List.map to_c cs)
+| Ast.C_vector cs -> CVector (List.map to_c cs)
+| Ast.C_size n -> CSize n
 | Ast.Inj _ -> assert false (* no partial application in the generated code *)
 | Ast.(Op _ | V_loc _) -> assert false
+
 
 let to_op = function
 | Ast.TyConstr ty -> TyConstr (Fsm_typing.translate_ty ty)
@@ -152,6 +154,7 @@ let rec to_a ~sums (e:Ast.e) : a =
       let_plug_a (to_a ~sums e) @@ (fun z ->
         let n,arg_size,ty_n = find_ctor y sums in
         A_tuple[A_const(n);A_encode(z,ty_n,arg_size)])
+  | Ast.E_vector(es) -> A_vector (List.map (to_a ~sums) es) 
   | _ ->
       Format.fprintf Format.std_formatter "--> %a\n"  Ast_pprint.pp_exp  e; assert false
 
@@ -279,10 +282,28 @@ let rec to_s ~statics ~sums gs e x k =
                 return_ (set_ x (to_a ~sums a))
   | E_get(ay) -> 
       (match ay with
-      | E_var y -> SMap.empty, SMap.empty, 
-                 return_ (set_ x (A_var y))
+      | E_var y ->
+         if !ref_set_lock_flag then
+           let q_wait = Ast.gensym ~prefix:"get_wait" () in
+           let s0 = S_if(y^"_lock", (S_continue q_wait), Some (
+                           (return_ (set_ x (A_var y))))) in
+            (SMap.empty, SMap.add q_wait s0 SMap.empty, s0)
+         else
+           SMap.empty, SMap.empty, return_ (set_ x (A_var y))
       | _ -> assert false)
   | E_set(ay,a) ->
+      if !ref_set_lock_flag then
+      (match ay with
+       | E_var y ->
+          let q_wait = Ast.gensym ~prefix:"get_wait" () in
+          let q1 = Ast.gensym ~prefix:"get_pause" () in
+          let w,ts,s = to_s ~statics ~sums gs (E_const Unit) x k in
+          let s0 = S_if(y^"_lock", 
+                       S_continue q_wait, Some(seq_ (set_ (y^"_lock") (A_const (Bool true))) @@
+                        seq_ (set_ y (to_a ~sums a)) @@ (S_continue q1))) in
+          (w, (SMap.add q1 (seq_ (set_ (y^"_lock") (A_const (Bool false))) s) @@
+               SMap.add q_wait s0 ts), s0)
+       | _ -> assert false) else
       (match ay with
        | E_var y ->
           let w,ts,s = to_s ~statics ~sums gs (E_const Unit) x k in
@@ -316,6 +337,7 @@ let rec to_s ~statics ~sums gs e x k =
                                  seq_ (S_setptr_write(y,a,a_upd)) @@
                                  (S_continue q1))) in
       (SMap.empty, SMap.add q_wait s' ts, s')
+      (* todo: pas besoin de dupliquer s': l'écriture en tant que telle ne prend que 1 cycle : on peut la faire démarrer un cycle plus tard *)
 
   | E_matrix_get(y,idx_list) -> (* TODO: adapt, same as array_get *)
       let a_list = List.map (to_a ~sums) idx_list in
@@ -332,7 +354,7 @@ let rec to_s ~statics ~sums gs e x k =
                                  seq_ s (S_continue q1))) in
         (SMap.empty, SMap.add q_wait s' ts, s')
 
-  | E_matrix_set(y,idx_list,e_upd) -> (* TODO: adapt, same as array_set *)
+  | E_matrix_set(y,idx_list,e_upd) ->
       let a_list = List.map (to_a ~sums) idx_list in
       let a_upd = to_a ~sums e_upd in
       let q1 = Ast.gensym ~prefix:"pause_setI" () in
@@ -348,25 +370,21 @@ let rec to_s ~statics ~sums gs e x k =
                                  (S_continue q1))) in
       (SMap.empty, SMap.add q_wait s' ts, s')
 
-  | E_reg((p,e2),e0,_) ->
-      (match p with
-      | P_var y ->
-          let w0,ts0,s0 = to_s ~statics ~sums [] e0 y S_skip in
-          let w2,ts2,s2 = to_s ~statics ~sums [] e2 y S_skip in
-          show "compute" w2;
+  | E_reg((p,e1),e0,_) ->
+      let y = match p with 
+              | P_var y -> y 
+              | _ -> assert false 
+      in
+      let pi = Ast.{statics;sums;main=e1} in
+      let rdy,res,compute,(ts,s1) = compile ~result:y pi in
+      let s1' = S_fsm((Ast.gensym ~prefix:"id" ()),rdy,res,compute,ts,s1,false) in
+      (SMap.empty, SMap.empty,
+      seq_ (let_plug_s (A_call(Runtime(Not),A_var rdy)) (fun z ->
+             S_if(z, set_ res (to_a ~sums e0), None))) @@
+      seq_ s1' @@
+      seq_ (set_ y (A_var res)) @@
+      return_ @@ set_ x (A_var res))
 
-          assert (SMap.is_empty w0);  (* if one of these assertion fails, this means that the input program is bad typed. *)
-          assert (SMap.is_empty ts0); (* Indeed, since [e2] souhld be instantaneous, *)
-          assert (SMap.is_empty w2);  (* it calls no recursive functions (except under an exec) *)
-          assert (SMap.is_empty ts2);
-
-          let s = seq_
-                    (let_plug_s (A_call(Runtime(Not), (A_var (y^"_init_done")))) (fun z ->
-                     S_if (z, seq_ s0 (S_set(y^"_init_done",A_const (Bool true))), None))) @@
-                   seq_ s2 (S_set(x,A_var y))
-                   in
-          SMap.empty, SMap.empty, return_ @@ s
-      | _ -> assert false)
   | E_exec(e1,e0,l) ->
       let pi = Ast.{statics;sums;main=e1} in
       let rdy,res,compute,(ts,s1) = compile (* ~result:x*) pi in

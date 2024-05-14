@@ -40,17 +40,28 @@ let rec rename_fun_e = function
   | e -> Ast_mapper.map rename_fun_e e
 
 
+let version2 = ref false 
+
 (** [lifting ~statics ~decls e] lifts expression [e]
     considering [~statics] and [~decls] as toplevel definitions
     that should not be added to lexical environments. *)
 let lifting ~statics (env:env) (e:e) : e =
-  let env_filter env p =
-    let xs = vars_of_p p in
-    SMap.filter (fun x _ -> not @@ SMap.mem x xs) env
+  let env_filter env p = env (*  (* NB: il faut bien renommer avant, mais ne pas filtrer à la volée car on perd la trace des fonctions placées dans des tuples qui sont déconstruits ensuite *)
+    let xs = vars_of_p p in 
+    SMap.filter (fun x _ -> not @@ SMap.mem x xs) env*)
    in
   let rec lift env e =
     let open Ast in
     match e with
+     | E_var f ->
+         if !version2 then 
+        (match SMap.find_opt f env with
+         | None -> E_var f
+         | Some p -> 
+            let x =gensym () in 
+            E_fun(P_var x,E_app(E_var f,E_tuple[E_var x;pat2exp p])))
+            (* E_letIn(P_var g,E_fun(P_var x,E_app(E_var f,E_tuple[E_var x;pat2exp p])), E_var g)) *)
+      else e
     | E_app((E_const (Op(TyConstr _))),_) ->
         assert false
     | E_app((E_const _) as e1,e2) ->
@@ -59,10 +70,10 @@ let lifting ~statics (env:env) (e:e) : e =
         let e2' = lift env e2 in
         (match SMap.find_opt f env with
          | None | Some (P_unit) -> E_app(E_var f,e2')
-         | Some p ->
+         | Some p -> (* Printf.printf "=====>%d\n" (SMap.cardinal  (vars_of_p p)); *)
             E_app(E_var f,E_tuple[e2'; pat2exp p]))
     | E_app(e1,e2) ->
-         assert (evaluated e1); lift env @@
+         (* assert (evaluated e1);*) lift env @@
          let f = gensym () in
          E_letIn(P_var f,e1,E_app(E_var f,e2))
     | E_letIn(P_var f,(E_fun(p,e1) as phi),e2) ->
@@ -72,7 +83,7 @@ let lifting ~statics (env:env) (e:e) : e =
         let vp = xs |> SMap.filter (fun x _ ->
                              not (SMap.mem x vp) && not (SMap.mem x env)) in
         let p_env' = vp |> SMap.bindings
-                        |> List.map (fun (x,_) -> P_var x)
+                        |> List.map (fun (x,_) -> (* Printf.printf "--->%s\n" x;*) P_var x)
                         |> group_ps in
         if not (SMap.is_empty (vars_of_p p_env')) then
           (has_changed := true;
@@ -120,6 +131,12 @@ let lifting ~statics (env:env) (e:e) : e =
     | E_for(x,lc1,lc2,e1,loc) ->
         let env' = env_filter env (P_var x) in
         E_for(x,lc1,lc2,lift env' e1,loc)
+    | E_vector_mapi(is_par,(p,e1),e2,ty) ->
+        let env' = env_filter env p in
+        E_vector_mapi(is_par,(p,lift env' e1),lift env e2,ty)
+    | E_int_mapi(is_par,(p,e1),e2,ty) ->
+        let env' = env_filter env p in
+        E_int_mapi(is_par,(p,lift env' e1),lift env e2,ty)
     | e -> Ast_mapper.map (lift env) e
   in lift env e
 
@@ -156,13 +173,18 @@ let globalize_e (e:e) : ((x * e) list * e) =
         let ds1,e1' = glob e1 in
         let ds2,e2' = glob e2 in
         ds1@ds2,E_app(e1',e2')
-    | E_letIn(P_var f,(E_fix _ | E_fun _ as v),e2) ->
+    (* | E_letIn(P_var f,(E_fix _ | E_fun _ as v),e2) ->
         let dsv,v = glob v in
         let ds,e2' = glob e2 in
-        (dsv@[(f,v)]@ds),e2'
+        (dsv@[(f,v)]@ds),e2'*)
     | E_fix(f,(p,e1)) ->
         let ds1,e1' = glob e1 in
-        ds1,E_fix(f,(p,e1'))
+        let xs = vars_of_p p in
+        if SMap.filter (fun x _ -> not @@ SMap.mem x xs) (Free_vars.fv_arrays e1) <> SMap.empty 
+        then 
+          ds1,E_fix(f,(p,e1'))
+        else
+        [],E_fix(f,(p,declare ds1 e1'))
     | E_fun(p,e1) ->
         let ds1,e1' = glob e1 in
         ds1,E_fun(p,e1')
@@ -185,6 +207,22 @@ let globalize_e (e:e) : ((x * e) list * e) =
                                  (dsw,Some ew')
       in
       ds1@List.concat dss@dsw, E_match(e1',hs',eo')
+    (* | E_letIn(P_var x,(E_local_static_array (e3,_) as e1),e2) ->
+        (match e3 with
+        | E_const _ ->
+            let ds1,e1' = glob e1 in
+            let ds2,e2' = glob e2 in
+            ds1@[x,e1']@ds2,e2'
+        | _ -> 
+            let ds1,e1' = glob e1 in
+            let ds2,e2' = glob e2 in
+            ds1,declare ((x,e1')::ds2) e2')*)
+    (* | E_letIn(P_var x,e1,e2) ->
+        let ds1,e1' = glob e1 in
+        let ds2,e2' = glob e2 in
+        ds1@[x,e1']@ds2,e2'
+    | E_letIn(P_tuple ps,E_tuple es,e2) ->
+        glob (List.fold_right2 (fun p e acc -> E_letIn(p,e,acc)) ps es e2) *)
     | E_letIn(p,e1,e2) ->
         let ds1,e1' = glob e1 in
         let ds2,e2' = glob e2 in
@@ -199,10 +237,9 @@ let globalize_e (e:e) : ((x * e) list * e) =
         let ds1,e1' = glob e1 in
         let ds2,e2' = glob e2 in
         ds1@ds2,E_set(e1',e2)
-    | E_local_static_array(e1,e2,loc) ->
+    | E_local_static_array(e1,loc) ->
         let ds1,e1' = glob e1 in
-        let ds2,e2' = glob e2 in
-        ds1@ds2,E_local_static_array(e1',e2',loc)
+        ds1,E_local_static_array(e1',loc)
    | E_array_length _ ->
         [],e
     | E_array_get(x,e1) ->
@@ -251,6 +288,18 @@ let globalize_e (e:e) : ((x * e) list * e) =
       let ds3,e_st3' = glob e_st3 in
       ds2,E_generate((p,declare ds1 e1'),e2',declare ds3 e_st3',loc)
       (* NB: definitions in [e_st1] are *not* globalized *)
+
+    | E_vector es ->
+        let ds,es' = globalize_list es in
+        ds,E_vector(es')
+    | E_vector_mapi(is_par,(p,e1),e2,ty) ->
+      let ds1,e1' = glob e1 in
+      let ds2,e2' = glob e2 in
+      ds2,E_vector_mapi(is_par,(p,declare ds1 e1'),e2',ty)
+    | E_int_mapi(is_par,(p,e1),e2,ty) ->
+      let ds1,e1' = glob e1 in
+      let ds2,e2' = glob e2 in
+      ds2,E_int_mapi(is_par,(p,declare ds1 e1'),e2',ty)
   in glob e
 
 
@@ -264,7 +313,7 @@ let lambda_lifting ~statics ~globalize (e:e) : ((x * e) list * e) =
 
 
 (** [lambda_lifting_pi ~globalize:true pi] lambda-lifts program [pi]. *)
-let lambda_lifting_pi ?(globalize=false) (pi:pi) : pi =
+let lambda_lifting_pi ?(globalize=true) (pi:pi) : pi =
   let statics = smap_of_list pi.statics in
   let (ds,e) = lambda_lifting ~statics ~globalize pi.main in
   let main = declare ds e in

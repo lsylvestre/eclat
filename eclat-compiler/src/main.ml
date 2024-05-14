@@ -20,14 +20,28 @@ let typing_with_tyB = ref true
 
 let prop_fsm_flag = ref false
 
+let tailrec_check_flag = ref true
+
 let arguments = ref ""
 let top_wrapper = ref ""
 let clock_top = ref "clk"
 
+(* ******************** *)
 let clock_top_intel_max10 = "MAX10_CLK1_50"
 
 let top_wrapper_intel_max10 =
   "SW:10,KEY:2|LEDR:10,HEX0:8,HEX1:8,HEX2:8,HEX3:8,HEX4:8,HEX5:8"
+
+(* ******************** *)
+let clock_top_xilinx_zybo = "clk"
+let top_wrapper_xilinx_zybo = "sw:4,btn:4|led:4"
+
+(* ******************** *)
+
+let top_wrapper_yosys_ecp5 =
+  "i:1|o:1"
+
+let nb_iterations_interp = ref 10 ;;
 
 (* main configuration *)
 let () =
@@ -45,6 +59,8 @@ let () =
                  "force litteral integers to be of the given size");
     ("-mono",    Arg.Set Typing.monomorphic,
                  "monomorphic type system");
+    ("-no-glob",    Arg.Clear Compile.globalize_flag,
+                 "no globalization during lambda lifting");
     ("-interp",   Arg.Set interp_flag,
                  "interprete and exit.");
 
@@ -52,14 +68,16 @@ let () =
                   "specify a list of inputs (one at each clock tick)\
                   \ for interpretation of the source program or simulation\
                   \ of the generated VHDL code");
+
     ("-ast",      Arg.Set show_ast_and_exit_flag,
                  "print input program and exit.");
 
     ("-ty",       Arg.Set show_ty_and_exit_flag,
                   "type and exit.");
-    ("-tyB",      Arg.Set typing_with_tyB,
-                  "run an additional type checking phase.");
-
+    ("-notyB",      Arg.Clear typing_with_tyB,
+                  "do not run an additional type checking phase.");
+    ("-no-tailrec-check", Arg.Clear tailrec_check_flag,
+                  "do not check that recursive functions are tail-recursive");
     ("-pp",      Arg.String Display_internal_steps.set_print_mode,
                  "display the output of the specified (intermediate)\
                  \ compilation pass specified.\n\tPossible values:\
@@ -100,13 +118,26 @@ let () =
                                  top_wrapper := top_wrapper_intel_max10),
      "synthesis for Intel MAX 10 FPGA");
 
+    ("-xilinx-zybo", Arg.Unit (fun () ->
+                                 Operators.flag_no_assert := true;
+                                 Operators.flag_no_print := true;
+                                 Gen_vhdl.ram_inference := true;
+                                 Gen_vhdl.intel_xilinx_target := true;
+                                 clock_top := clock_top_xilinx_zybo;
+                                 top_wrapper := top_wrapper_xilinx_zybo),
+     "synthesis for Xilinx Zybo FPGA");
+
     ("-yosys-ecp5", Arg.Unit (fun () ->
                                  Operators.flag_no_assert := true;
                                  Operators.flag_no_print := true;
                                  Gen_vhdl.ram_inference := true;
-                                 clock_top := "clk48"),
-     "synthesis for Intel MAX 10 FPGA");
+                                 clock_top := "clk48";
+                                 top_wrapper := top_wrapper_yosys_ecp5),
+     "synthesis for ECP5 FPGA with Yosys");
 
+    ("-unsafe", Arg.Clear Insert_bound_checking.insert_bound_checking_flag,
+        "Do not compile bounds checking on array access");
+    
     ("-rw-locks", Arg.Clear Gen_vhdl.single_read_write_lock_flag,
      "use two different locks per array to protect read and write memory accesses");
 
@@ -117,18 +148,21 @@ let () =
     ("-no-ref-arg", Arg.Clear Typing.accept_ref_arg_flag,
      "reject functional argument of type ref<'a>, for better performance (in space)");    
 
+    ("-nb-it", Arg.Set_int nb_iterations_interp,
+               "Number of reactions for interpretation");
+
     ]
-      add_input "Usage:\n  ./mixc file"
+      add_input "Usage:\n  ./eclat file"
 ;;
 
 let main () : unit =
   (** Lexing/parsing of source code *)
   let (pi,arg_list) =
-    Frontend.frontend ~inputs:!inputs !top_flag
-                      ~when_repl:Typing.when_repl
-                      ~relax:!Typing.relax_flag
-                      !Ast_mk.main_symbol
-                      !arguments
+      Frontend.frontend ~inputs:!inputs !top_flag
+                        ~when_repl:Typing.Typing2.when_repl
+                        ~relax:!Typing.relax_flag
+                        !Ast_mk.main_symbol
+                        !arguments
   in
 
   (** Pretty print *)
@@ -150,6 +184,9 @@ let main () : unit =
     exit 0;
   end;
 
+  if !tailrec_check_flag then
+    Check_tail_call.check_pi pi;
+
   let pi = if Operators.(!Operators.flag_no_assert || !Operators.flag_no_print)
            then Clean_simul.clean_pi
                   ~no_assert:!Operators.flag_no_assert
@@ -164,7 +201,7 @@ let main () : unit =
 
   (** Interprete only, when [interp_flag] is setted.  *)
   if !interp_flag then begin
-      Interp.interp_pi pi arg_list |> ignore;
+      Interp.interp_pi ~nb_iterations:!nb_iterations_interp pi arg_list |> ignore;
       exit 0
   end;
 

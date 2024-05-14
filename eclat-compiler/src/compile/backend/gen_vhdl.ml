@@ -2,9 +2,10 @@ open Fsm_syntax
 open Format
 
 let ram_inference = ref false
+let memory_initialization = ref false
 let intel_max10_target = ref false
+let intel_xilinx_target = ref false
 let single_read_write_lock_flag = ref true
-
 
 let size_ty t =
   (* we must canonising [t] to prevent it from being considered as a type variable *)
@@ -19,9 +20,15 @@ let rec size_const c =
       size_ty tsize
   | Enum _ ->
       assert false (* cannot infer enum size *)
-  |CTuple cs ->
+  | CTuple cs | CVector cs ->
       List.fold_left (fun s c -> s + size_const c) 0 cs
+  | CSize _ -> 
+      Prelude.Errors.warning (fun fmt ->
+        Format.fprintf fmt
+          "Size literal detected in the generated code: this is not an immediate value");
+      1 (* or 0 ? *)
   | String s -> String.length s * 8
+
 
 (* [reserved x] returns [true] iff [x] is a VHDL keyword
    or a reserved identifier (e.g., reset) *)
@@ -29,7 +36,7 @@ let reserved : string -> bool =
   let tbl = Hashtbl.create 20 in
   let () =
     List.iter (fun x -> Hashtbl.add tbl x ()) @@
-      [ "_"; "reset"; "others"; "run" ; "value"; "clk"; "loop"; "exit";"next";"rdy";"wait"]
+      [ (*"result"; "argument"; *)"_"; "reset"; "others"; "run" ; "value"; "clk"; "loop"; "exit";"next";"rdy";"wait"]
       (* todo: complete with other VHDL keywords *)
   in
   (fun x -> Hashtbl.mem tbl x)
@@ -70,7 +77,7 @@ let int2bin ~int_size =
   fun n ->
     for i = 0 to int_size - 1 do
       let pos = int_size - 1 - i in
-      Bytes.set buf pos (if n land (1 lsl i) != 0 then '1' else '0')
+      Bytes.set buf pos (if i <= 63 && (n land (1 lsl i) != 0) then '1' else '0') (* I add i <= 63 to avoid incorrect value due to overflow *)
     done;
     Bytes.to_string buf
 
@@ -105,6 +112,10 @@ let decl_locks fmt x =
 let pp_tuple fmt pp vs =
   pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt " & ") pp fmt vs
 
+let pp_vector fmt pp vs =
+  pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt " & ") pp fmt vs
+
+
 (** code generator for constants *)
 let rec pp_c fmt c =
   match c with
@@ -114,22 +125,24 @@ let rec pp_c fmt c =
       let n = abs n in
       let sz = size_ty tsize in
       if is_neg then fprintf fmt "eclat_neg(";
-      if n < 16 then
+      if sz < 16 then
         fprintf fmt "\"%s\"" (int2bin ~int_size:sz n)
       else
-      let v = Printf.sprintf "%x" n in (* dislay in hexa directly *)
-      let l_pad = sz - String.length v * 4 in
-      if l_pad = 0 then fprintf fmt "X\"%s\"" v else
-      fprintf fmt "%s & X\"%s\"" (const_zero l_pad) v;
-
+        (let v = Printf.sprintf "%x" n in (* dislay in hexa directly *)
+         let l_pad = sz - String.length v * 4 in
+         if l_pad = 0 then fprintf fmt "X\"%s\"" v else
+         fprintf fmt "%s & X\"%s\"" (const_zero l_pad) v);
       if is_neg then fprintf fmt ")";
   | Bool b ->
       (* notice: in VHDL, eclat_true(0) is valid, but "1"(0) is invalid. *)
       fprintf fmt "%s" (if b then "eclat_true" else "eclat_false")
   | Enum x -> pp_ident fmt x
   | CTuple(cs) ->
-      pp_tuple fmt pp_c cs
+       pp_tuple fmt pp_c cs
+  | CVector(cs) ->
+      pp_vector fmt pp_c cs
   | String s -> fprintf fmt "of_string(\"%s\")" s
+  | CSize n -> fprintf fmt "%d" n
 
 (** code generator for tuples deconstruction *)
 let rec pp_tuple_access fmt (i:int) ty (a:a) : unit =
@@ -185,7 +198,21 @@ let rec pp_tuple_access fmt (i:int) ty (a:a) : unit =
 and pp_call fmt (op,a) =
   match op with
   | GetTuple(i,_,ty) -> pp_tuple_access fmt i ty a
-  | Compute_address -> fprintf fmt "eclat_compute_address(caml_heap_base,%a)" pp_a a
+  | Runtime(Size_of_val(ty,size_int)) -> 
+     let n = size_ty (Fsm_typing.translate_ty ty) in
+     pp_c fmt (Int{value=n;tsize=Fsm_typing.translate_ty size_int})
+  | Runtime(Vector_make) ->
+      (match a with
+      | A_tuple[a1; a2] -> fprintf fmt "eclat_vector_make(%a,%a)" pp_a a1 pp_a a2
+      | _ -> assert false)
+  | Runtime(Vector_length (sz,sz_res)) ->
+      (match Types.canon sz with
+      | Types.T_size n -> pp_c fmt (Int {value=n;tsize=(Fsm_typing.translate_ty sz_res)})
+      | _ -> Ast_pprint.pp_ty Format.std_formatter (Types.canon sz); assert false)
+   | Runtime(Vector_get t) ->
+      fprintf fmt "eclat_vector_get(%a,%d)" pp_a a Fsm_typing.(size_ty (translate_ty t))
+   | Runtime(Vector_update t) ->
+      fprintf fmt "eclat_vector_update(%a,%d)" pp_a a Fsm_typing.(size_ty (translate_ty t))
   | Runtime p -> Operators.gen_op fmt p pp_a a
   | _ -> fprintf fmt "@[%a(%a)@]" pp_op op pp_a a
 
@@ -195,7 +222,6 @@ and pp_op fmt = function
 | Runtime p -> assert false (* deal with in pp_call*)
 | TyConstr _ -> fprintf fmt "eclat_id"
 | GetTuple (i,_,_) -> assert false (* special case, defined below (see tuple_access) *)
-| Compute_address -> assert false (* deal with in pp_call*)
 
 (** code generator for atoms (i.e. combinatorial expression) *)
 (* assumes that the let-bindings of atoms are not nested *)
@@ -207,6 +233,7 @@ and pp_a fmt = function
 | A_letIn(x,a1,a2) ->
    assert false (* flattening needed before *) (* fprintf fmt "@[%a := %a;@,%a@]" pp_ident x pp_a a1 pp_a a2*)
 | A_tuple aas -> pp_tuple fmt pp_a aas
+| A_vector aas -> pp_vector fmt pp_a aas
 | A_string_get(s,i) ->
     fprintf fmt "@[%a(to_integer(unsigned(%s&\"000\")) to to_integer(unsigned(%s&\"000\"))+7)@]" pp_ident s i i
 | A_buffer_get(xb) ->
@@ -392,6 +419,47 @@ module MatrixType = Map.Make(struct
   end)
 
 
+
+let array_decl fmt x sz_elem n default_value_pp =
+
+  fprintf fmt "signal %a : array_value_%d(0 to %d)" pp_ident x sz_elem (n-1);
+
+
+  if not(!ram_inference) then (
+   fprintf fmt " := (others => %a);@," default_value_pp ()
+  ) else (fprintf fmt ";@,";
+          if !memory_initialization then (
+            if !intel_max10_target then ( 
+              (** Intel MAX 10 FPGA device do not support memory initialization.
+                (source: https://www.intel.com/content/www/us/en/support/programmable/articles/000074796.html
+              *)
+              Prelude.Errors.warning (fun fmt ->
+                Format.fprintf fmt
+                  "Static array %s%a%s (RAM block): Intel MAX 10 FPGA device do not support memory initialization.\n"
+                  Prelude.Errors.bold
+                  pp_ident x
+                  Prelude.Errors.reset)) else (
+            fprintf fmt "attribute %a_init_file : string;@," pp_ident x;
+            fprintf fmt
+               "attribute %a_init_file of %a : signal is \"init_file_%a.mif\";@,"
+               pp_ident x
+               pp_ident x
+               pp_ident x)));
+
+  if !intel_xilinx_target then ( (* attribute for enforcing RAM inference in Xilinx Vivado *)
+    fprintf fmt "attribute ram_style of %a : signal is \"block\";@," pp_ident x;
+  );
+
+  fprintf fmt "signal %a : value(0 to %d);@," pp_ident ("$"^x^"_value") (sz_elem - 1);
+  fprintf fmt "signal %a : natural range 0 to %d;@," pp_ident ("$"^x^"_ptr") (n - 1);
+  fprintf fmt "signal %a : natural range 0 to %d;@," pp_ident ("$"^x^"_ptr_write") (n - 1);
+  fprintf fmt "signal %a : value(0 to %d);@," pp_ident ("$"^x^"_write") (sz_elem - 1);
+  fprintf fmt "signal %a : std_logic := '0';@," pp_ident ("$"^x^"_write_request")
+
+
+
+
+
 let declare_variable ~argument ~statics typing_env fmt =
   let var_decls = Hashtbl.create 10 in
   let add_var x n =
@@ -416,6 +484,10 @@ let pp_component fmt ~vhdl_comment ~name ~state_var ~argument ~result ~compute ~
 
   let arty = List.fold_left (fun arty (_,g) ->
       match g with
+      | Static_array_of ty -> 
+          (match ty with
+          | TStatic{elem} ->  ArrayType.add (size_ty elem) () arty
+          | _ -> assert false)
       | Static_array(c,_) -> ArrayType.add (size_const c) () arty
       | _ -> arty) ArrayType.empty statics
   in
@@ -464,14 +536,12 @@ use work.runtime.all;
   let st_result = match t_result with None -> "result_width - 1" | Some t -> string_of_int (size_ty t - 1) in
   fprintf fmt "signal %s : in value(0 to %s);@," argument st_argument;
   fprintf fmt "signal result : out value(0 to %s)" st_result;
-
-  begin
-    if !Fsm_comp.allow_heap_access || !Fsm_comp.allow_heap_assign then
-      fprintf fmt ";@,signal caml_heap_base : in value(0 to 31)";
-  end;
   fprintf fmt ");@,@]@]@,end entity;
 architecture rtl of %a is@,@[<v 2>@," pp_ident name;
 
+  if !intel_xilinx_target then ( (* attribute for enforcing RAM inference in Xilinx Vivado *)
+    fprintf fmt "attribute ram_style : string;@,"
+  );
 
   declare_machine fmt ~state_var ~compute ~infos (ts,s);
 
@@ -545,36 +615,15 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
 
   List.iter (fun (x,st) ->
     match st with
+   
+    | Static_array_of ty ->
+          let ty_elem,n = match ty with TStatic {elem;size=TSize n} -> elem,n | _ -> assert false (* error *) in
+          let sz_elem = size_ty ty_elem in 
+          array_decl fmt x sz_elem n ((fun fmt () -> fprintf fmt "%s" (default_zero ty_elem)))
+         
     | Static_array(c,n) ->
-          fprintf fmt "signal %a : array_value_%d(0 to %d)" pp_ident x (size_const c) (n-1);
+          array_decl fmt x (size_const c) n (fun fmt () -> pp_c fmt c)
 
-          if not(!ram_inference) then (
-           fprintf fmt " := (others => %a);@," pp_c c
-          ) else (fprintf fmt ";@,";
-                  if !intel_max10_target then (
-                    (** Intel MAX 10 FPGA device do not support memory initialization.
-                        (source: https://www.intel.com/content/www/us/en/support/programmable/articles/000074796.html
-                     *)
-                    Prelude.Errors.warning (fun fmt ->
-                        Format.fprintf fmt
-                          "Static array %s%a%s (RAM block): Intel MAX 10 FPGA device do not support memory initialization.\n"
-                          Prelude.Errors.bold
-                          pp_ident x
-                          Prelude.Errors.reset)
-                  )
-                  else (
-                    fprintf fmt "attribute %a_init_file : string;@," pp_ident x;
-                    fprintf fmt
-                       "attribute %a_init_file of %a : signal is \"init_file_%a.mif\";@,"
-                       pp_ident x
-                       pp_ident x
-                       pp_ident x));
-          fprintf fmt "signal %a : value(0 to %d);@," pp_ident ("$"^x^"_value") (size_const c - 1);
-          fprintf fmt "signal %a : natural range 0 to %d;@," pp_ident ("$"^x^"_ptr") (n - 1);
-          fprintf fmt "signal %a : natural range 0 to %d;@," pp_ident ("$"^x^"_ptr_write") (n - 1);
-          fprintf fmt "signal %a : value(0 to %d);@," pp_ident ("$"^x^"_write") (size_const c - 1);
-          fprintf fmt "signal %a : std_logic := '0';@," pp_ident ("$"^x^"_write_request")
-    
     | Static_matrix(c,n_list) ->
         fprintf fmt "signal %a : array_value" pp_ident x;
         List.iter (fun n -> fprintf fmt "_%d" (n-1)) n_list;
@@ -609,7 +658,8 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
 
   List.iter (fun (x,st) ->
     match st with
-    | Static_array(c,_) ->
+    | Static_array_of _
+    | Static_array _ ->
       fprintf fmt "process (clk)
             begin
             if (rising_edge(clk)) then
@@ -670,7 +720,7 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
   declare_variable ~argument ~statics typing_env fmt;
 
 
-  List.iter (fun (x,(Static_array _ | Static_matrix _)) ->
+  List.iter (fun (x,(Static_array_of _ | Static_array _ | Static_matrix _)) ->
       decl_locks fmt x
   ) statics;
 
@@ -683,6 +733,7 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
   fprintf fmt "@[<hov>";
    Hashtbl.iter (fun x t ->
       match List.assoc_opt x statics with
+      | Some (Static_array_of _)  -> ()
       | Some (Static_array(c,n)) ->
           () (* fprintf fmt "@]@,%a <= (others => %a);@,@[<hov>" pp_ident x pp_c c *)
       | Some (Static_matrix _) ->

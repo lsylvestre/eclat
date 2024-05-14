@@ -25,6 +25,7 @@ let clean_fsm ~rdy ~result (ts,s) typing_env =
   | A_encode(x,_,_)
   | A_decode(x,_) ->
       Hashtbl.add vs_read x ()
+  | A_vector aa -> List.iter collect_read_a aa
   in
 
   let rec collect_s = function

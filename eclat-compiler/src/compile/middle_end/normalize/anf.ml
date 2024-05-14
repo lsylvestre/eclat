@@ -140,12 +140,10 @@ let rec anf (e:e) : e =
       E_set(xc1,xc2)
   | E_array_length _ ->
       [],e
-  | E_local_static_array(e1,e2,loc) ->
+  | E_local_static_array(e1,loc) ->
       let ds1,e1' = glob e1 in
-      let ds2,e2' = glob e2 in
-      ds1@ds2,plug e1' @@ fun xc1 ->
-              plug e2' @@ fun xc2 ->
-              E_local_static_array(xc1,xc2,loc)
+      ds1,plug e1' @@ fun xc1 ->
+              E_local_static_array(xc1,loc)
   | E_array_get(x,e1) ->
       let ds1,e1' = glob e1 in
       ds1,plug e1' @@ fun xc1 ->
@@ -190,6 +188,16 @@ let rec anf (e:e) : e =
       E_generate((p,anf e1),xc,anf e_st3,loc) 
       (* NB: [e_st3] is *not* moved up with `plug` 
 *)
+  | E_vector(es) ->
+      let dss,es' = List.split (List.map glob es) in
+      List.concat dss, 
+      plug_n es' @@ fun xs -> E_vector(xs)
+  | E_vector_mapi(is_par,(p,e1),e2,ty) ->
+      [],plug (anf e2) @@ fun xc ->
+      E_vector_mapi(is_par,(p,anf e1),xc,ty) 
+  | E_int_mapi(is_par,(p,e1),e2,ty) ->
+      [],plug (anf e2) @@ fun xc ->
+      E_int_mapi(is_par,(p,anf e1),xc,ty) 
   in 
   let ds,e' = glob e in 
   Ast_mapper.declare ds e'

@@ -59,4 +59,9 @@ let rec combinational (e:e) : bool =
 	| E_for(_,e_st1,e_st2,e3,_) ->
 	   combinational e_st1 && combinational e_st2 && combinational e3
 	| E_generate((_,e1),e2,e_st3,_) ->
-	   combinational e1 && combinational e2 && combinational e_st3
+	    combinational e1 && combinational e2 && combinational e_st3
+	| E_vector es -> List.for_all combinational es
+	| E_vector_mapi(is_par,(_,e1),e2,_) ->
+	    not(is_par) && combinational e1 && combinational e2
+	| E_int_mapi(is_par,(_,e1),e2,_) ->
+	    not(is_par) && combinational e1 && combinational e2

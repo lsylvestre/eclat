@@ -29,8 +29,8 @@ let rec map f e =
       E_get(f e1)
   | E_set(e1,e2) ->
       E_set(f e1,f e2)
-  | E_local_static_array(e1,e2,deco) ->
-      E_local_static_array(f e1,f e2,deco)
+  | E_local_static_array(e1,deco) ->
+      E_local_static_array(f e1,deco)
   | E_array_length _ ->
       e
   | E_array_get(x,e1) ->
@@ -55,6 +55,12 @@ let rec map f e =
       E_for(x,f e_st1,f e_st2,f e,loc)
   | E_generate((p,e1),e2,e_st1,loc) ->
       E_generate((p,f e1),f e2,f e_st1,loc)
+  | E_vector es ->
+      E_vector (List.map f es)
+  | E_vector_mapi (is_par,(p,e1),e2,ty) ->
+      E_vector_mapi (is_par,(p,f e1),f e2,ty)
+  | E_int_mapi (is_par,(p,e1),e2,ty) ->
+      E_int_mapi (is_par,(p,f e1),f e2,ty)
 (** traversal order of sub-expressions is unspecified *)
 
 let rec iter f (e:e) : unit =
@@ -63,7 +69,7 @@ let rec iter f (e:e) : unit =
       f e
   | E_var _ ->
       ()
-  | E_const c ->
+  | E_const _ ->
       ()
   | E_if(e1,e2,e3) ->
       f e1; f e2; f e3
@@ -90,8 +96,8 @@ let rec iter f (e:e) : unit =
       f e1; f e0
   | E_exec(e1,e2,_) ->
       f e1; f e2
-  | E_local_static_array(e1,e2,_) ->
-      f e1; f e2
+  | E_local_static_array(e1,_) ->
+      f e1
   | E_array_length _ ->
       ()
   | E_array_get(_,e1) ->
@@ -110,7 +116,12 @@ let rec iter f (e:e) : unit =
       f e
   | E_generate((_,e1),e2,e_st3,_) ->
       f e1; f e2; f e_st3
-
+  | E_vector es ->
+      List.iter f es
+  | E_vector_mapi(_,(_,e1),e2,_) ->
+      f e1; f e2
+  | E_int_mapi(_,(_,e1),e2,_) ->
+      f e1; f e2
 
 let declare ds e =
   List.fold_right (fun (x,v) e -> E_letIn(P_var x,v,e)) ds e
@@ -181,10 +192,9 @@ let accum f (e:e) : ((x * e) list * e) =
             let ds1,e1' = aux e1 in
             let ds2,e2' = aux e2 in
             ds1@ds2,E_set(e1',e2')
-        | E_local_static_array(e1,e2,deco) ->
+        | E_local_static_array(e1,deco) ->
             let ds1,e1' = aux e1 in
-            let ds2,e2' = aux e2 in
-            ds1@ds2,E_local_static_array(e1',e2',deco)
+            ds1,E_local_static_array(e1',deco)
         | E_array_length _ ->
             [],e
         | E_array_get(x,e1) ->
@@ -224,13 +234,24 @@ let accum f (e:e) : ((x * e) list * e) =
             let ds3,e3' = aux e3 in
             ds1@ds2@ds3,E_for(x,e_st1',e_st2',e3,loc)
              (* NB: definitions in [e_st1] and [e_st2] and [e3]
-                are *not* auxalized *)
+                are *not* globalized *)
         | E_generate((p,e1),e2,e_st3,loc) ->
           let ds1,e1' = aux e1 in
           let ds2,e2' = aux e2 in
           let ds3,e_st3' = aux e_st3 in
           ds1@ds2@ds3,E_generate((p,e1'),e2',e_st3',loc)
-          (* NB: definitions in [e_st1] are *not* auxalized *)
+          (* NB: definitions in [e_st1] are *not* globalized *)
+        | E_vector es ->
+            let ds,es' = aux_list es in
+            ds,E_vector(es')
+        | E_vector_mapi(is_par,(p,e1),e2,ty) ->
+            let ds1,e1' = aux e1 in
+            let ds2,e2' = aux e2 in
+            ds1@ds2,E_vector_mapi(is_par,(p,e1'),e2',ty)
+        | E_int_mapi(is_par,(p,e1),e2,ty) ->
+            let ds1,e1' = aux e1 in
+            let ds2,e2' = aux e2 in
+            ds1@ds2,E_int_mapi(is_par,(p,e1'),e2',ty)
   ) 
   in 
   aux e

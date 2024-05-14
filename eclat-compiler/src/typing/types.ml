@@ -18,12 +18,16 @@ type ty =                (** type *)
   | T_ref of ty   (* mutable reference cell *)
   | T_array of {
       elem : ty ; (** static array of elements of type [elem], *)
-      size : ty   (** parameterized by its size using a the size type [size] *)
+      size : sz   (** parameterized by its size using a the size type [size] *)
     }
   | T_matrix of {
       elem : ty ; (** static matrix of elements of type [elem], *)
-      size : ty   (** parameterized by its size using a the size type [size] as tuple *)
+      size : sz   (** parameterized by its size using a the size type [size] as tuple *)
     }
+  | T_vector of {
+      elem : ty ;
+      size : sz
+    } (** type for immediate vector *)
   | T_static of ty
   (* sized types for check response time and static datastructures *)
   | T_size of int      (** n *)
@@ -32,7 +36,7 @@ type ty =                (** type *)
   | T_add of ty * ty   (** t + t'  *)
   | T_max of ty * ty   (** max(t,t') *)
   | T_le of ty * ty    (** t such that t <= t' *)
-  | T_forall of x * ty * ty
+and sz = ty
 
 and tconst = (** type constant *)
   | TBool      (** boolean type [bool] *)
@@ -64,6 +68,34 @@ let unknown =
   fun () ->
     let ty = T_var (ref (Unknown (!c))) in
     incr c; ty
+
+let rec no_unknown_in_ty t =
+  let exception Found in
+  let rec find t =
+    match t with
+    | T_const _ -> ()
+    | T_var{contents=Ty t'} ->
+        find t'
+    | T_var{contents=Unknown _} -> raise Found
+    | T_tuple (ts) ->
+        List.iter find ts
+    | T_fun{arg;dur;ret} ->
+        find arg; find dur; find ret
+    | T_string tz ->
+        find tz
+    | T_sum cs -> List.iter (fun (_,t) -> find t) cs
+    | T_ref(t) -> find t
+    | T_array {elem=t;size=tz} -> find t; find tz
+    | T_matrix {elem=t;size=tz} -> find t; find tz
+    | T_vector {elem=t;size=tz} -> find t; find tz
+    | T_static t -> find t
+    | T_size _ -> find t
+    | (T_response_time _ | T_infinity) -> ()
+    | (T_add(t1,t2) | T_max(t1,t2) | T_le(t1,t2)) -> 
+       find t1; find t2
+  in
+  try find t; false with Found -> true
+
 
 
 let simplify_response_time t =
@@ -124,8 +156,8 @@ let rec canon t =
   | T_ref(t) -> T_ref (canon t)
   | T_array {elem=t;size=tz} -> T_array {elem=canon t;size=canon tz}
   | T_matrix {elem=t;size=tz} -> T_matrix {elem=canon t;size=canon tz}
+  | T_vector {elem=t;size=tz} -> T_vector {elem=canon t;size=canon tz}
   | T_static t -> T_static (canon t)
-  | T_forall(x,t1,t2) -> T_forall(x,canon t1,canon t2)
   | T_size _ -> t
   | (T_response_time _ | T_infinity | T_add _ | T_max _ | T_le _) as t -> simplify_response_time t
 
@@ -150,6 +182,27 @@ module Ty = struct
   type 'a var = 'a var_content ref
   and 'a var_content = Unknown of int
                      | Is of 'a
+
+  type size = Sz_var of size var
+            | Sz_lit of int
+
+  type tyB = TyB_var of tyB var
+           | TyB_int of size
+           | TyB_bool
+           | TyB_unit
+           | TyB_tuple of tyB list
+           | TyB_sum of (tag * tyB) list
+           | TyB_string of size
+           | TyB_vector of size * tyB
+           | TyB_size of size
+
+  and tag = string
+
+  type dur = Dur_var of dur var
+          | Dur_zero
+          | Dur_one
+          | Dur_max of dur * dur
+
   type ty = Ty_var of ty var
           | Ty_base of tyB
           | Ty_tuple of ty list
@@ -157,45 +210,15 @@ module Ty = struct
           | Ty_ref of tyB
           | Ty_array of size * tyB
           | Ty_matrix of size list * tyB
-  and tyB = TyB_var of tyB var
-          | TyB_int of size
-          | TyB_bool
-          | TyB_unit
-          | TyB_tuple of tyB list
-          | TyB_string of size
-  and size = Sz_var of size var
-           | Sz_lit of int
-  and dur = Dur_var of dur var
-          | Dur_zero
-          | Dur_one
-          | Dur_max of dur * dur
 
-  let rec canon_ty = function
-  | Ty_var ({contents=Is ty} as v) ->
-      let ty' = canon_ty ty in
-      v := Is ty'; ty'
-  | Ty_var {contents=Unknown _} as ty -> ty
-  | Ty_base tyB -> Ty_base(canon_tyB tyB)
-  | Ty_tuple ty_list ->
-      (let exception E in
-      let ty_list' = List.map canon_ty ty_list in
-      try
-        Ty_base (TyB_tuple (List.map (function
-                                   | Ty_base tyB -> tyB
-                                   | _ -> raise E) ty_list))
-      with E ->
-        Ty_tuple (ty_list'))
-  | Ty_fun(ty,dur,tyB) ->
-      Ty_fun(canon_ty ty,
-             canon_dur dur,
-             canon_tyB tyB)
-  | Ty_ref(tyB) ->
-      Ty_ref(canon_tyB tyB)
-  | Ty_array(sz,tyB) ->
-      Ty_array(canon_size sz, canon_tyB tyB)
-  | Ty_matrix(sz_list,tyB) ->
-      Ty_matrix(List.map canon_size sz_list,canon_tyB tyB)
-  and canon_tyB = function
+  let rec canon_size = function
+  | Sz_var ({contents=Is sz} as v) ->
+    let sz' = canon_size sz in
+    v := Is sz'; sz'
+  | Sz_var {contents=Unknown _} as sz -> sz
+  | Sz_lit _ as n -> n
+
+  let rec canon_tyB = function
   | TyB_var ({contents=Is tyB} as v) ->
       let tyB' = canon_tyB tyB in
       v := Is tyB'; tyB'
@@ -205,15 +228,16 @@ module Ty = struct
   | TyB_unit -> TyB_unit
   | TyB_tuple tyB_list ->
       TyB_tuple (List.map canon_tyB tyB_list)
+  | TyB_vector(sz,tyB) ->
+      TyB_vector(canon_size sz, canon_tyB tyB)
+  | TyB_size(sz) ->
+      TyB_size(canon_size sz)
+  | TyB_sum(ctors) ->
+      TyB_sum(List.map (fun (tag,tyB) -> (tag,canon_tyB tyB)) ctors)
   | TyB_string sz ->
       TyB_string (canon_size sz)
-  and canon_size = function
-  | Sz_var ({contents=Is sz} as v) ->
-    let sz' = canon_size sz in
-    v := Is sz'; sz'
-  | Sz_var {contents=Unknown _} as sz -> sz
-  | Sz_lit _ as n -> n
-  and canon_dur = function
+
+  let rec canon_dur = function
   | Dur_var ({contents=Is d} as v) ->
     let d' = canon_dur d in
     v := Is d'; d'
@@ -233,11 +257,42 @@ module Ty = struct
   | Dur_max(Dur_one,_)|Dur_max(_,Dur_one) ->
       Dur_one
   | Dur_max(d1,d2) ->
-       (match canon_dur d1,canon_dur d2 with
+       let d1,d2 = canon_dur d1,canon_dur d2 in
+       (match d1,d2 with
        | Dur_zero,d | d,Dur_zero -> d
        | Dur_one,_ | _,Dur_one -> Dur_one
-       | d1,d2 -> Dur_max(d1,d2)
+       | Dur_var {contents=(Unknown n)},
+         Dur_var {contents=(Unknown m)} ->
+           if n = m then d1 else Dur_max(d1,d2)
+       | _ -> Dur_max(d1,d2)
      )
+
+  let rec canon_ty = function
+  | Ty_var ({contents=Is ty} as v) ->
+      let ty' = canon_ty ty in
+      v := Is ty'; ty'
+  | Ty_var {contents=Unknown _} as ty -> ty
+  | Ty_base tyB -> Ty_base(canon_tyB tyB)
+  | Ty_tuple ty_list ->
+      (let exception E in
+      let ty_list_candidates = List.map canon_ty ty_list in
+      try
+        Ty_base (TyB_tuple (List.map (function
+                                   | Ty_base tyB -> tyB
+                                   | _ -> raise E) ty_list_candidates))
+      with E ->
+        Ty_tuple (ty_list_candidates))
+  | Ty_fun(ty,dur,tyB) ->
+      Ty_fun(canon_ty ty,
+             canon_dur dur,
+             canon_tyB tyB)
+  | Ty_ref(tyB) ->
+      Ty_ref(canon_tyB tyB)
+  | Ty_array(sz,tyB) ->
+      Ty_array(canon_size sz, canon_tyB tyB)
+  | Ty_matrix(sz_list,tyB) ->
+      Ty_matrix(List.map canon_size sz_list,canon_tyB tyB)
+
 
   let pp_dur fmt (d:dur) : unit =
     let open Format in
@@ -278,6 +333,17 @@ let pp_tuple fmt pp vs =
     | TyB_unit -> fprintf fmt "unit"
     | TyB_int sz -> fprintf fmt "int<%a>" pp_size sz
     | TyB_tuple tyB_list -> pp_tuple fmt pp tyB_list
+    | TyB_vector(sz,tyB) ->
+        fprintf fmt "vector<%a,%a>" pp_size sz pp tyB
+    | TyB_size(sz) ->
+        fprintf fmt "size<%a>" pp_size sz
+    | TyB_sum(ctors) ->
+       fprintf fmt "(";
+          pp_print_list
+            ~pp_sep:(fun fmt () -> fprintf fmt " | ")
+          (fun fmt (x,t) ->
+             fprintf fmt "%s of %a" x pp t) fmt ctors;
+          fprintf fmt ")"
     | TyB_string sz -> fprintf fmt "string<%a>" pp_size sz
    in pp fmt tyB
 
@@ -321,12 +387,6 @@ let new_ty_unknown() =
   Ty_var (ref (Unknown (new_unknown ())))
 
 
-(* module V = struct
-  type tag = Ty | Tyb | Dur | Sz
-  type t = tag * int
-  let compare = Stdlib.compare
-end *)
-
 module Vs = Set.Make(Int)
 type scheme = Forall of (Vs.t * ty)
 
@@ -356,8 +416,13 @@ let rec occur_tyB v tyB =
   | TyB_var {contents=Is tyB} -> occ tyB
   | TyB_bool | TyB_unit -> ()
   | TyB_int sz -> occur_size v sz
+  | TyB_size sz -> occur_size v sz
   | TyB_tuple tyB_list ->
       List.iter occ tyB_list
+  | TyB_vector(sz,tyB) ->
+       occur_size v sz; occ tyB
+  | TyB_sum ctors ->
+      List.iter (fun (_,tyB) -> occ tyB) ctors
   | TyB_string sz -> occur_size v sz
   in occ tyB
 
@@ -409,7 +474,11 @@ let vars_of_tyB ?(s=Vs.empty) tyB =
     | TyB_bool | TyB_unit -> s
     | TyB_int sz -> vars_of_size ~s:s sz
     | TyB_tuple tyB_list ->
-      List.fold_left vars s tyB_list
+        List.fold_left vars s tyB_list
+    | TyB_size sz -> vars_of_size ~s sz
+    | TyB_vector(sz,tyB) -> vars_of_size ~s:(vars s tyB) sz
+    | TyB_sum ctors ->
+        List.fold_left (fun s (_,tyB) -> vars s tyB) s ctors
     | TyB_string sz -> vars_of_size ~s:s sz
   in
   vars s tyB
@@ -472,6 +541,12 @@ let instance (Forall(vs,ty)) =
   | TyB_int sz -> TyB_int (inst_size sz)
   | TyB_tuple tyB_list ->
       TyB_tuple (List.map inst_tyB tyB_list)
+  | TyB_vector(sz,tyB) ->
+      TyB_vector(inst_size sz,inst_tyB tyB)
+  | TyB_size sz ->
+      TyB_size(inst_size sz)
+  | TyB_sum ctors ->
+      TyB_sum (List.map (fun (tag,tyB) -> tag,inst_tyB tyB) ctors)
   | TyB_string sz -> TyB_string (inst_size sz) in
 
   let rec inst_ty = function

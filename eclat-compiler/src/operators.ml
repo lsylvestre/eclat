@@ -12,7 +12,19 @@ type op =
 
   | Resize_int of int
   | Tuple_of_int of int
+  | Int_of_tuple of int
+  | Size_of_val of Types.ty * Types.ty 
   | String_length
+
+  | GetBit
+  | UpdateBit
+
+  | Unroll of int (* experimental *)
+
+  | Vector_make
+  | Vector_length of Types.ty * Types.ty
+  | Vector_get of Types.ty
+  | Vector_update of Types.ty
 
   (* for simulation only *)
   | Print | Print_string | Print_int | Print_newline | Assert
@@ -48,6 +60,38 @@ let ty_op op =
   | Tuple_of_int k ->
       let t = T_tuple (List.init k (fun _ -> tbool)) in
       tint (T_size k) ==> t
+  | Int_of_tuple k ->
+      let t = T_tuple (List.init k (fun _ -> tbool)) in
+      t ==> tint (T_size k)
+  | GetBit ->
+      let sz = unknown() in
+      let t = tint sz in
+      (T_tuple [t;tint (T_size(32))]) ==> tbool
+  | UpdateBit ->
+      let sz = unknown() in
+      let t = tint sz in
+      (T_tuple [t;tint (T_size(32));tbool]) ==> t
+  | Unroll _ ->
+      let v = unknown() in
+      let d = unknown() in
+      let v' = unknown() in
+      fun_ty (T_tuple[fun_ty v d v'; v]) d v'
+  | Vector_make ->
+      let v = unknown() in
+      let v' = unknown() in
+      (T_tuple[v; v']) ==> T_vector{size=v;elem=v'}
+  | Vector_length (sz,sz_res) ->
+      let v = unknown() in
+      (T_vector{size=sz;elem=v}) ==> tint sz_res
+  | Vector_get v ->
+      let sz = unknown() in
+      (T_tuple[T_vector{size=sz;elem=v}; tint (T_size 32)]) ==> v
+  | Vector_update sz ->
+      let v = unknown() in
+      let t = T_vector{size=sz;elem=v} in
+      (T_tuple[t; tint (T_size 32);v]) ==> t
+  | Size_of_val (ty,tsz) ->
+      ty ==> tint tsz
   | Print ->
       (unknown()) ==> tunit
   | Print_string ->
@@ -90,8 +134,24 @@ let ty_op2 op =
       let tyB_k = TyB_int (Sz_lit k) in
       Ty_fun(Ty_base tyB,Dur_zero,tyB_k)
   | Tuple_of_int k ->
-      let tyB = TyB_tuple (List.init k (fun _ -> TyB_unit)) in
+      let tyB = TyB_tuple (List.init k (fun _ -> TyB_bool)) in
       Ty_fun(Ty_base (TyB_int (Sz_lit k)),Dur_zero,tyB)
+  | Int_of_tuple k ->
+      let tyB = TyB_tuple (List.init k (fun _ -> TyB_bool)) in
+      Ty_fun(Ty_base tyB,Dur_zero, TyB_int (Sz_lit k))
+  | GetBit ->
+      let sz = new_size_unknown() in
+      let tyB = TyB_int sz in
+      Ty_fun(Ty_base(TyB_tuple[tyB;TyB_int (Sz_lit(32))]),Dur_zero,TyB_bool)
+  | UpdateBit ->
+      let sz = new_size_unknown() in
+      let tyB = TyB_int sz in
+      Ty_fun(Ty_base(TyB_tuple[tyB;TyB_int (Sz_lit(32));TyB_bool]),Dur_zero,tyB)
+  | Unroll _ ->
+      let v = new_ty_unknown() in
+      let d = new_dur_unknown() in
+      let v' = new_tyB_unknown() in
+      Ty_fun((Ty_tuple[Ty_fun(v,d,v'); v]),d,v')
   | Print ->
       let tyB = new_tyB_unknown() in
       Ty_fun(Ty_base tyB,Dur_zero,TyB_unit)
@@ -105,6 +165,27 @@ let ty_op2 op =
       Ty_fun(Ty_base TyB_unit,Dur_zero,TyB_unit)
   | Assert ->
       Ty_fun(Ty_base TyB_bool,Dur_zero,TyB_unit)
+  | Vector_make ->
+      let sz = new_size_unknown() in
+      let v = new_tyB_unknown() in
+      Ty_fun(Ty_base (TyB_tuple[TyB_size sz;v]),Dur_zero,TyB_vector(sz,v))
+  | Vector_length (_sz,_sz_res) ->
+      let sz = new_size_unknown() in (* todo: unify sz and _sz, iem for _sz_res *)
+      let v = new_tyB_unknown() in
+      let sz_int = new_size_unknown() in
+      Ty_fun(Ty_base(TyB_vector(sz,v)),Dur_zero,TyB_int sz_int)
+  | Vector_get _ ->
+      let sz = new_size_unknown() in
+      let v = new_tyB_unknown() in
+      Ty_fun(Ty_base (TyB_tuple[TyB_vector(sz,v);
+                                TyB_int (Sz_lit 32)]),Dur_zero,v)
+  | Vector_update _ ->
+      let sz = new_size_unknown() in
+      let v = new_tyB_unknown() in
+      let t = TyB_vector(sz,v) in
+      Ty_fun(Ty_base (TyB_tuple[t;TyB_int (Sz_lit 32);v]),Dur_zero,t)
+  | Size_of_val _ ->
+      Ty_fun(new_ty_unknown(),Dur_zero,TyB_int (new_size_unknown()))
   | String_length ->
       (* enforce result to be a 16-bit integer *)
       let sz = new_size_unknown() in
@@ -139,6 +220,15 @@ let pp_op fmt (op:op) : unit =
   | Asr -> "asr"
   | Resize_int k -> "resize_int<" ^ string_of_int k ^ ">"
   | Tuple_of_int k -> "tuple_of_int<" ^ string_of_int k ^ ">"
+  | Int_of_tuple k -> "int_of_tuple<" ^ string_of_int k ^ ">"
+  | GetBit -> "get_bit"
+  | UpdateBit -> "update_bit"
+  | Vector_make -> "vector_make"
+  | Vector_length _ -> "vector_length"
+  | Vector_get _ -> "vector_get"
+  | Vector_update _ -> "vector_update"
+  | Unroll n -> "unroll" ^ string_of_int n ^ ">"
+  | Size_of_val _ -> "size_of_val"
   | Print -> "print"
   | Print_string -> "print_string"
   | Print_int -> "print_int"
@@ -184,6 +274,23 @@ let gen_op fmt (op:op) pp a : unit =
       fprintf fmt "eclat_resize(%a,%d)" pp a k
   | Tuple_of_int _ ->
       pp fmt a
+  | Int_of_tuple _ ->
+      pp fmt a
+  | GetBit -> 
+      funcall fmt "eclat_getBit"
+  | UpdateBit -> 
+      funcall fmt "eclat_updateBit"
+  | Unroll _ -> assert false (* should be eliminated before *)
+  | Vector_make ->
+      assert false (* special case *)
+  | Vector_length _ -> 
+      assert false (* special case *)
+  | Vector_get _ ->
+     assert false (* special case *)
+  | Vector_update _ ->
+      assert false (* special case *)
+  | Size_of_val _ ->
+      assert false (* special case *)
   | Print ->
       skip_when !flag_no_print fmt procall "eclat_print"
   | Print_string ->

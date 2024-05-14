@@ -1,3 +1,5 @@
+[@@@warning "-8"] (* todo *)
+
 open Ast
 open Ast_subst
 
@@ -122,10 +124,10 @@ open Format
 let fmt = Format.std_formatter
 
 let rec red (e,r) =
-(*fprintf fmt "%a\n" pp_exp  e ;
+  (* fprintf fmt "%a\n" Ast_pprint.pp_exp  e ;
    (fprintf fmt "i: ";
-             SMap.iter (fun x e -> fprintf fmt "    (%s %a)\n" x pp_exp e) r;
-             fprintf fmt "@,");*)
+             SMap.iter (fun x e -> fprintf fmt "    (%s %a)\n" x Ast_pprint.pp_exp e) r.mu;
+             fprintf fmt "@,"); *)
   let rec red_list es r =
     let rec aux acc es r =
       match es with
@@ -199,8 +201,8 @@ let rec red (e,r) =
          | E_fun(p,e) ->
              red (subst_p_e p v e,r'')
          | (E_fix(g,(p,e))) as w ->
-            (subst_e g w @@
-             subst_p_e p v e),r''
+            (E_letIn(p,v,subst_e g w e)),r''  
+            (** we do not substituate [p] by [v] in [e] directly as the redex must not be a value *)
          | _ -> assert false)
   | E_reg((p,e1),e0,l) ->
       (* [Reg] *)
@@ -240,16 +242,24 @@ let rec red (e,r) =
                then E_tuple es'
                else E_par es' in
       e',r'
-  | E_array_get (x,e1) ->
-      if evaluated e1 then E_const (buffer_get x e1 r),r else
+  | E_local_static_array(e1,_) ->
       let e1',r1 = red (e1,r) in
+      assert (evaluated e1');
+      let l = Ast.gensym () in
+      let n = match un_annot e1' with E_const (Int (n,_)) -> n | _ -> assert false (*error *)
+      in
+      let any_constant = Unit in
+      E_const (V_loc l), {r with statics = SMap.add l (Array.make n any_constant) r.statics}
+  | E_array_get (x,e1) ->
+      let e1',r1 = red (e1,r) in
+      if evaluated e1' then E_const (buffer_get x e1' r),r else
       E_array_get (x,e1'),r1
   | E_array_length(x) ->
       E_const(buffer_length x r),r
   | E_array_set (x,e1,e2) ->
-      if evaluated e1 && evaluated e2 then E_const(Unit), set_buffer x e1 e2 r else
       let e1',r1 = red (e1,r) in
       let e2',r2 = red (e2,r1) in
+      if evaluated e1' && evaluated e2' then E_const(Unit), set_buffer x e1' e2' r else
       E_array_set (x,e1',e2'),r2
   | E_matrix_size(x,n) ->
       E_const(matrix_size x n),r
@@ -267,10 +277,14 @@ let rec red (e,r) =
   | E_generate _ 
   | E_for _ -> assert false (* todo *)
 
-let rec reduce_until (e_init,r) args =
-  let rec aux (e,r) args =
+let reduce_until ~nb_iterations:nb (e_init,r) list_args =
+   if list_args = [] then 
+     Prelude.Errors.error (fun fmt ->
+       Format.fprintf fmt "@[<v>Arguments needed to evaluate the program (see option -arg)@]");
+  let rec aux i (e,r) args =
+    if i > nb then (e,r) else
     match args with
-    | [] -> (e,r)
+    | [] -> aux (i+1) (e,r) list_args
     | a::args' ->
         let ee = if evaluated e then E_app(e_init,a) else e in
         (* SMap.iter (fun x e -> fprintf fmt "~~~~~> (%s %a)\n" x Ast_pprint.pp_exp e) mu; *)
@@ -278,17 +292,18 @@ let rec reduce_until (e_init,r) args =
         let open Prelude.Errors in
         let open Format in
         (if evaluated e' then
-          fprintf std_formatter "%a --> %a @]\n" Ast_pprint.pp_exp a Ast_pprint.pp_exp e'
+          fprintf std_formatter "%a : %a --> %a@]\n" 
+            (emph_pp blue (fun fmt () -> fprintf fmt "cycle %d" i)) () Ast_pprint.pp_exp a Ast_pprint.pp_exp e'
         else
           fprintf std_formatter "%a %a\n" Ast_pprint.pp_exp a (emph red) "(running)");
-        aux (e',r') args'
-  in aux (e_init,r) args
+        aux (i+1) (e',r') args'
+  in aux 0 (e_init,r) list_args
 
 
 
-let interp ?(init_env=r_init) (e : e) (value_list : e list) : (e * r) =
+let interp ?(init_env=r_init) ~nb_iterations (e : e) (value_list : e list) : (e * r) =
   let e = Norm.normalize e in
-  reduce_until (e,init_env) value_list
+  reduce_until ~nb_iterations (e,init_env) value_list
 
 let prepare_statics (statics: (x * static) list) : c array SMap.t =
   smap_of_list statics |>
@@ -298,10 +313,10 @@ let prepare_statics (statics: (x * static) list) : c array SMap.t =
             | Static_matrix _ -> assert false (* not yet implemented *))
 
 
-let interp_pi (pi : pi) (value_list : e list) : (e * r) =
+let interp_pi ~nb_iterations (pi : pi) (value_list : e list) : (e * r) =
   let r = { r_init with statics = prepare_statics pi.statics } in
   let e = pi.main in
-  interp ~init_env:r e value_list
+  interp ~init_env:r ~nb_iterations e value_list
 
 (* *************** evaluate a close expression *************** *)
 

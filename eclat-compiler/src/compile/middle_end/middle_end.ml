@@ -7,7 +7,7 @@ let normalize (pi:pi) : pi =
   (** ensure that each long-running sub-expression is bound to a [let] *)
   let pi = Anf.anf_pi pi in
   display_pi Anf pi;
-  (** ensure each function called within an [exec] or [( || )] construct
+  (** ensure each function called within an [exec], or [( || )] construct
       is defined locally in this construct *)
   let pi = Move_down_gfun_under_exec_and_par.move_down_gfun_under_exec_and_par_pi pi in
   (* assign a fresh label to each [reg] and [exec] construct *)
@@ -41,21 +41,24 @@ let compile ?globalize
 
   (** ensure that each function is defined by a let-binding *)
   let pi = Fun_assign_name.name_pi pi in
+  let pi = Unroll.unroll_pi pi in
   let pi = Anf.anf_pi pi in
   display_pi Anf pi;
-
   let pi = Specialize.specialize_pi pi in
   display_pi Specialize pi;
 
   (** make explicit all lexical environments *)
+  (* let pi = Ast_rename.rename_pi pi in *)
   let pi = Lambda_lifting.lambda_lifting_pi ?globalize pi in
+   display_pi Lambda_lifting pi;
+  let _ = Typing.typing_with_argument pi arg_list in
+  
   let pi = Specialize.specialize_pi pi in
-  display_pi Lambda_lifting pi;
-
-  let pi = Macro.inl_pi pi in (* macro expansion *)
+  display_pi Specialize pi;
 
   (** inline non-recursive functions *)
   let rec loop pi =
+    (* let pi = Ast_rename.rename_pi pi in*)
     let pi = Inline.inl_pi pi in
     let pi = Specialize.specialize_pi pi in
     let pi = Anf.anf_pi pi in
@@ -64,20 +67,27 @@ let compile ?globalize
   in 
   let pi = loop pi in
   display_pi Inline pi;
-  
+
   let pi = Specialize_ref.specialize_ref pi in
   display_pi Specialize_ref pi;
   (** compile pattern matching *)
+
+  let pi = Insert_bound_checking.insert_pi pi in
+
   let pi = Matching.matching_pi pi in
+
   display_pi Matching pi;
 
   (** normalization *)
   let pi = normalize pi in
-  let pi = Globalize_arrays.globalize_arrays pi in
   (** optimization *)
   let pi = if propagation then Propagation.propagation_pi pi else pi in
-  display_pi Propagation pi;
 
+  let pi = Globalize_arrays.globalize_arrays pi in
+  display_pi Propagation pi;
   (** ensure that transformations preserve typing *)
-  let _ = Typing.typing_with_argument pi arg_list in
+
+  let _ = Typing.typing_with_argument ~get_vector_size:false pi arg_list in
+  let pi = Expand.expand_pi pi in
+  
   pi

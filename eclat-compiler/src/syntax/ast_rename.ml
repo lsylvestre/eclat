@@ -4,6 +4,7 @@ open Pattern
 
 (* custom symbol generator *)
 module Gensym : sig val reset : unit -> unit
+                    val rename : x -> x
                     val gensym : statics:x list -> x -> x end = struct
 
   let of_int (n:int) : x =
@@ -38,7 +39,7 @@ end
 open Gensym
 
 let rename_ident ~statics x =
-  gensym ~statics x
+  rename x
 
 (** [rename_pat p] rename all names in the pattern [p],
   assuming that any variable is bound several times in p *)
@@ -73,9 +74,21 @@ let rename_e ~statics e =
       let pz = rename_pat ~statics p in
       let e1' = ren_e (subst_p_e p (pat2exp pz) e1) in
      E_reg((pz,e1'),ren_e e0,l)
+  | E_generate((p,e1),e2,e3,l) ->
+      let pz = rename_pat ~statics p in
+      let e1' = ren_e (subst_p_e p (pat2exp pz) e1) in
+     E_generate((pz,e1'),ren_e e2,ren_e e3,l)
   | E_for(x,lc,lc',e,loc) ->
       let x' = rename_ident ~statics x in
       E_for(x',lc,lc',ren_e @@ subst_e x (E_var x') e,loc) (* rename lc & lc' ? *)
+  | E_vector_mapi(is_par,(p,e1),e2,ty) ->
+      let pz = rename_pat ~statics p in
+      let e1' = ren_e (subst_p_e p (pat2exp pz) e1) in
+     E_vector_mapi(is_par,(pz,e1'),ren_e e2,ty)
+  | E_int_mapi(is_par,(p,e1),e2,ty) ->
+      let pz = rename_pat ~statics p in
+      let e1' = ren_e (subst_p_e p (pat2exp pz) e1) in
+     E_int_mapi(is_par,(pz,e1'),ren_e e2,ty)
   | e -> Ast_mapper.map ren_e e
   in
   ren_e e

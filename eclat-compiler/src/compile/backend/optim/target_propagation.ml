@@ -32,6 +32,7 @@ let rec prop env a =
   | A_encode _
   | A_decode _ ->  (* no sub-atoms*)
       a
+  | A_vector aas -> A_vector(List.map (prop env) aas)
 
 let rec prop_s env s =
   match s with

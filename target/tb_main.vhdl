@@ -64,14 +64,14 @@ end component;
   U1: main port map(tb_clk,rst,tb_run,tb_rdy,tb_argument,tb_result);
   process
   variable 
-\$v3003\ : value(0 to 11) := (others => '0');
+\$v6681\ : value(0 to 11) := (others => '0');
 begin
     tb_run <= '0';
     wait for 10 ns;
     tb_run <= '1';
       -- Start computation
-      \$v3003\ := eclat_true & eclat_true & eclat_true & eclat_true & eclat_true & eclat_true & eclat_true & eclat_true & eclat_true & eclat_true & eclat_true & eclat_false;
-      tb_argument <= \$v3003\;
+      \$v6681\ := eclat_true & eclat_true & eclat_true & eclat_true & eclat_true & eclat_true & eclat_true & eclat_true & eclat_true & eclat_true & eclat_true & eclat_false;
+      tb_argument <= \$v6681\;
 
       wait for 10 ns;
       while tb_rdy = "0" loop

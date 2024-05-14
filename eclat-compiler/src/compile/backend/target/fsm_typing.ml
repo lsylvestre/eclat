@@ -7,11 +7,14 @@ let emit_warning_flag = ref false
   themselves put in canonical form. *)
 let rec canon = function
   | TVar{contents=V _} as t -> t
-  | TVar{contents=T t} -> canon t
+  | TVar({contents=T t'} as v) ->
+      let t2 = canon t' in
+      v := T t2; t2
   | TInt tz -> TInt (canon tz)
   | TBool | TUnit | TString _ as t -> t
   | TStatic{elem;size} ->TStatic{elem=canon elem;size=canon size}
   | TTuple ts -> TTuple(List.map canon ts)
+  | TVector{elem;size} ->TVector{elem=canon elem;size=canon size}
   | TVect _ as t -> t
   | TSize _ as t -> t
 
@@ -34,6 +37,7 @@ let rec size_ty =
             Format.fprintf fmt "Unknown value size in the generated code replaced by a %d bits range size.\n" when_tvar);
         end;
         when_tvar
+    | TVector{elem;size} -> size_ty elem * size_ty size
     | TString tz -> (size_ty tz * 8)
     | TStatic{elem;size} -> size_ty elem * size_ty size
     | TVect n -> n
@@ -50,8 +54,8 @@ let rec string_of_ty = function
   | TVar{contents=V s} -> s
   | TVect n -> "vect<"^string_of_int n^">"
   | TSize n -> "size<"^string_of_int n^">"
-  | TStatic {elem ; size} -> string_of_ty elem ^ " buffer<" ^ string_of_ty size ^ ">"
-
+  | TVector {elem ; size} -> string_of_ty elem ^ " vector<" ^ string_of_ty size ^ ">"
+  | TStatic {elem ; size} -> string_of_ty elem ^ " static<" ^ string_of_ty size ^ ">"
 exception CannotUnify of (ty*ty)
 
 let rec unify t1 t2 =
@@ -72,6 +76,9 @@ let rec unify t1 t2 =
   | TTuple ts,TTuple ts' ->
     if List.compare_lengths ts ts' <> 0 then cannot_unify t1 t2
     else List.iter2 unify ts ts'
+  | TVector{elem=te;size=tz},TVector{elem=te';size=tz'} ->
+      unify te te';
+      unify tz tz'
   | TVar ({contents=V n} as r),TVar {contents=V n'} -> if n = n' then () else r := T t2; ()
   | TVar {contents=T t1},t2 | t1,TVar {contents=T t2} -> unify t1 t2
   | TVar ({contents=V _} as r),t | t,TVar ({contents=V _} as r) ->
@@ -120,9 +127,9 @@ let rec translate_ty =
   | Types.T_ref t -> translate_ty t
   | Types.T_array{elem=te;size=tz} -> TStatic{elem=translate_ty te;size=translate_ty tz}
   | Types.T_matrix{elem=te;size=tz} -> TStatic{elem=translate_ty te;size=translate_ty tz}
+  | Types.T_vector{elem=te;size=tz} -> TVector{elem=translate_ty te;size=translate_ty tz}
   | Types.(T_response_time _|T_infinity|T_fun _|T_add (_, _)|T_max (_, _)|T_le (_, _)) ->
      assert false (* already expanded *)
-  | Types.T_forall _ -> assert false (* already expanded *)
 
 
 let rec typing_c = function
@@ -135,7 +142,12 @@ let rec typing_c = function
   |  (Bool _) -> TBool
   |  (Enum _) -> (new_tvar ()) (* TODO! *)
   |  (CTuple cs) -> TTuple(List.map typing_c cs)
+  |  (CVector cs) -> 
+       let v = new_tvar() in
+       List.iter (fun c -> unify (typing_c c) v) cs;
+       TVector{elem=v;size=TSize (List.length cs)}
   |  (String s) -> TString (TSize(String.length s))
+  |  (CSize n) -> TSize n
 
 let rec typing_op h t op =
   match op with
@@ -157,11 +169,6 @@ let rec typing_op h t op =
   | TyConstr ty ->
       unify ty t;
       t
-  | Compute_address ->
-      let w = (new_tvar ()) in
-      unify (TTuple [TInt (TSize 32);TInt w]) t;
-      t
-
 
 let trace_last_exp = ref (A_const Unit)
 
@@ -179,6 +186,10 @@ let rec typing_a h a =
       typing_op h t op
   | A_tuple es ->
       TTuple (List.map (typing_a h) es)
+  | A_vector es ->
+       let v = new_tvar() in
+       List.iter (fun a -> unify (typing_a h a) v) es;
+       TVector{elem=v;size=TSize (List.length es)}
   | A_letIn(x,a1,a2) ->
       let t = typing_a h a1 in
       add_typing_env h x t;
@@ -220,7 +231,9 @@ let rec typing_a h a =
       ty
 
 
-let rec typing_s ~result h = function
+let rec typing_s ~result h s =
+  (* Printf.printf "==> %d\n" (Hashtbl.length h); flush stdout; *)
+  match s with
   | S_skip -> ()
   | S_set(x,a) ->
       let t = typing_a h a in
@@ -316,6 +329,7 @@ let typing_circuit ~statics ty (rdy,result,fsm) =
     let h = Hashtbl.create 64 in
 
     List.iter (function 
+      | x,Static_array_of ty -> add_typing_env h x ty
       | x,Static_array(c,n) -> add_typing_env h x (TStatic{elem=typing_c c;size=TSize n})
       | x,Static_matrix(c,n_list) -> 
             add_typing_env h x (TStatic{elem=typing_c c;
@@ -326,7 +340,10 @@ let typing_circuit ~statics ty (rdy,result,fsm) =
     in
     typing_fsm h ~rdy ~result ~ty_result:(translate_ty t2) fsm;
 
+
+    (* why two times ? *)
     List.iter (function 
+      | x,Static_array_of ty -> add_typing_env h x ty
       | x,Static_array(c,n) -> add_typing_env h x (TStatic{elem=typing_c c;size=TSize n})
       | x,Static_matrix(c,n_list) -> add_typing_env h x (TStatic{elem=typing_c c;size=TTuple (List.map (fun n -> TSize n) n_list)})
     ) statics;

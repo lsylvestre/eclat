@@ -40,11 +40,6 @@ architecture tb of tb_%s is
       signal %s : in value(0 to %d);
       signal result : out value(0 to %d)" argument (argument_size-1) (result_size-1);
 
-  begin
-    if !Fsm_comp.allow_heap_access || !Fsm_comp.allow_heap_assign then
-      fprintf fmt ";@,signal caml_heap_base : in value(0 to 31)";
-  end;
-
   fprintf fmt ");@,end component;";
 
   fprintf fmt "
@@ -54,11 +49,6 @@ architecture tb of tb_%s is
   signal tb_rdy: value(0 to 0);
   signal tb_clk: std_logic;
   signal rst: std_logic;" (argument_size-1) (result_size-1);
-
-  begin
-    if !Fsm_comp.allow_heap_access || !Fsm_comp.allow_heap_assign then
-      fprintf fmt "@,signal tb_caml_heap_base : value(0 to 31);";
-  end;
 
   fprintf fmt "
   begin
@@ -82,10 +72,6 @@ architecture tb of tb_%s is
 
   U1: main port map(tb_clk,rst,tb_run,tb_rdy,tb_argument,tb_result";
 
-  begin
-    if !Fsm_comp.allow_heap_access || !Fsm_comp.allow_heap_assign then
-      fprintf fmt ",tb_caml_heap_base";
-  end;
   fprintf fmt ");";
   fprintf fmt "
   process

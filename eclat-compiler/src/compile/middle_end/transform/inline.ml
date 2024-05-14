@@ -23,7 +23,7 @@ let eval_static_exp_int ~loc ~statics e =
     | E_array_length(x) ->
        (match List.assoc_opt x statics with
        | Some (Static_array(_,n)) -> (n,Types.unknown())
-       | _ -> assert false (* ill-typed *) ) 
+       | _ -> Ast_pprint.pp_exp Format.std_formatter e; assert false (* ill-typed *) ) 
     | E_matrix_size(x,n) ->
        (match List.assoc_opt x statics with
         | Some (Static_matrix(_,n_list)) -> 

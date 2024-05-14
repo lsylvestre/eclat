@@ -104,10 +104,10 @@ let pp_ty (fmt:fmt) (ty:ty) : unit =
       fprintf fmt "%a matrix<%a>"
         (pp_type ~paren:true) t
         (pp_type ~paren:false) tz
-  | T_forall(x,t1,t2) ->
-      fprintf fmt "forall ~%s:%a . %a" x
-        (pp_type ~paren:true) t1
-        (pp_type ~paren:true) t2
+  | T_vector{elem=t;size=tz} ->
+      fprintf fmt "%a vector<%a>"
+        (pp_type ~paren:true) t
+        (pp_type ~paren:false) tz
   | T_size n ->
       fprintf fmt "%d" n
   | T_response_time n ->
@@ -158,16 +158,6 @@ let pp_op (fmt:fmt) (op:op) : unit =
     | TyConstr ty ->
         fprintf fmt "(as_type %a)@,"  pp_ty ty
 
-
-(** pretty printer for asynchronous primitives *)
-let pp_external (fmt:fmt) (op:extern) : unit =
-  fprintf fmt @@
-    match op with
-    | Array_make -> "array_make"
-    | Array_set -> "array_set"
-    | Array_get -> "array_get"
-    | Array_length -> "array_length"
-
 let pp_tuple (fmt:fmt) pp vs =
   fprintf fmt "(";
   pp_print_list
@@ -175,6 +165,12 @@ let pp_tuple (fmt:fmt) pp vs =
         pp fmt vs;
   fprintf fmt ")"
 
+let pp_vector (fmt:fmt) pp vs =
+  fprintf fmt "[|";
+  pp_print_list
+        ~pp_sep:(fun fmt () -> fprintf fmt "; ")
+        pp fmt vs;
+  fprintf fmt "|]"
 
 (** pretty printer for constants *)
 let rec pp_const (fmt:fmt) (c:c) : unit =
@@ -193,6 +189,9 @@ let rec pp_const (fmt:fmt) (c:c) : unit =
       fprintf fmt "#%a" pp_ident l
   | C_tuple(cs) ->
       pp_tuple fmt pp_const cs
+  | C_vector(cs) ->
+      pp_vector fmt pp_const cs
+  | C_size n -> fprintf fmt "size<%d>" n
   | Inj x ->
       fprintf fmt "%s" x
 
@@ -205,12 +204,6 @@ let rec pp_pat (fmt:fmt) (p:p) : unit =
       pp_ident fmt x
   | P_tuple ps ->
       pp_tuple fmt pp_pat ps
-
-
-let pp_lc fmt lc = 
-  match lc with
-  | St_const c -> pp_const fmt c
-  | St_var l -> fprintf fmt "%s" l
 
 (** pretty printer for expressions *)
 let pp_exp (fmt:fmt) (e:e) : unit =
@@ -285,10 +278,9 @@ let pp_exp (fmt:fmt) (e:e) : unit =
         fprintf fmt "@[<v>%a := %a@]"
           (pp_e ~paren:true) e1
           (pp_e ~paren:true) e2) fmt ()
-  | E_local_static_array(e1,e2,_) ->
-     fprintf fmt "%a^%a"
+  | E_local_static_array(e1,_) ->
+     fprintf fmt "array_create %a"
         (pp_e ~paren:true) e1
-        (pp_e ~paren:true) e2
   | E_array_length(x) ->
       fprintf fmt "@[<v>%a.length@]"
         pp_ident x
@@ -338,12 +330,24 @@ let pp_exp (fmt:fmt) (e:e) : unit =
         (pp_e ~paren:true) (E_fun(p,e1))
         (pp_e ~paren:true) e2
         (pp_e ~paren:true) e_st3
+  | E_vector(es) ->
+      pp_vector fmt (pp_e ~paren:false) es
+  | E_vector_mapi(is_par,(p,e1),e2,_) ->
+      fprintf fmt "mapi%s" (if is_par then "_par" else "");
+      fprintf fmt "%a %a" (pp_e ~paren:true) (E_fun(p,e1))
+                          (pp_e ~paren:true) e2
+  | E_int_mapi(is_par,(p,e1),e2,_) ->
+      fprintf fmt "mapi%s" (if is_par then "_par" else "");
+      fprintf fmt "%a %a" (pp_e ~paren:true) (E_fun(p,e1))
+                          (pp_e ~paren:true) e2
   in
   fprintf fmt "@[<v 0>%a@]" (pp_e ~paren:false) e
 
 (** pretty printer for static declarations *)
 let pp_static (fmt:fmt) (g:static) : unit =
   match g with
+  | Static_array_of (t,_) ->
+      fprintf fmt "array of %a" pp_ty t
   | Static_array(c,n) ->
       fprintf fmt "(%a)^%d" pp_const c n
   | Static_matrix(c,n_list) ->

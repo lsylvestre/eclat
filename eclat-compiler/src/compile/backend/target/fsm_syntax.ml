@@ -6,6 +6,7 @@ and ty = TInt of ty | TBool | TUnit
        | TVar of tvar ref
        | TString of ty
        | TStatic of {elem:ty ; size: ty}
+       | TVector of {elem:ty ; size: ty}
        | TVect of int
        | TSize of int
 
@@ -17,8 +18,10 @@ type c = Unit
        | Bool of bool
        | Enum of x
        | CTuple of c list
+       | CVector of c list
        | String of string (* non synthesizable *)
-
+       | CSize of int
+  
 type op = If (* i.e., a multiplexer *)
         | Runtime of Operators.op
         | GetTuple of
@@ -26,14 +29,15 @@ type op = If (* i.e., a multiplexer *)
             (* ty is the type of the value from which a field is extracted  *)
              int * int * ty
         | TyConstr of ty
-        | Compute_address
 
 type global =
+  | Static_array_of of ty
   | Static_array of c * int
   | Static_matrix of c * int list
 
 type a = A_letIn of x * a * a
   | A_tuple of a list
+  | A_vector of a list
   | A_const of c
   | A_var of x
   | A_call of op * a
@@ -94,11 +98,13 @@ module Debug = struct
   | TVar{contents=V n} -> fprintf fmt "'a%s" n
   | TVar{contents=T t} -> pp_ty fmt t
   | TString ty -> fprintf fmt "string<%a>" pp_ty ty
+  | TVector {elem ; size} -> fprintf fmt "%a vector<%a>" pp_ty elem pp_ty size
   | TVect n -> fprintf fmt "vect<%d>" n
   | TSize n -> fprintf fmt "size<%d>" n
   | TStatic {elem ; size} -> fprintf fmt "%a buffer<%a>" pp_ty elem pp_ty size
 
 let pp_tuple = Ast_pprint.pp_tuple
+let pp_vector = Ast_pprint.pp_vector
 
   let rec pp_c fmt = function
     | Unit -> fprintf fmt "()"
@@ -106,15 +112,18 @@ let pp_tuple = Ast_pprint.pp_tuple
     | Bool b -> fprintf fmt "\"%d\"" (if b then 1 else 0)
     | Enum x -> fprintf fmt "%s" x
     | CTuple(cs) ->
-      pp_tuple fmt pp_c cs
+        pp_tuple fmt pp_c cs
+    | CVector(cs) ->
+        pp_vector fmt pp_c cs
+    | CSize n ->
+        fprintf fmt "size%d" n
     | String s -> fprintf fmt "\"%s\"" s
 
   let pp_op fmt = function
-  | If -> fprintf fmt "mixc_if"
+  | If -> fprintf fmt "eclat_if"
   | Runtime p -> Operators.pp_op fmt p
-  | GetTuple (i,_,_) -> fprintf fmt "mixc_get_%d" i
-  | TyConstr _ -> fprintf fmt "mixc_id"
-  | Compute_address -> fprintf fmt "mixc_compute_address"
+  | GetTuple (i,_,_) -> fprintf fmt "eclat_get_%d" i
+  | TyConstr _ -> fprintf fmt "eclat_id"
 
   let rec pp_a fmt = function
   | A_const c -> pp_c fmt c
@@ -125,6 +134,8 @@ let pp_tuple = Ast_pprint.pp_tuple
      fprintf fmt "@[<v>let %s = %a in@,%a@]" x pp_a a1 pp_a a2
   | A_tuple aas ->
       pp_tuple fmt pp_a aas
+  | A_vector aas ->
+      pp_vector fmt pp_a aas
   | A_string_get(sx,ix) -> fprintf fmt "%s[%s]" sx ix
   | A_ptr_taken(x) -> fprintf fmt "ptr_taken<%s>" x
   | A_ptr_write_taken(x) -> fprintf fmt "ptr_write_taken<%s>" x

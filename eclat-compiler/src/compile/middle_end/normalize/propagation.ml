@@ -32,17 +32,19 @@ let rec simple_atom e =
   match e with
     | E_var _ | E_const _ -> true
     | E_tuple es -> List.for_all simple_atom es
+    (* | E_app(E_const(Op(op)),e1) -> Combinational.op_combinational op  && simple_atom e1 *)
     | _ -> false
 
 
 let propagation e =
   let propagable e =
     if !flag_propagate_combinational_linear then Combinational.combinational e else
-    simple_atom e in
+    simple_atom e 
+  in
   let rec prop e =
     match e with
     | E_letIn(P_tuple ps,E_tuple es,e2) ->
-        List.fold_left2 (fun e pi ei -> subst_p_e pi (prop ei) e) (prop e2) ps es
+        prop @@ List.fold_right2 (fun pi ei e -> E_letIn(pi,ei,e)) ps es e2
     | E_letIn(P_var x as p,e1,e2) ->
         let e1' = prop e1 in
         if propagable e1'

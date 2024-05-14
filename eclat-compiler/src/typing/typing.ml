@@ -33,9 +33,9 @@ let rec occur v ty =
       f t; f tz
   | T_matrix{elem=t;size=tz} ->
       f t; f tz
+  | T_vector{elem=t;size=tz} ->
+      f t; f tz
   | T_static t -> f t
-  | T_forall(_,t1,t2) ->
-      f t1; f t2
   | T_size _ -> ()
   | (T_response_time _ | T_infinity) -> ()
   | T_max(tz1,tz2) | T_add(tz1,tz2) | T_le(tz1,tz2) ->
@@ -46,9 +46,9 @@ let rec occur v ty =
 
   type scheme = Forall of (Vs.t * ty)
 
-  let vars_of_type t =
+  let vars_of_type ?(get_vector_size=true) t =
     let rec vars s = function
-    | T_const(TInt tz) -> vars s tz
+    | T_const(TInt tz) -> if get_vector_size then vars s tz else s
     | T_const _ -> s
     | T_tuple ts ->
        List.fold_left vars s ts
@@ -69,9 +69,10 @@ let rec occur v ty =
         vars (vars s t) tz
     | T_matrix{elem=t;size=tz} ->
         vars (vars s t) tz
+    | T_vector{elem=t;size=tz} ->
+        let s' = vars s t in
+        if get_vector_size then vars s' tz else s'   
     | T_static tz -> vars s tz
-    | T_forall(_,t1,t2) ->
-        vars (vars s t1) t2
     | T_size _ -> s
     | T_response_time _ | T_infinity -> s
     | T_max(t1,t2) | T_add(t1,t2) | T_le(t1,t2) ->
@@ -79,8 +80,8 @@ let rec occur v ty =
     in
     vars Vs.empty t
 
-  let free_vars_of_type (bv,t) =
-    Vs.diff (vars_of_type t) bv
+  let free_vars_of_type ?get_vector_size (bv,t) =
+    Vs.diff (vars_of_type ?get_vector_size t) bv
 
 (* let free_vars_of_type2 (bv,t) = (* generalize only the left part of a functional part *)
     match canon t with
@@ -119,8 +120,8 @@ let rec occur v ty =
         T_array{elem=instance t;size=instance tz}
      | T_matrix{elem=t;size=tz} ->
         T_matrix{elem=instance t;size=instance tz}
-     | T_forall(x,t1,t2) ->
-        T_forall(x,instance t1,instance t2)
+     | T_vector{elem=t;size=tz} ->
+        T_vector{elem=instance t;size=instance tz}
      | T_size _ as t -> t
      | (T_response_time _ | T_infinity) as t -> t
      | T_max(t1,t2) -> T_max(instance t1,instance t2)
@@ -132,16 +133,18 @@ let rec occur v ty =
 
   type env = scheme SMap.t
 
-  let free_vars_of_type_env l =
+  let free_vars_of_type_env ?get_vector_size l =
     List.fold_left (fun vs (x,(Forall (v,t))) ->
-                    Vs.union vs (free_vars_of_type (v,t)) )
+                    Vs.union vs (free_vars_of_type ?get_vector_size (v,t)) )
       Vs.empty l
+
+  let get_vector_size_ref = ref true ;;
 
   let generalize r ty =
     match canon ty with
     | T_var{contents=Ty (T_fun _)} | T_fun _ ->
-        let fvg = free_vars_of_type_env r in
-        Forall(free_vars_of_type (fvg,ty),ty)
+        let fvg = free_vars_of_type_env ~get_vector_size:!get_vector_size_ref r in (* if get_vector_size:false, no generalization for vector size *)
+        Forall(free_vars_of_type ~get_vector_size:!get_vector_size_ref (fvg,ty),ty)
     | ty -> Forall(Vs.empty,ty)
 
   let tvar_a = T_var (ref (Unknown (-1)))
@@ -201,7 +204,9 @@ let rec unify ~loc t1 t2 =
       unify ~loc dur d;
       unify ~loc ret r
   | T_string tz,T_string tz' ->
-      unify ~loc tz tz'
+      (try 
+        unify ~loc tz tz'
+       with CannotUnify _ -> raise (CannotUnify (t1,t2,loc)))
   | T_sum cs, T_sum cs' ->
       if List.compare_lengths cs cs' <> 0 then raise (CannotUnify (t1,t2,loc));
       List.iter2 (fun (x1,t1) (x2,t2) ->
@@ -215,12 +220,11 @@ let rec unify ~loc t1 t2 =
   | T_matrix{elem=t;size=tz},T_matrix{elem=t';size=tz'} ->
       unify ~loc t t';
       unify ~loc tz tz'
+  | T_vector{elem=t;size=tz},T_vector{elem=t';size=tz'} ->
+      unify ~loc t t';
+      unify ~loc tz tz'
   | T_static t1', T_static t2' ->
       unify ~loc t1' t2'
-  | T_forall(x,tt1,tt2), T_forall(x',tt1',tt2') ->
-      if x <> x' then raise (CannotUnify (t1,t2,loc));
-      unify ~loc tt1 tt1';
-      unify ~loc tt2 tt2'
   | T_size n,T_size m ->
       if n <> m then raise (CannotUnify (t1,t2,loc))
   | (T_response_time _ | T_infinity | T_add _ | T_max _ | T_le _),
@@ -293,7 +297,8 @@ let ty_op ~loc op =
 
 let rec typ_const ~loc g = function
 | Int(n,tz) -> (* TODO, add a type constraint according to the size of the literal *)
-    (match canon tz with
+    let t = canon tz in
+    (match t with
     | T_var({contents=Ty (T_size k)}) | T_size k ->
         if int_of_float (Float.ceil (Float.log2 (float (n+1)))) > k then (* unsigned *)
           let open Prelude.Errors in
@@ -303,7 +308,7 @@ let rec typ_const ~loc g = function
                 n k)
     | _ -> () (* uncomplete verification, will be complete during type checking of the generate code *)
     );
-    tint tz
+    tint t
 | Bool _ -> tbool
 | Unit -> tunit
 | String s -> T_string (T_size (String.length s))
@@ -312,6 +317,11 @@ let rec typ_const ~loc g = function
     (* not in source program: handled in the typer *)
     unknown()
 | C_tuple(cs) -> T_tuple(List.map (typ_const ~loc g) cs)
+| C_vector(cs) ->
+    let v = unknown () in
+    List.iter (fun c -> unify ~loc v (typ_const ~loc g c)) cs; 
+    T_vector{size=T_size (List.length cs);elem=v} 
+| C_size n -> T_size n
 | Inj x ->
     typ_ident g x loc
 
@@ -357,9 +367,9 @@ let base_type t =
     | T_ref _
     | T_array _
     | T_matrix _ -> raise Not_a_base_type
-    | T_forall(_,_,t2) -> aux t2
+    | T_vector _ -> ()
     | (T_size _ | T_response_time _ | T_infinity | T_add _ | T_max _ | T_le _) ->
-        assert false
+        ()
     | T_static t1 -> aux t1
   in
   try aux t; true with
@@ -389,7 +399,7 @@ let rec contain_fun t =
   | T_ref t1 -> contain_fun t1
   | T_array {elem=t;size=tz} -> contain_fun t
   | T_matrix {elem=t;size=tz} -> contain_fun t
-  | T_forall(_,_,t2) -> contain_fun t2
+  | T_vector {elem=t;size=tz} -> contain_fun t
   | T_size _ -> ()
   | (T_response_time _ | T_infinity | T_add _ | T_max _ | T_le _) -> ()
   | T_static t1 -> contain_fun t1
@@ -439,20 +449,14 @@ let is_TyConstr = function
 
 let typ_ident_static ~loc x statics =
   match List.assoc_opt x statics with
-  | None ->
-     let open Prelude.Errors in
+  | None -> raise @@ UnboundVariable(x,loc)
+     (* let open Prelude.Errors in
       error ~loc (fun fmt ->
         Format.fprintf fmt
           "@[<v>variables %s should be defined at toplevel with keyword ``static''.@]"
-                x)
+                x) *)
   | Some t -> t
 
-let typ_lc ~statics g ~loc lc =
-  match lc with
-  | St_var l' ->
-      typ_ident g l' loc
-  | St_const c ->
-      typ_const ~loc g c
 
 let trace_last_exp = ref (E_const Unit) (* fake *)
 
@@ -464,8 +468,10 @@ let rec typ_exp ?(collect_sig=false) ~statics ~sums ~toplevel ~loc (g:env) e =
       (typ_const ~loc g c, Response_time.zero)
   | E_var(x) ->
       (* lookup *)
-      let tx = if List.mem_assoc x statics then typ_ident_static ~loc x statics
-               else typ_ident g x loc in
+      let tx = try typ_ident g x loc 
+               with UnboundVariable _ ->
+                 typ_ident_static ~loc x statics
+      in
       (tx, Response_time.zero)
   | E_if(e1,e2,e3) ->
       let t1,n1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
@@ -492,7 +498,10 @@ let rec typ_exp ?(collect_sig=false) ~statics ~sums ~toplevel ~loc (g:env) e =
         Prelude.Errors.error ~loc (fun fmt -> Format.fprintf fmt "Unbound constructor %s" ctor)
       in
       let t1,n1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
-      let c_witness = match hs with (x,_)::_ -> x | _ -> assert false in
+      let c_witness = match hs with 
+                      | (x,_)::_ -> x 
+                      | _ -> Prelude.Errors.error ~loc (fun fmt -> Format.fprintf fmt "this pattern matching should have at least one constructor") 
+      in
       let _,sum,_ = try Types.find_ctor c_witness sums
                     with Not_found -> error_unbound_constructor c_witness in
       let v = unknown () in
@@ -627,10 +636,9 @@ let rec typ_exp ?(collect_sig=false) ~statics ~sums ~toplevel ~loc (g:env) e =
      unify ~loc:(loc_of e1) (T_ref(t2)) t1;
      check_base_type ~loc t2;
      (T_const TUnit, n)
-  | E_local_static_array(e1,e2,_) ->
-      let t1,n1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
+  | E_local_static_array(e2,_) ->
+      let t1 = unknown() in
       let t2,n2 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e2 in
-      unify ~loc n1 Response_time.zero;
       unify ~loc n2 Response_time.zero;
       unify ~loc t2 (tint (unknown()));
      ((T_array{elem=t1; size=unknown ()}),Response_time.zero)
@@ -706,7 +714,35 @@ let rec typ_exp ?(collect_sig=false) ~statics ~sums ~toplevel ~loc (g:env) e =
       let intv = tint v in
       let g' = env_extend ~loc g p (T_tuple[intv;t2]) in
       let t1,n1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g' e1 in
-      t2,n1 (* n1+n1+ ... n fois *)
+      t2,n1 (* (n1+n1+ ...) n times *)
+  | E_vector(es) ->
+      let v = unknown () in
+      let ns = List.map (fun ei ->
+                    let t,n = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g ei in
+                    unify ~loc:(loc_of ei) t v;
+                    n) es
+      in
+      let n = List.fold_left Response_time.add Response_time.zero ns in
+      T_vector{size=T_size(List.length es);elem=v},n
+  | E_vector_mapi(_,(p,e1),e2,ty) ->
+      let v = unknown() in
+      let elem = unknown () in
+      let t2,n = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e2 in
+      unify ~loc:(loc_of e2) t2 (T_vector{size=ty;elem});
+      let intv = tint v in
+      let g' = env_extend ~loc g p (T_tuple[intv;elem]) in
+      let t1,n1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g' e1 in
+      (T_vector{size=ty;elem=t1}),n1 (* (n1+n1+ ...) n times *)
+
+  | E_int_mapi(_,(p,e1),e2,ty) ->
+      let v = unknown() in
+      let elem = T_const TBool in
+      let t2,n = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e2 in
+      unify ~loc:(loc_of e2) t2 (T_const (TInt(ty)));
+      let intv = tint v in
+      let g' = env_extend ~loc g p (T_tuple[intv;elem]) in
+      let t1,n1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g' e1 in
+      (T_const (TInt(ty))),n1 (* (n1+n1+ ...) n times *)
 
 
 let typing_handler ?(msg="") f () =
@@ -747,16 +783,26 @@ let fun_shape (t_arg : ty) : ty =
          (unknown())
          (unknown())
 
-let typing_static g =
-  match g with
-  | Static_array(c,n) ->
-      let elem = typ_const ~loc:Prelude.dloc SMap.empty c in  (*todo loc *)
-      T_array{elem;size=T_size n}
-  | Static_matrix(c,n_list) ->
-      let elem = typ_const ~loc:Prelude.dloc SMap.empty c in  (*todo loc *)
-      T_matrix{elem;size=T_tuple (List.map (fun n -> T_size n) n_list) }
-  | Static_const c ->
-      typ_const ~loc:Prelude.dloc SMap.empty c
+let typing_static env g =
+  try (
+    match g with
+    | Static_array_of (t,loc) -> 
+       unify ~loc t (T_array{elem=unknown(); size=unknown()}) ;
+       t
+    | Static_array(c,n) ->
+        let elem = typ_const ~loc:Prelude.dloc env c in  (*todo loc *)
+        T_array{elem;size=T_size n}
+    | Static_matrix(c,n_list) ->
+        let elem = typ_const ~loc:Prelude.dloc env c in  (*todo loc *)
+        T_matrix{elem;size=T_tuple (List.map (fun n -> T_size n) n_list) }
+    | Static_const c ->
+        typ_const ~loc:Prelude.dloc env c 
+  )
+  with CannotUnify(t1,t2,loc) ->
+    Prelude.Errors.(error ~loc (fun fmt ->
+      Format.fprintf fmt "static variable has type %a but should have type %a"
+                 (emph_pp bold pp_ty) t1
+                 (emph_pp bold pp_ty) t2))
 
 (** Typing of the program [e].
    The program must be a function of type [t1 -> t2] that takes
@@ -764,42 +810,47 @@ let typing_static g =
 
    Returns the type of [e] and a type abstraction of its reponse time.
  *)
-let typing_with_argument ?collect_sig ({statics;sums;main} : pi) (arg_list : e list) : ty * ty =
+let typing_with_argument ?(get_vector_size=true) ?collect_sig ({statics;sums;main} : pi) (arg_list : e list) : ty * ty =
+  (*get_vector_size_ref := get_vector_size; *)
+  typing_handler (fun () ->
+      (* caution: [typing_handler] put a message about **expressions**
+         when CannotUnify is raised, wherever it is raised *)
+    get_vector_size_ref := get_vector_size;
+    let t_arg = unknown() in
+    let env = SMap.empty in
+    let env = List.fold_left (fun env (x,cases) ->
+                                 let t = T_sum (cases) in
+                                 List.fold_left (fun env (ctor,targ) ->
+                                  SMap.add ctor (generalize (SMap.bindings env) (targ ==> t)) env) env cases) env sums
+    in
+    let env = List.fold_left (fun env (x,g) ->
+                                 let ty = typing_static env g in
+                                  SMap.add x (Forall(Vs.empty,ty)) env) env statics
+    in
+    let loc = loc_of main in
+    let e = mk_loc loc @@ ty_annot ~ty:(fun_shape t_arg) main in
+    let statics_env = List.map (fun (x,st) -> x,typing_static env st) statics in
+    let (ty,response_time) =
+      typing ?collect_sig ~env ~statics:statics_env ~sums e
+    in
+    (if !relax_flag then () else
+      let t = canon ty in
+      match t with
+      | T_fun{dur} ->
+          if simplify_response_time (canon dur) <> T_response_time 0 then
+            let open Prelude.Errors in
+            error (fun fmt ->
+            Format.fprintf fmt
+          "@[<v>This program has type %a. It is not reactive. @]" (* Hint: use eta-expansion. *)
+                   (emph_pp green pp_ty) t)
+      | _ -> assert false);
+    List.iter (fun a -> typing ~env ~msg:"checking inputs given by option -arg, " 
+                           ~statics:statics_env ~sums
+                           (ty_annot ~ty:t_arg a)
+                        |> ignore) arg_list;
 
-  let t_arg = unknown() in
-  let env = SMap.empty in
-  let env = List.fold_left (fun env (x,g) ->
-                               let ty = typing_static g in
-                                SMap.add x (Forall(Vs.empty,ty)) env) env statics
-  in
-  let env = List.fold_left (fun env (x,cases) ->
-                               let t = T_sum (cases) in
-                               List.fold_left (fun env (ctor,targ) ->
-                                SMap.add ctor (generalize (SMap.bindings env) (targ ==> t)) env) env cases) env sums
-  in
-  let loc = loc_of main in
-  let e = mk_loc loc @@ ty_annot ~ty:(fun_shape t_arg) main in
-  let statics_env = List.map (fun (x,st) -> x,typing_static st) statics in
-  let (ty,response_time) =
-    typing ?collect_sig ~env ~statics:statics_env ~sums e
-  in
-  (if !relax_flag then () else
-    let t = canon ty in
-    match t with
-    | T_fun{dur} ->
-        if simplify_response_time (canon dur) <> T_response_time 0 then
-          let open Prelude.Errors in
-          error (fun fmt ->
-          Format.fprintf fmt
-        "@[<v>This program has type %a. It is not reactive. @]" (* Hint: use eta-expansion. *)
-                 (emph_pp green pp_ty) t)
-    | _ -> assert false);
-  List.iter (fun a -> typing ~env ~msg:"checking inputs given by option -arg, " 
-                         ~statics:statics_env ~sums
-                         (ty_annot ~ty:t_arg a)
-                      |> ignore) arg_list;
-
-  (ty, response_time)
+    (ty, response_time)
+    ) ()
 
 
 let when_repl : ((p * e) * Prelude.loc) -> unit =
@@ -853,13 +904,21 @@ module Typing2 = struct
 
 
   let rec unify_dur ~loc d1 d2 =
+    
+    let warning_loss_of_precision d d' var = 
+      Prelude.Errors.warning ~loc (fun fmt -> 
+        Format.fprintf fmt "don't know how to unify durations %a and %a.\nVariable %a is arbitrarily set to 1 (this is safe but result in a loss of precision)" 
+            pp_dur d pp_dur d' pp_dur (Dur_var var))
+    in
+
     let d1,d2 = canon_dur d1,canon_dur d2 in
-    (* Format.fprintf Format.std_formatter "-- ====> %a / %a\n"  pp_dur  d1  pp_dur  d2;
-    *)match d1,d2 with
+    (* Format.fprintf Format.std_formatter "-- ====> %a / %a\n"  pp_dur  d1  pp_dur  d2; *)
+    match d1,d2 with
     | Dur_zero,Dur_zero
     | Dur_one,Dur_one -> ()
     | d1,Dur_var {contents=Is d2}
-    | Dur_var {contents=Is d1},d2 -> unify_dur ~loc d1 d2
+    | Dur_var {contents=Is d1},d2 -> 
+        unify_dur ~loc d1 d2
     | Dur_var {contents=(Unknown n)},
       Dur_var ({contents=Unknown m} as v) ->
         if n = m then () else v := Is d1
@@ -869,8 +928,6 @@ module Typing2 = struct
     | Dur_var ({contents=Unknown n} as r1),d2 ->
         if test_occur (occur_dur n) d2 then raise (Cyclic_dur(n,d2,loc));
         r1 := Is d2
-    (* | Dur_one,Dur_var ({contents=Unknown n} as r) ->
-         r := Is (Dur_one)*)
     | Dur_max(Dur_zero,d1),d2
     | Dur_max(d1,Dur_zero),d2
     | d1,Dur_max(d2,Dur_zero)
@@ -878,9 +935,25 @@ module Typing2 = struct
     | Dur_max(Dur_one,_),d
     | Dur_max(_,Dur_one),d
     | d,Dur_max(Dur_one,_)
-    | d,Dur_max(_,Dur_one) ->  unify_dur ~loc d Dur_one
+    | d,Dur_max(_,Dur_one) -> 
+        unify_dur ~loc d Dur_one
+    | Dur_max(Dur_var ({contents=(Unknown n)} as r1),Dur_var ({contents=(Unknown m)} as r2)),d2 ->
+        if n = m then let d = Dur_var r1 in r2 := Is d; unify_dur ~loc d d2 else
+        (warning_loss_of_precision d1 d2 r1;
+         r1 := Is Dur_one;
+         unify_dur ~loc Dur_one d2)
+    | _,Dur_max(Dur_var ({contents=(Unknown n)} as r3),Dur_var ({contents=(Unknown m)} as r4)) ->
+        if n = m then let d = Dur_var r3 in r4 := Is d; unify_dur ~loc d1 d else    
+        (warning_loss_of_precision d1 d2 r3;
+         r3 := Is Dur_one;
+         unify_dur ~loc d1 Dur_one)
     | _ ->
       raise @@ CannotUnify_dur(loc,d1,d2)
+
+  (* let () =  (* test *)
+    Printf.printf "===>\n";
+    unify_dur ~loc:Prelude.dloc (Dur_max(new_dur_unknown(),new_dur_unknown()))
+                                (Dur_max(new_dur_unknown(),new_dur_unknown())) *)
 
   let rec unify_tyB ~loc tyB1 tyB2 =
     let tyB1,tyB2 = canon_tyB tyB1, canon_tyB tyB2 in
@@ -891,11 +964,17 @@ module Typing2 = struct
     | TyB_bool,TyB_bool
     | TyB_unit,TyB_unit -> ()
     | TyB_int sz1, TyB_int sz2 ->  unify_size ~loc sz1 sz2
-    | TyB_string sz1, TyB_string sz2 -> unify_size ~loc sz1 sz2
+    | TyB_string sz1, TyB_string sz2 -> 
+        (try unify_size ~loc sz1 sz2 
+         with CannotUnify_size _ -> raise @@ CannotUnify_tyB(loc,Ty_base tyB1,Ty_base tyB2))
     | TyB_tuple tyB_list1, TyB_tuple tyB_list2 ->
        if List.compare_lengths tyB_list1 tyB_list2 <> 0 then
          raise @@ CannotUnify_tyB(loc,Ty_base tyB1,Ty_base tyB2);
          List.iter2 (unify_tyB ~loc) tyB_list1 tyB_list2
+    | TyB_vector(sz1,tyB1),TyB_vector(sz2,tyB2) ->
+        unify_size ~loc sz1 sz2;
+        unify_tyB ~loc tyB1 tyB2   
+    | TyB_size sz1, TyB_size sz2 -> unify_size ~loc sz1 sz2
     | TyB_var {contents=(Unknown n)},
       TyB_var ({contents=Unknown m} as v) ->
         if n = m then () else v := Is tyB1
@@ -910,7 +989,6 @@ module Typing2 = struct
   let rec unify_ty ~loc ty1 ty2 =
     let ty1,ty2 = canon_ty ty1, canon_ty ty2 in
     (* Format.fprintf Format.std_formatter "====> %a / %a\n"  pp_ty  ty1  pp_ty  ty2; *)
-    
     match ty1,ty2 with
     | Ty_var {contents=(Unknown n)},
       Ty_var ({contents=Unknown m} as v) ->
@@ -921,24 +999,6 @@ module Typing2 = struct
     | ty1,Ty_var ({contents=(Unknown n)} as r2) ->
         if test_occur (occur_ty n) ty1 then raise (Cyclic_ty(n,ty1,loc));
         r2 := Is ty1
-
-    (*| Ty_base tyB, Ty_var {contents=(Unknown n)} ->*)
-
-(*
-    | Ty_base ((TyB_var {contents=(Unknown n)}) as tyB),
-      Ty_base (TyB_var ({contents=Unknown m} as v)) ->
-        if n = m then () else v := Is tyB
-    | Ty_base (Ty_var ({contents=(Unknown n)} as r1)),ty2 ->
-        r1 := Is ty2
-    | ty1,Ty_base (Ty_var ({contents=(Unknown n)} as r2)) ->
-        r2 := Is ty1*)
-
-    (* | Ty_base tyB1, Ty_base tyB2
-       | Ty_base tyB1, Ty_var {contents=Is (Ty_base tyB2)}
-       | Ty_var {contents=Is (Ty_base tyB2)},Ty_base tyB1 ->
-        unify_tyB ~loc tyB1 tyB2
-       | Ty_base tyB1, Ty_var ({contents=Unknown n} as r) ->
-        r := Is (Ty_base tyB1)*)
     | Ty_base tyB1, Ty_base tyB2 ->
         unify_tyB ~loc tyB1 tyB2
     | Ty_base tyB, Ty_tuple ty_list
@@ -950,15 +1010,6 @@ module Typing2 = struct
     | Ty_tuple ty_list1, Ty_tuple ty_list2 ->
       if List.compare_lengths ty_list1 ty_list2 <> 0 then raise @@ CannotUnify_ty(loc,ty1,ty2);
       List.iter2 (unify_ty ~loc) ty_list1 ty_list2
-    (* | Ty_tuple ty_list,Ty_base (TyB_tuple tyB_list)
-       | Ty_base (TyB_tuple tyB_list), Ty_tuple ty_list ->
-        if List.compare_lengths tyB_list ty_list <> 0 then raise @@ CannotUnify_tyB(loc,ty1,ty2);
-        List.iter2 (fun tyB ty -> unify_ty ~loc (Ty_base tyB) ty)
-          tyB_list ty_list*)
-    (*   | Ty_base (TyB_tuple tyB_list),Ty_var ({contents=(Unknown n)} as r)
-
-         | Ty_var ({contents=(Unknown n)} as r),Ty_base (TyB_tuple tyB_list) ->
-           r := Is (Ty_base (TyB_tuple tyB_list))*)
     | Ty_fun(ty1,d1,tyB1),Ty_fun(ty2,d2,tyB2) ->
         unify_ty ~loc ty1 ty2; (* todo dur *)
         unify_dur ~loc d1 d2;
@@ -1023,10 +1074,16 @@ module Typing2 = struct
 
   exception UnboundVariable of x * Prelude.loc
 
-  let typ_ident g x loc =
+  let typ_ident ~loc g x =
     match SMap.find_opt x g with
     | None -> raise (UnboundVariable (x,loc))
     | Some t -> instance t
+
+
+  let typ_ident_static ~loc x statics =
+    match List.assoc_opt x statics with
+    | None -> raise @@ UnboundVariable(x,loc)
+    | Some t -> t
 
   let group_tyB_list = function
     | [] -> TyB_unit
@@ -1052,9 +1109,9 @@ module Typing2 = struct
                Dur_zero,
                List.nth tyB_list pos)
 
-  let rec typ_const g = function
+  let rec typ_const ~loc g = function
     | Int(n,sz) ->
-        let v = new_size_unknown () in
+        let v = new_size_unknown () in (* TODO *)
         TyB_int v
 (*
 | Int(n,sz) ->
@@ -1076,19 +1133,29 @@ module Typing2 = struct
     (*| (V_loc _) ->
         (* not in source program: handled in the typer *)
         unknown()*)
-    | C_tuple(cs) -> TyB_tuple(List.map (typ_const g) cs)
-  (* | Inj x ->
-      typ_ident g x loc *)
+    | C_tuple(cs) -> TyB_tuple(List.map (typ_const ~loc g) cs)
+    | C_vector(cs) ->
+        let v = new_tyB_unknown () in
+        List.iter (fun c -> unify_tyB ~loc v (typ_const ~loc g c)) cs; 
+        TyB_vector(Sz_lit (List.length cs),v)
+    | C_size n -> TyB_size (Sz_lit n)
+    | Inj x ->
+        let tx = typ_ident ~loc g x in
+        let tyB = new_tyB_unknown () in
+        unify_ty ~loc:Prelude.dloc tx (Ty_base tyB);
+        tyB
     | _ -> assert false
 
   let rec typ_exp ?(collect_sig=false) ~statics ~sums ?(toplevel=false) ~loc g e =
     match e with
     | E_const (Op op) -> ty_op op,Dur_zero
     | E_const c ->
-        (Ty_base (typ_const g c), Dur_zero)
+        (Ty_base (typ_const ~loc g c), Dur_zero)
     | E_var(x) ->
         (* lookup *)
-        (typ_ident g x Prelude.dloc,Dur_zero)
+        let tx = (* try*) typ_ident ~loc g x
+                 (*with UnboundVariable _ -> typ_ident_static ~loc x statics*) in
+        (tx,Dur_zero)
     | E_deco(e1,loc) ->
         typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1
     | E_if(e1,e2,e3) ->
@@ -1102,7 +1169,7 @@ module Typing2 = struct
         t2,Dur_max(d1,Dur_max(d2,d3))
     | E_case(e1,hs,e_els) ->
         let ty1,d1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
-        List.iter (fun (c,_) -> unify_ty ~loc (Ty_base (typ_const g c)) ty1) hs;
+        List.iter (fun (c,_) -> unify_ty ~loc (Ty_base (typ_const ~loc g c)) ty1) hs;
         let ty_els,d_els = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e_els in
         let d_list = List.map (fun (_,ei) ->
           let ty,d = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g ei in
@@ -1150,15 +1217,16 @@ module Typing2 = struct
         let ty,dur = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc:(loc_of e1) g' e1 in
         let tyB = new_tyB_unknown() in
         unify_ty ~loc ty (Ty_base tyB);
-        (Ty_fun(v,dur,tyB), Dur_zero)
+        (Ty_fun(v,canon_dur dur,tyB), Dur_zero)
 
-    | E_fix(f,(x,e1)) ->
+    | E_fix(f,(p,e1)) ->
         let ty1 = new_ty_unknown () in
         let tyB2 = new_tyB_unknown () in
         let tf = Ty_fun(ty1,Dur_one,tyB2) in
         let g' = env_extend ~loc g (P_var f) tf in
-        let ty,d = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g' (E_fun(x,e1)) in
-        (* unify_ty ~loc:(loc_of e1) tf ty;*)
+        let g' = env_extend ~loc g' p ty1 in
+        let ty,d = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g' e1 in
+        unify_ty ~loc:(loc_of e1) ty (Ty_base tyB2);
         (tf, d)
     | E_app(e1,e2) ->
         (match un_deco e1 with
@@ -1181,7 +1249,7 @@ module Typing2 = struct
             | E_const _ -> ()
             | _ -> assert false (* compilation error ! *)
             );*)
-         Ty_base tyB, Dur_max(Dur_max(d1,d2),d))
+         Ty_base tyB, canon_dur (Dur_max(Dur_max(d1,d2),d)))
 
 
     | E_par(es) ->
@@ -1190,7 +1258,7 @@ module Typing2 = struct
           ti,d) es
         in
         let d = List.fold_left (fun d1 d2 -> Dur_max(d1,d2)) Dur_zero ds in
-        Ty_tuple ts,d
+        Ty_tuple ts,canon_dur d
 
     (* *************************************************** *)
     | E_reg((p,e1),e0,_) ->
@@ -1215,12 +1283,49 @@ module Typing2 = struct
 
     (* *************************************************** *)
 
+     | E_match(e1,hs,eo) ->
+      let error_unbound_constructor ctor =
+        Prelude.Errors.error ~loc (fun fmt -> Format.fprintf fmt "Unbound constructor %s" ctor)
+      in
+      let ty1,d1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
+      (* todo : error if there is no clause *)
+      let c_witness = match hs with (x,_)::_ -> x | _ -> assert false in
+      let _,sum,_ = try Types.find_ctor c_witness sums
+                    with Not_found -> error_unbound_constructor c_witness in
+      let ty_result = (Ty_base (new_tyB_unknown ())) in
+      let r = ref d1 in
+      List.iter (fun (inj,(p,ei)) ->
+         let t_inj = match List.assoc_opt inj sum with
+                     | Some t -> t
+                     | None -> error_unbound_constructor inj
+         in
+         let g' = env_extend ~loc g p t_inj in
+         let tyi,di = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g' ei in
+         unify_ty ~loc tyi ty_result;
+         r := Dur_max(!r,di)) hs;
+
+      Option.iter (fun ew -> 
+         (* wildcard clause *)
+         let tyw,dw = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g ew in
+         unify_ty ~loc tyw ty_result;
+         r := Dur_max(!r,dw)) eo;
+
+      let ctors = smap_of_list (List.map (fun (x,_) -> x,()) hs) in
+
+      if eo = None && SMap.cardinal ctors < List.length sum then (
+        Prelude.Errors.error ~loc (fun fmt ->
+          Format.fprintf fmt "This pattern-matching is not exhaustive.")
+      );
+      ty_result,!r
+
+    (* *************************************************** *)
+
     | E_ref(e1) ->
         let ty,d = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc:(loc_of e1) g e1 in
-        Format.fprintf Format.std_formatter "|///|||--->%a\n" pp_ty  ty;
+        (* Format.fprintf Format.std_formatter "|///|||--->%a\n" pp_ty  ty; *)
         let tyB = new_tyB_unknown () in
         unify_ty ~loc (Ty_base tyB) ty;
-        Format.fprintf Format.std_formatter "||||--->%a\n" pp_tyB  tyB;
+        (* Format.fprintf Format.std_formatter "||||--->%a\n" pp_tyB  tyB; *)
         (Ty_ref(tyB),d)
     | E_get(e1) ->
         let ty1,d = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
@@ -1237,10 +1342,9 @@ module Typing2 = struct
 
     (* *************************************************** *)
 
-    | E_local_static_array(e1,e2,_) ->
-      let ty1,d1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
+    | E_local_static_array(e2,_) ->
+      let ty1 = new_ty_unknown() in
       let ty2,d2 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e2 in
-      unify_dur ~loc d1 Dur_zero;
       unify_dur ~loc d2 Dur_zero;
       let sz = new_size_unknown () in
       unify_ty ~loc ty2 (Ty_base (TyB_int sz));
@@ -1250,7 +1354,7 @@ module Typing2 = struct
       begin
         match un_annot e2 with
         | E_array_length(y) -> 
-            let tx = typ_ident g y loc in
+            let tx = typ_ident ~loc g y in
             let tyB2 = new_tyB_unknown () in
             unify_ty ~loc tx (Ty_array(sz2,tyB2))
         | E_const (Int(n,_)) -> 
@@ -1263,7 +1367,7 @@ module Typing2 = struct
       (Ty_array(sz2,tyB1)),Dur_zero
 
     | E_array_length(x) ->
-        let tyx = typ_ident g x loc in
+        let tyx = typ_ident ~loc g x in
         let sz = new_size_unknown () in
         let v = new_tyB_unknown () in
         unify_ty ~loc (Ty_array(sz,v)) tyx;
@@ -1271,7 +1375,7 @@ module Typing2 = struct
     | E_array_get(x,e1) ->
         let ty1,d = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
         unify_ty ~loc ty1 (Ty_base (TyB_int (new_size_unknown ())));
-        let tyx = typ_ident g x loc in
+        let tyx = typ_ident ~loc g x in
         let tyB = new_tyB_unknown () in
         unify_ty ~loc (Ty_array(new_size_unknown(),tyB)) tyx;
         (Ty_base tyB,d)
@@ -1279,7 +1383,7 @@ module Typing2 = struct
         let ty1,d1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
         let ty2,d2 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e2 in
         unify_ty ~loc ty1 (Ty_base (TyB_int (new_size_unknown ())));
-        let tyx = typ_ident g x loc in
+        let tyx = typ_ident ~loc g x in
         let tyB = new_tyB_unknown () in
         unify_ty ~loc ty2 (Ty_base tyB);
         unify_ty ~loc (Ty_array(new_size_unknown(),tyB)) tyx;
@@ -1299,7 +1403,7 @@ module Typing2 = struct
        let ty_list,d_list = List.split @@ List.map (fun ei ->
                       typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g ei) es in
        List.iter (fun ty_i -> unify_ty ~loc ty_i (Ty_base (TyB_int (new_size_unknown())))) ty_list;
-       let tyx = typ_ident g x loc in
+       let tyx = typ_ident ~loc g x in
        let tyB_elem = new_tyB_unknown() in
        unify_ty ~loc (Ty_matrix(List.map (fun _ -> new_size_unknown ()) ty_list, tyB_elem)) tyx;
        let d = List.fold_left (fun d1 d2 -> Dur_max(d1,d2)) Dur_zero d_list in
@@ -1309,7 +1413,7 @@ module Typing2 = struct
                       typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g ei) es in
        List.iter (fun ty_i -> unify_ty ~loc ty_i (Ty_base (TyB_int (new_size_unknown())))) ty_list;
        let ty2,d2 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e2 in
-       let tyx = typ_ident g x loc in
+       let tyx = typ_ident ~loc g x in
        let tyB_elem = new_tyB_unknown() in
        unify_ty ~loc ty2 (Ty_base tyB_elem);
        unify_ty ~loc (Ty_matrix(List.map (fun _ -> new_size_unknown ()) ty_list, tyB_elem)) tyx;
@@ -1326,7 +1430,7 @@ module Typing2 = struct
       unify_ty ~loc t2 intv;
       unify_dur ~loc d2 Dur_zero;
       let g' = env_extend ~loc g (P_var x) intv in
-      typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g' e3
+      typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g' e3  (* todo *)
 
 
     | E_generate((p,e1),e2,e_st3,_) ->
@@ -1337,12 +1441,52 @@ module Typing2 = struct
       unify_dur ~loc d3 Dur_zero;
       let vsize1 = new_size_unknown() in
       let intv1 = Ty_base (TyB_int vsize1) in
-      let ty2,d2 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e2 in (* TODO: force ty2 to be a base type *)
+      let ty2,d2 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc:(loc_of e2) g e2 in (* TODO: force ty2 to be a base type *)
       let g' = env_extend ~loc g p (Ty_tuple[intv1;ty2]) in
-      let ty1,d1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g' e1 in
+      let ty1,d1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc:(loc_of e1) g' e1 in
       ty1,Dur_max(d1,d2) (* n1+n1+ ... n fois *)
 
-      | e ->  Format.fprintf Format.std_formatter "--->%a\n" Ast_pprint.pp_exp e; assert false
+  | E_vector(es) ->
+      let v = new_tyB_unknown () in
+      let ns = List.map (fun ei ->
+                    let t,n = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g ei in
+                    unify_ty ~loc:(loc_of ei) t (Ty_base v);
+                    n) es
+      in
+      let n = List.fold_left (fun acc n -> Dur_max(acc,n)) Dur_zero ns in
+      Ty_base(TyB_vector(Sz_lit(List.length es),v)),n
+
+  | E_vector_mapi(_,(p,e1),e2,_) ->
+      let elem = new_tyB_unknown () in
+      let size_vect = new_size_unknown() in
+      let vsize1 = new_size_unknown() in
+      let intv1 = TyB_int vsize1 in
+      let ty2,d2 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc:(loc_of e2) g e2 in (* TODO: force ty2 to be a base type *)
+      let w = new_tyB_unknown () in
+      unify_ty ~loc:(loc_of e2) (Ty_base w) ty2;
+      unify_tyB ~loc:(loc_of e2) w (TyB_vector(size_vect,elem));
+      let g' = env_extend ~loc g p (Ty_base (TyB_tuple[intv1;elem])) in
+      let ty1,d1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc:(loc_of e2) g' e1 in
+      let w1 = new_tyB_unknown () in
+      unify_ty ~loc:(loc_of e1) (Ty_base w1) ty1;
+      Ty_base (TyB_vector(size_vect,w1)),d1 (* n times d1 *)
+
+
+  | E_int_mapi(_,(p,e1),e2,_) ->
+      let elem = TyB_bool in
+      let size_vect = new_size_unknown() in
+      let vsize1 = new_size_unknown() in
+      let intv1 = TyB_int vsize1 in
+      let ty2,d2 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc:(loc_of e2) g e2 in (* TODO: force ty2 to be a base type *)
+      let w = new_tyB_unknown () in
+      unify_ty ~loc:(loc_of e2) (Ty_base w) ty2;
+      unify_tyB ~loc:(loc_of e2) w (TyB_int(size_vect));
+      let g' = env_extend ~loc g p (Ty_base (TyB_tuple[intv1;elem])) in
+      let ty1,d1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc:(loc_of e2) g' e1 in
+      let w1 = new_tyB_unknown () in
+      unify_ty ~loc:(loc_of e1) (Ty_base w1) ty1;
+      (Ty_base (TyB_int(size_vect))),d1 (* n times d1 *)
+
 
 
   let typing_handler ?(msg="") f () =
@@ -1381,17 +1525,18 @@ module Typing2 = struct
          Prelude.Errors.raise_error ~loc ~msg:("unbound variable "^x) ()
 
 
-  let typing_static g =
+  let typing_static ~loc g =
     match g with
+    | Static_array_of (t,_) -> 
+        Ty_array(new_size_unknown(),new_tyB_unknown()) (* todo: translate [t] *)
     | Static_array(c,n) ->
-        let elem = typ_const SMap.empty c in  (*todo loc *)
+        let elem = typ_const ~loc SMap.empty c in  (*todo loc *)
         Ty_array(Sz_lit n,elem)
     | Static_matrix(c,n_list) ->
-        let elem = typ_const SMap.empty c in  (*todo loc *)
-        assert false (* TODO *)
-        (* Ty_matrix(new_size_unknown(), elem) }*)
+        let elem = typ_const ~loc SMap.empty c in  (*todo loc *)
+       Ty_matrix(List.map (fun _ -> new_size_unknown()) n_list, elem)
     | Static_const c ->
-        Ty_base (typ_const SMap.empty c)
+        Ty_base (typ_const ~loc SMap.empty c)
 
 
   let typing ?collect_sig ?(env=SMap.empty) ?(msg="") ~statics ~sums e =
@@ -1399,16 +1544,32 @@ module Typing2 = struct
     let loc = loc_of e in
     typing_handler (fun () ->
 
-  let env = SMap.empty in
-  let env = List.fold_left (fun env (x,g) ->
-                               let ty = typing_static g in
-                                SMap.add x (Forall(Vs.empty,ty)) env) env statics
-  in
+    let env = List.fold_left (fun env (x,g) ->
+                                 (* todo : ~loc *)
+                                 let ty = typing_static ~loc g in
+                                  SMap.add x (Forall(Vs.empty,ty)) env) env statics
+    in
 
-        let t,n = typ_exp ?collect_sig ~statics ~sums ~toplevel:true ~loc env e in
-        let tyB = new_tyB_unknown () in
-        unify_ty ~loc (Ty_fun(Ty_base tyB,new_dur_unknown(),new_tyB_unknown())) t;
-        canon_ty t, n) ()
+   (* TODO
+
+    let env = List.fold_left (fun env (x,cases) ->
+                                   let t = Ty_base (TyB_sum (cases)) in
+                                   List.fold_left (fun env (ctor,targ) ->
+                                    SMap.add ctor (generalize (SMap.bindings env) (targ ==> t)) env) env cases) env sums
+      in *)
+
+    let t,n = typ_exp ?collect_sig ~statics ~sums ~toplevel:true ~loc env e in
+    (* let tyB = new_tyB_unknown () in*)
+    (* unify_ty ~loc (Ty_fun(Ty_base tyB,new_dur_unknown(),new_tyB_unknown())) t; *)
+    canon_ty t, n) ()
+
+  let when_repl : ((p * e) * Prelude.loc) -> unit =
+    let r = ref SMap.empty in
+    fun ((p,e),loc) ->
+      let (ty,_) = typing ~env:!r ~statics:[] ~sums:[] e in
+      r := typing_handler (fun () -> (env_extend ~loc ~gen:true !r p ty)) ();
+      Format.fprintf Format.std_formatter "val %a : %a@."  Ast_pprint.pp_pat p pp_ty ty
+
 
 
 
