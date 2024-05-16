@@ -49,8 +49,8 @@ let rec map f e =
       E_par (List.map f es)
   | E_reg((p,e1),e0,l) ->
       E_reg((p,f e1),f e0,l)
-  | E_exec(e1,e2,k) ->
-      E_exec(f e1,f e2,k)
+  | E_exec(e1,e2,e3,l) ->
+      E_exec(f e1,f e2,Option.map f e3,l)
   | E_for(x,e_st1,e_st2,e,loc) ->
       E_for(x,f e_st1,f e_st2,f e,loc)
   | E_generate((p,e1),e2,e_st1,loc) ->
@@ -94,8 +94,8 @@ let rec iter f (e:e) : unit =
       List.iter f es
    | E_reg((_,e1),e0,_) ->
       f e1; f e0
-  | E_exec(e1,e2,_) ->
-      f e1; f e2
+  | E_exec(e1,e2,e3,_) ->
+      f e1; f e2; Option.iter f e3
   | E_local_static_array(e1,_) ->
       f e1
   | E_array_length _ ->
@@ -224,10 +224,14 @@ let accum f (e:e) : ((x * e) list * e) =
             let ds1,e1' = aux e1 in
             let ds0,e0' = aux e0 in
             ds1@ds0,E_reg((p,e1'),e0',l)
-        | E_exec(e1,e0,l) ->
+        | E_exec(e1,e2,eo,l) ->
             let ds1,e1' = aux e1 in
-            let ds0,e0' = aux e0 in
-            ds1@ds0,E_exec(e1',e0',l)
+            let ds2,e2' = aux e2 in
+            let ds3,eo' = match eo with
+                          | None -> [],None 
+                          | Some e3 -> let ds,e3' = aux e3 in
+                                       ds,Some e3' in
+            ds2@ds1@ds3,E_exec(e1',e2',eo',l)
         | E_for(x,e_st1,e_st2,e3,loc) ->
             let ds1,e_st1' = aux e_st1 in
             let ds2,e_st2' = aux e_st2 in

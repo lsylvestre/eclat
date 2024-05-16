@@ -120,10 +120,16 @@ let rec anf (e:e) : e =
       let ds0,e0' = glob e0 in
       ds0,plug e0' @@ fun xc0 ->
       E_reg((p,anf e1),xc0,l)
-  | E_exec(e1,e0,l) ->
+  | E_exec(e1,e0,eo,l) ->
       let ds0,e0' = glob e0 in
-      ds0,plug e0' @@ fun xc0 ->
-      E_exec(anf e1,xc0,l) 
+      let ds3,eo' = match eo with 
+                    | None -> [],eo 
+                    | Some e3 -> let ds3,e3' = glob e3 in
+                    ds3,Some e3 in
+      ds0@ds3,plug e0' @@ fun xc0 ->
+      (match eo' with
+       | None -> E_exec(anf e1,xc0,None,l)
+       | Some e3' -> plug e3' @@ fun xc3 -> E_exec(anf e1,xc0,Some xc3,l))
   | E_ref(e1) ->
       let ds1,e1' = glob e1 in
       ds1,plug e1' @@ fun xc1 ->

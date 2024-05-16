@@ -16,6 +16,8 @@
        "register", REGISTER;
        "reg",   REGISTER;
        "exec",  EXEC;
+       "reset", RESET;
+       "when",  WHEN;
        "and",   AND;
        "in",    IN;
        "if",    IF;

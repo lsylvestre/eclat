@@ -36,9 +36,9 @@ module Deadcode_elimination = struct
         let ys = vars_of_p p in
         let xs' = SMap.add f () @@ (xs++ys) in
         aux xs' e
-    | E_exec(e1,e2,_) ->
-        (* note: no recursive call on [e1] *)
-        aux xs e2
+    | E_exec(e1,_,eo,_) ->
+        (* note: no recursive call on [e2] *)
+        aux xs e1; Option.iter (aux xs) eo
     | E_par _ ->
         (* note: no recursive call *)
         ()
@@ -75,8 +75,8 @@ let rec map_under_exec_and_par e =
         E_par(List.map (fun e -> map_under_exec_and_par (decl env e)) es)
     (* | E_reg((p,e1),e0,l) ->
         E_reg((p,map_under_exec_and_par (decl env e1)), aux env e0,l) *)
-    | E_exec(e1,e0,l) ->
-        E_exec(map_under_exec_and_par (decl env e1), aux env e0,l)
+    | E_exec(e1,e0,eo,l) ->
+        E_exec(map_under_exec_and_par (decl env e1), aux env e0, Option.map (aux env) eo, l)
     | e -> Ast_mapper.map (aux env) e
   in aux [] e
 

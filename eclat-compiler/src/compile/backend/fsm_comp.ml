@@ -416,16 +416,28 @@ let rec to_s ~statics ~sums gs e x k =
       seq_ (set_ y (A_var res)) @@
       return_ @@ set_ x (A_var res))
 
-  | E_exec(e1,e0,l) ->
+  | E_exec(e1,e0,eo,l) ->
+      (* assume e0 is combinational *)
       let pi = Ast.{statics;sums;main=e1} in
       let rdy,res,compute,(ts,s1) = compile (* ~result:x*) pi in
-      let s1' = S_fsm((Ast.gensym ~prefix:"id" ()),rdy,res,compute,ts,s1,false) in
-      (SMap.empty, SMap.empty,
-      seq_ s1' @@
-      seq_ (let_plug_s (A_call(Runtime(Not),A_var rdy)) (fun z ->
-             S_if(z, set_ res (to_a ~sums e0), None))) @@
-      return_ @@ set_ x (A_tuple[A_var res;A_var rdy]))
-
+      let id = Ast.gensym ~prefix:"id" () in
+      let s1' = S_fsm(id,rdy,res,compute,ts,s1,false) in
+      let s2 = seq_ (let_plug_s (A_call(Runtime(Not),A_var rdy)) (fun z ->
+                  S_if(z, set_ res (to_a ~sums e0), None))) @@
+               return_ @@ set_ x (A_tuple[A_var res;A_var rdy]) in
+      let s = seq_ s1' s2 in
+      (match eo with
+      | None -> (SMap.empty, SMap.empty, s)
+      | Some e3 ->
+         (* assume e3 is combinational *)
+         let s_not_rdy = let_plug_s (to_a ~sums e3) (fun zz ->
+                            S_if(zz, S_in_fsm(id,S_continue compute), None))
+           in
+         let s4 = seq_ (let_plug_s (A_call(Runtime(Not),A_var rdy)) (fun z ->
+                  S_if(z, (seq_ (set_ res (to_a ~sums e0)) s_not_rdy), None))) @@
+               return_ @@ set_ x (A_tuple[A_var res;A_var rdy]) in
+          let s5 = seq_ s1' s4 in
+          (SMap.empty, SMap.empty, s5))
   | E_par(es) ->
       let id_s = List.map (fun _ -> Ast.gensym ~prefix:"id" ()) es in
       let pi_s = List.map (fun e -> compile @@ Ast.{statics;sums;main=e}) es in

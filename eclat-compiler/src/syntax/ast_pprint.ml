@@ -265,7 +265,7 @@ let pp_exp (fmt:fmt) (e:e) : unit =
         fprintf fmt "@[<v>reg[%s] (fun %a -> %a) last %a@]" l
           pp_pat p
           (pp_e ~paren:false) e1 (pp_e ~paren:false) e0) fmt ()
-  | E_exec(e1,e2,x) ->
+  | E_exec(e1,e2,e3,x) ->
       fprintf fmt "(@[<v>exec[%s] %a default %a@])"
         x (pp_e ~paren:false) e1 (pp_e ~paren:false) e2
   | E_ref(e1) ->

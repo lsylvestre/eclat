@@ -4,6 +4,7 @@
 type token = 
   | XOR
   | WITH
+  | WHEN
   | VECTOR_MAPI
   | VECTOR_CREATE
   | UP_IDENT of (string)
@@ -26,6 +27,7 @@ type token =
   | RPAREN
   | RIGHT_ARROW
   | RESIZE_INT
+  | RESET
   | REGISTER
   | REF
   | REC

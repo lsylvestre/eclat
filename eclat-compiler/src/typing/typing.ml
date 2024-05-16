@@ -605,12 +605,17 @@ let rec typ_exp ?(collect_sig=false) ~statics ~sums ~toplevel ~loc (g:env) e =
      unify ~loc n1 Response_time.zero;
      check_base_type ~loc t0;
      (t0, Response_time.zero)
-  | E_exec(e1,e2,_) ->
+  | E_exec(e1,e2,eo,_) ->
      let t1,_ = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
      let t2,n2 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e2 in
      unify ~loc t1 t2;
      unify ~loc n2 Response_time.zero;
      check_base_type ~loc:(loc_of e1) t1;
+     Option.iter (fun e3 ->
+        let t3,n3 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e3 in
+        let loc = loc_of e3 in
+        unify ~loc t3 tbool;
+        unify ~loc n3 Response_time.zero) eo;
      (T_tuple[t1;tbool], Response_time.zero)
   | E_par(es) ->
     let ts,ns = List.split @@ List.map (fun ei ->
@@ -1220,11 +1225,11 @@ module Typing2 = struct
         (Ty_fun(v,canon_dur dur,tyB), Dur_zero)
 
     | E_fix(f,(p,e1)) ->
-        let ty1 = new_ty_unknown () in
+        let tyB1 = new_tyB_unknown () in
         let tyB2 = new_tyB_unknown () in
-        let tf = Ty_fun(ty1,Dur_one,tyB2) in
+        let tf = Ty_fun(Ty_base tyB1,Dur_one,tyB2) in
         let g' = env_extend ~loc g (P_var f) tf in
-        let g' = env_extend ~loc g' p ty1 in
+        let g' = env_extend ~loc g' p (Ty_base tyB1) in
         let ty,d = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g' e1 in
         unify_ty ~loc:(loc_of e1) ty (Ty_base tyB2);
         (tf, d)
@@ -1272,13 +1277,18 @@ module Typing2 = struct
         unify_ty ~loc:(loc_of e1) (Ty_base tyB) ty0;
         (ty0, Dur_zero)
 
-    | E_exec(e1,e2,_) ->
+    | E_exec(e1,e2,eo,_) ->
         let ty1,_ = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
         let ty2,d2 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e2 in
         unify_ty ~loc ty1 ty2;
         unify_dur ~loc d2 Dur_zero;
         let tyB = new_tyB_unknown () in
         unify_ty ~loc:(loc_of e1) (Ty_base tyB) ty1;
+        Option.iter (fun e3 ->
+            let ty3,d3 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e3 in
+            let loc = loc_of e3 in
+            unify_ty ~loc ty3 (Ty_base (TyB_bool));
+            unify_dur ~loc d3 Dur_zero) eo;
         (Ty_base (TyB_tuple[tyB;TyB_bool]), Dur_zero)
 
     (* *************************************************** *)

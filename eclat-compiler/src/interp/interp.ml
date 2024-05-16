@@ -217,12 +217,12 @@ let rec red (e,r) =
      let v1,r1 = red (e1,r) in
      let v2,r2 = red (e2,r1) in
      (E_const Unit, add_r x v r') *)
-  | E_exec (e1,e2,k) ->
+  | E_exec (e1,e2,e3,k) -> (* TODO e3 *)
      (* [Exec] *)
      if not (SMap.mem k r.mu) then
         (* [Exec-init] *)
         let r' = add_r k e1 r in
-        red (E_exec (e1,e2,k),r')
+        red (E_exec (e1,e2,e3,k),r')
       else
         let e = SMap.find k r.mu in
         let e',r' = red (e,r) in

@@ -59,9 +59,13 @@ let rec lfloat (e:e) : e =
   | E_reg((p,e1),e0,l) ->
       let ds0,e0' = glob e0 in
       ds0,E_reg((p,lfloat e1),e0',l)
-  | E_exec(e1,e0,l) ->
+  | E_exec(e1,e0,eo,l) ->
       let ds0,e0' = glob e0 in
-      ds0,E_exec(lfloat e1,e0',l) 
+      let ds3,eo' = match eo with 
+                    | None -> [],eo 
+                    | Some e3 -> let ds3,e3' = glob e3 in
+                    ds3,Some e3 in
+      ds0@ds3,E_exec(lfloat e1,e0',eo',l)
   | E_ref(e1) ->
       let ds1,e1' = glob e1 in
       ds1,E_ref(e1')

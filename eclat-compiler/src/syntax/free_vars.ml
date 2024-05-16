@@ -50,9 +50,11 @@ let fv ?(get_arrays=true) ?(xs=SMap.empty) e =
       let ys = vars_of_p p in
       let xs' = xs++ys in
       aux xs' e1 ++ aux xs e0
-  | E_exec(e1,e2,_k) ->
+  | E_exec(e1,e2,eo,_k) ->
       (* _k is in a different name space than variables *)
-      aux xs e1 ++ aux xs e2
+      aux xs e1 ++ aux xs e2 ++ (match eo with 
+                                 | None -> SMap.empty 
+                                 | Some e3 -> aux xs e3)
   | E_ref(e1) ->
       aux xs e1
   | E_get(e1) ->
@@ -163,9 +165,11 @@ let fv_arrays ?(xs=SMap.empty) e =
       let ys = vars_of_p p in
       let xs' = xs++ys in
       aux xs' e1 ++ aux xs e0
-  | E_exec(e1,e2,_k) ->
+  | E_exec(e1,e2,eo,_k) ->
       (* _k is in a different name space than variables *)
-      aux xs e1 ++ aux xs e2
+      aux xs e1 ++ aux xs e2 ++ (match eo with 
+                                 | None -> SMap.empty 
+                                 | Some e3 -> aux xs e3)
   | E_ref(e1) ->
       aux xs e1
   | E_get(e1) ->

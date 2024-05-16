@@ -34,7 +34,7 @@
 
 %token LPAREN RPAREN LBRACKET RBRACKET COMMA PIPE_PIPE PIPE_COMMA_PIPE EQ EQ_EQ COL SEMI HAT STATIC DOT_LENGTH ARRAY_LENGTH
 %token SHARP_PIPE_LBRACKET LBRACKET_PIPE PIPE_RBRACKET
-%token FUN AMP DOT REGISTER EXEC LAST DEFAULT
+%token FUN AMP DOT REGISTER EXEC LAST DEFAULT RESET WHEN
 %token NODE IMPLY
 %token MATCH WITH PIPE END
 %token OF
@@ -448,7 +448,9 @@ app_exp_desc:
          E_reg((P_var y,E_app(E_var f,E_var y)),e0,Ast.gensym ())
        }
 | EXEC e1=exp DEFAULT e2=lexp
-       { E_exec(e1,e2,"") }
+       { E_exec(e1,e2,None,"") }
+| EXEC e1=exp DEFAULT e2=lexp RESET WHEN e3=app_exp
+       { E_exec(e1,e2,Some e3,"") }
 | MACRO_GENERATE ef1=aexp e_init2=aexp e_st3=aexp
   { let z = Ast.gensym () in
     E_generate((P_var z,E_app(ef1,E_var z)),e_init2,e_st3,with_file $loc) }

@@ -48,8 +48,8 @@ type e =                      (** expression     [e]                       *)
   | E_fix of x * (p * e)      (** recursive function [fix (fun p -> e)]    *)
   | E_par of e list           (** parallel tuple             [(e1 || e2 ... en)] *)
 
-  | E_reg of (p * e) * e * l     (** register       [reg^l (fun p -> e) last e] *)
-  | E_exec of e * e * l       (** exec           [(exec^l e default e)]    *)
+  | E_reg of (p * e) * e * l  (** register       [reg^l (fun p -> e) last e] *)
+  | E_exec of e * e * e option * l   (** exec           [(exec^l e default e [reset when e])]    *)
 
   | E_local_static_array of e * deco (* [array_crate n], should be resolved at compile time *)
   | E_array_get of x * e      (** static array access        [x.(e)]      *)
