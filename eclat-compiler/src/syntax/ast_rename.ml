@@ -2,10 +2,10 @@ open Ast
 open Ast_subst
 open Pattern
 
+(* rename all variables that are not statics *)
+
 (* custom symbol generator *)
-module Gensym : sig val reset : unit -> unit
-                    val rename : x -> x
-                    val gensym : statics:x list -> x -> x end = struct
+module Gensym : sig val gensym : statics:x list -> x -> x end = struct
 
   let of_int (n:int) : x =
     "$"^string_of_int n
@@ -24,22 +24,16 @@ module Gensym : sig val reset : unit -> unit
       | None -> of_int !c)
     else make_name !c x
 
-  let h = Hashtbl.create 10;;
-
-  let reset () =
-    (* c := 0;*)  (* no ! *)
-    Hashtbl.clear h
-
   let gensym ~statics x =
-    if Hashtbl.mem h x || List.mem x statics then (let y = rename x in Hashtbl.add h x y; y)
-    else (Hashtbl.add h x x; x)
+    if List.mem x statics then x else
+    rename x 
 
 end
 
 open Gensym
 
 let rename_ident ~statics x =
-  rename x
+  gensym ~statics x
 
 (** [rename_pat p] rename all names in the pattern [p],
   assuming that any variable is bound several times in p *)
@@ -67,7 +61,7 @@ let rename_e ~statics e =
   | E_match(e1,hs,eo) ->
       let hs' = List.map (fun (inj,(p,ei)) ->
                             let pz = rename_pat ~statics p in
-                            let ei' = (subst_p_e p (pat2exp pz) ei) in
+                            let ei' = ren_e (subst_p_e p (pat2exp pz) ei) in
                             (inj,(pz,ei'))) hs in
       E_match(ren_e e1, hs',Option.map ren_e eo)
   | E_reg((p,e1),e0,l) ->
@@ -94,7 +88,7 @@ let rename_e ~statics e =
   ren_e e
 
 let rename_pi pi =
-  Gensym.reset ();
   let statics = List.map fst pi.statics in
   let main = rename_e ~statics pi.main in
   { pi with main }
+
