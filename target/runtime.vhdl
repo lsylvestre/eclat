@@ -34,6 +34,15 @@ package runtime is
   function eclat_lsl   (arg: value) return value;
   function eclat_lsr   (arg: value) return value;
   function eclat_asr   (arg: value) return value;
+  function eclat_getBit(arg: value) return value;
+  function eclat_updateBit(arg: value) return value;
+  function eclat_size_create(arg: value) return value;
+  function eclat_vector_make (size:natural;arg: value) return value;
+  function eclat_vector_get (arg: value;constant k:integer) return value;
+  function eclat_vector_update (arg: value;constant k:integer) return value;
+  function eclat_tuple_get(arg: value; k:integer) return value;
+  function eclat_tuple_update(arg: value; k:integer) return value;
+  function eclat_size_val(arg: value) return value;
   function of_string   (s: string)   return value; 
   function to_string   (a: std_logic_vector) return string;
 
@@ -324,6 +333,111 @@ package body runtime is
       return value(r);
     end;
 
+  function eclat_getBit (arg: value) return value is
+    constant length: natural := arg'length-32;
+    variable r : unsigned (0 to length - 1);
+    constant n : unsigned (0 to 31) := unsigned(arg(length to arg'length - 1));
+    constant n_int: integer := to_integer(resize(n,31));
+    begin
+      r := unsigned(arg(0 to length-1));
+      --echo(integer'image(n_int));
+      --echo(" " &LF);
+      return value(r(length-1-n_int to length-1-n_int));
+    end;
+
+  function eclat_updateBit (arg: value) return value is
+    constant length: natural := (arg'length-1)-32;
+    variable r : unsigned (0 to length - 1);
+    constant n : integer range 0 to 31 := integer_of_value(arg(length to arg'length - 2));
+    constant z : natural := arg'length-1;
+    begin
+      r := unsigned(arg(0 to length-1));
+      r(length-1-n) := arg(z);
+      return value(r);
+    end;
+
+  function eclat_tuple_get(arg: value; k:integer) return value is
+    constant length: natural := (arg'length-32);
+    constant l: natural := length/k;
+    variable i : integer;
+    begin
+      i := to_integer(unsigned(arg(length to arg'length-1)));
+      return arg(l * i to (l * (i +1))-1);
+    end;
+
+  function eclat_tuple_update(arg: value; k:integer) return value is
+    constant length: natural := (arg'length-32);
+    constant l: natural := length/(k+1); -- size of each element in the tuple
+    variable i : integer;
+    variable r : value (0 to l*k-1);
+    begin
+      i := to_integer(unsigned(arg(l*k to arg'length-l-1)));
+      r := arg(0 to l*k-1);
+      r(l * i to l * (i + 1) - 1) := arg(arg'length-l to arg'length - 1);
+      return r;
+    end;
+
+
+  function eclat_size_val (arg: value) return value is
+    begin
+      return value(to_unsigned(arg'length,32));
+    end;
+  function eclat_size_create (arg: value) return value is
+    begin
+      return eclat_resize(arg,16);
+    end;
+
+  function eclat_vector_make (size:natural;arg: value) return value is
+    constant l: natural := arg'length;
+    variable r : value(0 to l*size-1);
+    begin
+      for k in 0 to size-1 loop
+        r(l*k to l*(k+1)-1) := arg;
+      end loop;
+      return value(r);
+    end;
+
+  function eclat_vector_get (arg: value;constant k:integer) return value is
+    constant length: natural := (arg'length-32);
+    constant i : natural := to_integer(unsigned(arg(length to arg'length-1)));
+    constant s : natural := k * i;
+    variable r : value(0 to k-1);
+    begin
+      for j in 0 to k - 1 loop
+        r(j) := arg(s+j);
+      end loop;
+      return r;
+    end;
+
+  function eclat_vector_update(arg: value; constant k:integer) return value is
+    constant length: natural := (arg'length-32);
+    constant l: natural := length/(k+1);
+    variable i : natural;
+    variable r : value (0 to l*k-1);
+    begin
+      i := to_integer(unsigned(arg(l*k to l*k+31))); 
+      r := arg(0 to l*k-1);
+
+      for j in 0 to l-1 loop
+        r(l*i+j) := arg(arg'length-l+j);
+      end loop;
+      return r;
+    end;
+
+ -- function eclat_vector_update(arg: value;k:integer) return value is
+   -- constant length: natural := (arg'length-16);
+ --   variable i : integer;
+   -- begin
+     -- i := to_integer(unsigned(arg(length to arg'length-1)));
+   --   return arg(k * i to (k * (i +1))-1);
+    --end;
+  --function eclat_size_val (arg: value) return value is
+  --  constant length: natural (arg'length);
+  --  begin
+  --    r := unsigned(length);
+  --    return value(r);
+  --  end;
+
   function eclat_id(arg : value) return value is
     begin 
       return arg;
@@ -390,7 +504,12 @@ package body runtime is
 
   procedure eclat_print_int(arg:value) is
     begin
-       echo(integer'image(to_integer(signed(arg))));
+      if arg'length <= 63 then
+        echo(integer'image(to_integer(signed(arg))));
+      else
+        echo("<resize>");
+        echo(integer'image(to_integer(resize(unsigned(arg),63))));
+      end if;
     end procedure;
 
   procedure eclat_print_newline(arg:value) is
