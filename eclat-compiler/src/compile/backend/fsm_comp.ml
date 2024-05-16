@@ -194,12 +194,30 @@ let rec to_s ~statics ~sums gs e x k =
   match e with
   | Ast.E_if(a,e1,e2) ->
       (* [IF] *)
+      (* ************************** *)
+      (* no use-less duplication: 
+         [assert(not(Combinational.combinational e1 && Combinational.combinational e2))] 
+       *)
+      (* ************************** *)
       let w1,ts1,s1 = to_s ~statics ~sums gs e1 x k in
       let w2,ts2,s2 = to_s ~statics ~sums gs e2 x k in
       let z = Ast.gensym () in
       (w1++>w2),(ts1 ++ ts2),S_letIn(z,to_a ~sums a,S_if(z,s1,Some s2))
   | E_case(a,hs,e_els) ->
       (* [MATCH (for integers)] *)
+      if ( k <> S_skip (* needed to ensure termination *) )
+         && 
+          (List.for_all (fun (_,e) -> Combinational.combinational e) hs 
+           && Combinational.combinational e_els)
+      then
+        (* ************************** *)
+        (* optimization avoiding the duplication of the continuation *)
+        let k_cut = S_skip in
+        let w,ts,s = to_s ~statics ~sums gs e x k_cut in
+        assert (SMap.is_empty ts);
+        w,ts,seq_ s k
+        (* ************************** *)  
+      else
       let ws,tss,hs' = Prelude.map_split3 (fun (c,e) ->
                          let w,ts,s = to_s ~statics ~sums gs e x k in
                          w,ts,(to_c c,s)
@@ -212,6 +230,19 @@ let rec to_s ~statics ~sums gs e x k =
       S_letIn(z,to_a ~sums a, S_case(z,hs',Some s1))
   | E_match(a,hs,eo) ->
       (* [MATCH] *)
+      if ( k <> S_skip (* needed to ensure termination *) )
+         && 
+           (List.for_all (fun (_,(_,e)) -> Combinational.combinational e) hs 
+            && (match eo with None -> true | Some e -> Combinational.combinational e)) 
+      then
+        (* ************************** *)
+        (* optimization avoiding the duplication of the continuation *)
+        let k_cut = S_skip in
+        let w,ts,s = to_s ~statics ~sums gs e x k_cut in
+        assert (SMap.is_empty ts);
+        w,ts,seq_ s k
+        (* ************************** *)
+      else
       let z2 = Ast.gensym () in
       let ws,tss,hs' = Prelude.map_split3 (fun (inj,(py,e)) ->
                          let y = match py with Ast.P_var y -> y | _ -> assert false in
@@ -441,11 +472,12 @@ let rec to_s ~statics ~sums gs e x k =
                      seq_ (S_in_fsm(id2,s2)) @@
                      S_continue q*)
 
-  | E_for _ -> assert false
+  | E_for _ -> assert false (* already expanded *)
  
   | E_fun _ | E_fix _ -> 
      (* can occur in case of higher order function that does not use its argument,
-        e.g.: [let rec f g = f g in f (fun x -> x)] *)
+        e.g.: [let rec f g = f g in f (fun x -> x)].
+        We can safely ignore it in this case *)
   SMap.empty,SMap.empty,return_ (set_ x (A_const Unit))
  
 
