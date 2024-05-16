@@ -1,19 +1,19 @@
 NS=50000   # number of clock cycles (for simulation)
 
 FLAGS=
-SRC=ocaml-vm/tests/fibo.ml
+SRC=tests/fibo.ml
 
 all: vm
 
 
-ECLAT_COMPILER=eclat-compiler
+ECLAT_COMPILER=../eclat-compiler
 OCAML_VM=ocaml-vm
 VM_FROM_ECLAT_COMPILER=../$(OCAML_VM)
-TARGET_DIR="target"
-GEN_BYTECODE_DIR=$(OCAML_VM)/gen_bytecode
+TARGET_DIR=../target
+GEN_BYTECODE_DIR=gen_bytecode
 
 byte:
-	(cd $(GEN_BYTECODE_DIR) ; make SRC=../../$(SRC))
+	(cd $(GEN_BYTECODE_DIR) ; make SRC=../$(SRC))
 
 
 CUSTOM=
