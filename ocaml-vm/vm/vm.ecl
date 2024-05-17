@@ -620,15 +620,15 @@ let config1 () =
 let print_cy = true ;;
 
 
-(** [await(i,reset)] sustains value true as soon as
-    input [i] is true until [reset] is false *)
-let await (i,reset) : bool =
-  let step(s) = (s or i) & not reset in
+(** [await(i,rst)] sustains value true as soon as
+    input [i] is true until [rst] is false *)
+let await (i,rst) : bool =
+  let step(s) = (s or i) & not rst in
   reg step last false ;;
 
-let load_bytecode (reset) =
+let load_bytecode (rst) =
   let ((),rdy) = exec config1 () default () in
-  await(rdy,reset) ;;
+  await(rdy,rst) ;;
 
 let ocaml_vm (button) =
   let step (_,_,init_done,led) =

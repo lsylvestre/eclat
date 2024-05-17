@@ -1,8 +1,8 @@
-(* [counter (reset)] is instantaneous,
+(* [counter (rst)] is instantaneous,
    it increments its output each time it is re-executed *)
-let counter (reset) =
+let counter (rst) =
   let inc(c) =
-    if reset then 0 else c + 1
+    if rst then 0 else c + 1
   in
   reg inc last 0 ;;
 
