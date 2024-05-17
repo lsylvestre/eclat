@@ -20,7 +20,7 @@ open Pattern
 (** [fv ~statics ~decls e] returns the free variables of [e] that are not
     global definitions (bound in ~static and ~decls) *)
 let fv ~statics e =
-  SMap.filter (fun x _ -> not (SMap.mem x statics)) (Free_vars.fv ~get_arrays:false e)
+  SMap.filter (fun x _ -> not (SMap.mem x statics)) (Free_vars.fv ~get_arrays:true e)
 
 (** [has_changed] boolean flag setted to true each time a [lift] pass modifies
     the input expression *)
