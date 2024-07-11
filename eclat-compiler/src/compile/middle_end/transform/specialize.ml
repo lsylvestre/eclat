@@ -111,20 +111,20 @@ let p_without_fun f p =
     try Hashtbl.find Typing.signatures f (* need to types the program before *) 
     with
     | Not_found ->
-       Types.unknown() (*TODO : check *) 
+       Types.new_ty_unknown() (*TODO : check *) 
   in
   let open Types in
-  let targ = match canon t with 
-             | T_fun{arg} -> arg
-             | _ -> Types.unknown() (* assert false ?*) 
+  let targ = match canon_ty t with 
+             | Ty_fun(arg,_,_) -> arg
+             | _ -> new_ty_unknown() (* assert false ?*) 
   in
   let rec remove_fun t p = 
-    match canon t,p with 
+    match canon_ty t,p with 
     | _,P_unit -> P_unit
-    | T_tuple ts,P_tuple ps -> 
+    | Ty_tuple ts,P_tuple ps -> 
         P_tuple (List.map2 remove_fun ts ps)
-    | T_fun{arg},_ -> P_unit
-    | T_var{contents=Ty t},p ->
+    | Ty_fun(arg,_,_),_ -> P_unit
+    | Ty_var{contents=Is t},p ->
         remove_fun t p
     | _ -> p
   in

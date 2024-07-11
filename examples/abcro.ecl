@@ -20,8 +20,8 @@
          concatenated and encoded in hexadimal
 *)
 
-let await (i,reset) =
-  let step s = (s or i) & not reset in
+let await (i,rst) =
+  let step s = (s or i) & not rst in
   reg step last false ;;
   
 let fby (a,b) =

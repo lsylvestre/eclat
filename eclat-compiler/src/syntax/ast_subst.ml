@@ -50,17 +50,6 @@ let subst_e x ex e =
     | E_array_set(y,e1,e2) ->
         let z = if x <> y then y else as_ident ex in
         E_array_set(z, ss e1, ss e2)
-    | E_local_static_matrix(e1,es,deco) ->
-        E_local_static_matrix(ss e1,List.map ss es,deco)
-    | E_matrix_size(y,n) ->
-        let z = if x <> y then y else as_ident ex in
-        E_matrix_size(z,n)
-    | E_matrix_get(y,es) ->
-        let z = if x <> y then y else as_ident ex in
-        E_matrix_get(z,List.map ss es)
-    | E_matrix_set(y,es,e2) ->
-        let z = if x <> y then y else as_ident ex in
-        E_matrix_set(z,List.map ss es, ss e2)
     | E_for(y,e_st1,e_st2,e3,loc) ->
        E_for(y,ss e_st1,ss e_st2,
              (if x = y then e3 else ss e3),loc)

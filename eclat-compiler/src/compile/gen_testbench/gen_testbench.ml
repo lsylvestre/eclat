@@ -2,7 +2,7 @@ open Format
 
 let size_ty_opt = function
 | None -> 1
-| Some t -> Gen_vhdl.size_ty t
+| Some t -> Gen_vhdl_aux.size_ty t
 
 let gen_testbench fmt ?(vhdl_comment="") typing_env name ty ((argument,ta),(result,tr)) (args_for_simul: _ list) =
   let argument_size = size_ty_opt ta in
@@ -35,7 +35,6 @@ architecture tb of tb_%s is
     port(
       signal clk    : in std_logic;
       signal reset  : in std_logic;
-      signal run    : in std_logic;
       signal rdy    : out value(0 to 0);
       signal %s : in value(0 to %d);
       signal result : out value(0 to %d)" argument (argument_size-1) (result_size-1);
@@ -43,12 +42,12 @@ architecture tb of tb_%s is
   fprintf fmt ");@,end component;";
 
   fprintf fmt "
-  signal tb_run: std_logic;
-  signal tb_argument: std_logic_vector(0 to %d);
+  signal tb_argument: std_logic_vector(0 to %d) := (others => '0');
   signal tb_result: std_logic_vector(0 to %d);
+  signal tb_next_result: std_logic_vector(0 to %d);
   signal tb_rdy: value(0 to 0);
   signal tb_clk: std_logic;
-  signal rst: std_logic;" (argument_size-1) (result_size-1);
+  signal rst: std_logic;" (argument_size-1) (result_size-1) (result_size-1);
 
   fprintf fmt "
   begin
@@ -70,25 +69,35 @@ architecture tb of tb_%s is
     wait for 5 ns;
   end process;
 
-  U1: main port map(tb_clk,rst,tb_run,tb_rdy,tb_argument,tb_result";
+  U1: main port map(tb_clk,rst,tb_rdy,tb_argument,tb_next_result";
 
   fprintf fmt ");";
+
+  fprintf fmt "
+      process (RST,tb_clk) 
+      begin
+        if RST = '1' then
+          tb_result <= (others => '0');
+        elsif (rising_edge(tb_clk)) then
+          tb_result <= tb_next_result;   -- resynchronize output
+        end if;
+      end process;@,";
+
+
   fprintf fmt "
   process
   ";
 
-
   Gen_vhdl.declare_variable ~argument:"tb_argument" ~statics:[] typing_env_tb fmt;
 
   fprintf fmt "begin
-    tb_run <= '0';
-    wait for 10 ns;
-    tb_run <= '1';
-      -- Start computation@,";
+
+      -- Start computation
+    wait for 5 ns;@,";
 
   List.iter (fun s_arg ->
     fprintf fmt "      @[<v>%a@]@," (Gen_vhdl.pp_s ~st:"fake") s_arg;
-    fprintf fmt "      tb_argument <= %a;@," Gen_vhdl.pp_ident tmp; (* (Gen_vhdl.default_zero_value argument_size);*)
+    fprintf fmt "      tb_argument <= %a;@," Gen_vhdl_aux.pp_ident tmp; (* (Gen_vhdl.default_zero_value argument_size);*)
     fprintf fmt "
       wait for 10 ns;
       while tb_rdy = \"0\" loop

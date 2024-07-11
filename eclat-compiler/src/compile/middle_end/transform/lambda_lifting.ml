@@ -249,19 +249,6 @@ let globalize_e (e:e) : ((x * e) list * e) =
         let ds1,e1' = glob e1 in
         let ds2,e2' = glob e2 in
         ds1@ds2,E_array_set(x,e1',e2')
-    | E_local_static_matrix(e1,es,loc) ->
-        let ds1,e1' = glob e1 in
-        let ds,es' = globalize_list es in
-        ds1@ds,E_local_static_matrix(e1',es',loc)
-    | E_matrix_size _ ->
-        [],e
-    | E_matrix_get(x,es) ->
-        let ds,es' = globalize_list es in
-        ds,E_matrix_get(x,es')
-    | E_matrix_set(x,es,e2) ->
-        let ds,es' = globalize_list es in
-        let ds2,e2' = glob e2 in
-        ds@ds2,E_matrix_set(x,es',e2')
     | E_par(es) ->
         let ds,es' = globalize_list es in
         ds,E_par(es')

@@ -46,7 +46,7 @@ let rec is_xc (e:e) : bool =
   | E_var _ | E_const _ -> true
   | E_tuple(es) -> List.for_all is_xc es
   | E_app(E_const(Op(GetTuple _)),e) -> is_xc e
-  | E_array_length _ | E_matrix_size _ -> true
+  | E_array_length _ -> true
   | _ -> false
 
 (** [plug e ctx] plugs expression [e] into context [ctx], i.e., returns
@@ -160,26 +160,6 @@ let rec anf (e:e) : e =
       ds1@ds2,plug e1' @@ fun xc1 ->
               plug e2' @@ fun xc2 ->
               E_array_set(x,xc1,xc2)
-  | E_local_static_matrix(e1,es,loc) ->
-      let ds1,e1' = glob e1 in
-      let dss,es' = List.split (List.map glob es) in
-      List.concat dss@ds1,
-      plug e1' @@ fun xc1 ->
-      plug_n es' @@ fun xs ->
-      E_local_static_matrix(xc1,xs,loc)
-  | E_matrix_size _ ->
-      [],e
-  | E_matrix_get(x,es) ->
-      let dss,es' = List.split (List.map glob es) in
-      List.concat dss,
-      plug_n es' @@ fun xs -> E_matrix_get(x,xs)
-  | E_matrix_set(x,es,e2) ->
-      let dss,es' = List.split (List.map glob es) in
-      let ds2,e2' = glob e2 in
-      List.concat dss@ds2,
-      plug_n es' @@ fun xs ->
-      plug e2' @@ fun xc2 ->
-      E_matrix_set(x,xs,xc2)
   | E_par(es) ->
       [],E_par(List.map anf es)
   (*| E_absLabel(l,e1) ->
@@ -210,6 +190,5 @@ let rec anf (e:e) : e =
 
 (** [anf e] puts program [pi] in ANF-form *)
 let anf_pi (pi:pi) : pi =
-  { pi with main = anf pi.main } (*
-  { pi with main = anf pi.main }*)
+  { pi with main = anf pi.main }
 

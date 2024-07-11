@@ -31,6 +31,7 @@
        "or",    OR;
        "mod",   MOD;
        "last",  LAST;
+       "init",  LAST;
        "default",  DEFAULT;
        "static", STATIC;
        "match", MATCH;
@@ -66,7 +67,6 @@
        "create", CREATE;
        "length", LENGTH;
        "size_create", SIZE_CREATE;
-       "vect_create", VECTOR_CREATE;
        "vect_mapi", VECTOR_MAPI;
        "int_mapi", INT_MAPI
      ]
@@ -135,6 +135,7 @@ rule token = parse
 | "="                 { EQ }
 | ":="                { COL_EQ }
 | "!"                 { BANG }
+| "?"                 { QUESTION_MARK }
 | "!=" | "<>"         { NEQ }
 | "&&"                { AMP_AMP }
 | "&"                 { AMP }

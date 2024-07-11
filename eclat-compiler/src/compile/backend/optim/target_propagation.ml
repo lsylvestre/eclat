@@ -1,6 +1,6 @@
 open Fsm_syntax
 
-let verbose_mode = ref true
+let verbose_mode = ref false
 
 let when_propagate x =
   if !verbose_mode then Printf.printf "Name %s has been propagated\n" x
@@ -18,7 +18,7 @@ let rec prop env a =
   | A_letIn(x,a1,a2) ->
       let a1' = prop env a1 in
       if propagable a1' then
-       (Printf.printf "--4--> %s\n" x; prop (SMap.add x a1' env) a2) else A_letIn(x,a1',prop env a2)
+       (prop (SMap.add x a1' env) a2) else A_letIn(x,a1',prop env a2)
   | A_tuple(aas) ->
       A_tuple(List.map (prop env) aas)
   | A_call(op,a1) ->
@@ -27,11 +27,11 @@ let rec prop env a =
   | A_ptr_write_taken _
   | A_string_get _
   | A_buffer_get _
-  | A_buffer_length _
-  | A_buffer_matrix_length _
-  | A_encode _
-  | A_decode _ ->  (* no sub-atoms*)
-      a
+  | A_buffer_length _ -> a
+  | A_encode(x,_,_) | A_decode(x,_) -> 
+      (match SMap.find_opt x env with
+      | None -> a
+      | Some a1 -> A_letIn(x,a1,a))
   | A_vector aas -> A_vector(List.map (prop env) aas)
 
 let rec prop_s env s =
@@ -45,10 +45,11 @@ let rec prop_s env s =
       S_case(x, List.map (fun (c,s) -> c, prop_s env s) hs,Option.map (prop_s env) so)
   | S_set(x,a) ->
       S_set(x,prop env a)
-  | S_buffer_set _
-  | S_setptr_read _ | S_setptr_write _ 
-  | S_setptr_matrix_read _ | S_setptr_matrix_write _ 
-  | S_ptr_take _ | S_ptr_write_take _-> s
+  | S_acquire_lock _ | S_release_lock _ -> s
+  | S_write_start _
+  | S_write_stop _
+  | S_read_start _ 
+  | S_read_stop _ -> s
   | S_seq(s1,s2) -> S_seq(prop_s env s1,prop_s env s2)
   | S_letIn(x,a1,s1) ->
       let a1' = prop env a1 in

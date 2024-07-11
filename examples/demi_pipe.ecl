@@ -16,9 +16,12 @@ let demi_pipe(id,go,f,src,dst) =
   in loop(0) ;;
 
 let pipe4 ((f1,f2,f3,f4),(src,dst)) =
-  let tmp1 = (0,false)^100 in
-  let tmp2 = (0,false)^100 in
-  let tmp3 = (0,false)^100 in
+  let tmp1 = array_create 100 in
+  let tmp2 = array_create 100 in
+  let tmp3 = array_create 100 in
+  set(tmp1,0,(0,false));
+  set(tmp2,0,(0,false));
+  set(tmp3,0,(0,false));
   let () = demi_pipe(0,true,f1,src,tmp1)
   and () = demi_pipe(1,false,f2,tmp1,tmp2)
   and () = demi_pipe(2,false,f3,tmp2,tmp3)

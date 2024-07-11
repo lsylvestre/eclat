@@ -16,10 +16,9 @@ let rec list_machines_s s =
   | S_letIn(x,a,s) ->
       S_letIn(x,a,list_machines_s s)
   | S_set _ -> s
-  | S_setptr_read _ | S_setptr_write _ 
-  | S_setptr_matrix_read _ | S_setptr_matrix_write _ 
-  | S_ptr_take _ | S_ptr_write_take _ -> s
-  | S_buffer_set _ -> s
+  | S_acquire_lock _ | S_release_lock _
+  | S_read_start _ | S_read_stop _ 
+  | S_write_start _  | S_write_stop _ -> s
   | S_seq(s1,s2) ->
       seq_ (list_machines_s s1)
            (list_machines_s s2)

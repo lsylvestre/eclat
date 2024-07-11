@@ -9,7 +9,7 @@ let check_bound e x eidx len =
   let x = gensym () in
   E_letIn(P_var x,eidx,
   E_if(E_app(E_const(Op(Runtime(And))),
-            E_tuple[E_app(E_const(Op(Runtime(Ge))),E_tuple[E_var x;E_const(Int(0,Types.unknown()))]);
+            E_tuple[E_app(E_const(Op(Runtime(Ge))),E_tuple[E_var x;E_const(Int(0,Types.new_size_unknown()))]);
                     E_app(E_const(Op(Runtime(Lt))),E_tuple[E_var x;len])]),
             e,(E_app(E_var stop,E_const Unit))))
 
@@ -26,7 +26,7 @@ let rec insert e =
        let x = gensym () in
        let idx = gensym () in
        E_letIn(P_tuple[P_var x;P_var idx],ee,
-       bound_mod c e x (E_var idx) (E_app(E_const(Op(Runtime(Operators.Vector_length (Types.unknown(),Types.unknown())))),E_var x)))
+       bound_mod c e x (E_var idx) (E_app(E_const(Op(Runtime(Operators.Vector_length (Types.new_size_unknown(),Types.new_size_unknown())))),E_var x)))
   | E_app(E_const(Op(Runtime(Vector_update t))),E_tuple[E_var x;eidx;_]) ->
        e (*
        check_bound e x eidx (E_app(E_const(Op(Runtime(Operators.Vector_length (Types.unknown(),Types.unknown())))),E_var x))

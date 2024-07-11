@@ -88,19 +88,6 @@ let rec lfloat (e:e) : e =
       let ds1,e1' = glob e1 in
       let ds2,e2' = glob e2 in
       ds1@ds2,E_array_set(x,e1',e2')
-  | E_local_static_matrix(e1,es,loc) ->
-      let ds1,e1' = glob e1 in
-      let dss,es' = List.split (List.map glob es) in
-      List.concat dss@ds1, E_local_static_matrix(e1',es',loc)
-  | E_matrix_size _ ->
-      [],e
-  | E_matrix_get(x,es) ->
-      let dss,es' = List.split (List.map glob es) in
-      List.concat dss,E_matrix_get(x,es')
-  | E_matrix_set(x,es,e2) ->
-      let dss,es' = List.split (List.map glob es) in
-      let ds2,e2' = glob e2 in
-      List.concat dss@ds2,E_matrix_set(x,es',e2')
   | E_par(es) ->
       [],E_par(List.map lfloat es)
   | E_for(x,e_st1,e_st2,e3,loc) ->

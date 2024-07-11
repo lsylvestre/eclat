@@ -17,7 +17,7 @@ let mk_fun_ty_annot p ty_f_opt e =
 let mk_fun_ty_annot_p p ty_p_opt e =
   match ty_p_opt with
   | None -> mk_fun p e
-  | Some ty -> (ty_annot ~ty:(fun_ty ty (unknown()) (unknown())) (mk_fun p e))
+  | Some ty -> (ty_annot ~ty:(Ty_fun(ty,new_dur_unknown(),new_tyB_unknown())) (mk_fun p e))
 
 (* to buid expression [fun (p : t) -> (e : t')] from
    a declaration [let f (p : t) : t' =  e] *)
@@ -25,7 +25,7 @@ let mk_let_fun ~loc ~p_ty_opt ~ty_opt_ret e =
   let p,ty_f_opt =
     match p_ty_opt with
     | p,None -> p,None
-    | p,Some t -> p,Some (fun_ty t (unknown()) (unknown()))
+    | p,Some t -> p,Some (Ty_fun(t,new_dur_unknown(),new_tyB_unknown()))
   in
   mk_fun_ty_annot p ty_f_opt (ty_annot_opt ~ty:ty_opt_ret e)
   |> mk_loc loc
@@ -35,12 +35,8 @@ let mk_let_fun ~loc ~p_ty_opt ~ty_opt_ret e =
      to the binding {p |-> (fun x -> e)} enforcing (fun x -> e)
      to be instantaneous. *)
 let enforce_node (p,e) =
-  p, ty_annot ~ty:(fun_ty (unknown()) (T_response_time 0) (unknown())) e
+  p, ty_annot ~ty:(Ty_fun(new_ty_unknown(),Dur_zero,new_tyB_unknown())) e
 
-
-(* [fresh_node ()] returns a fresh type of instantaneous function *)
-let fresh_node () =
-  fun_ty (unknown()) (T_response_time 0) (unknown())
 
 let rec mk_fix (f:x) (e:e) loc : e =
   match e with

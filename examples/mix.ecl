@@ -29,10 +29,10 @@
          concatenated and encoded in hexadimal
 *)
 
-let main (a,b,reset) =
+let main (a,b,rst) =
   let (x,rdy) = exec 
                   gcd(a,b) 
                 default 0 in
-  let r = rdy or reset in
+  let r = rdy or rst in
   let c = counter(r) in
   (x,c) ;;

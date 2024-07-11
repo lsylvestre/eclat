@@ -20,17 +20,7 @@ type 'a pp = fmt -> 'a -> unit
 let parenthesize ~(paren:bool) (pp:'a pp) (fmt:fmt) (a:'a) : unit =
  if paren then fprintf fmt "(%a)" pp a else pp fmt a
 
-
-(** [size_is_not_zero ty] returns true iff [ty] a size type of size 0,
-    e.g., [max(0,0+0)]. *)
-let rec size_is_not_zero (ty:ty) : bool =
-  match ty with
-  | T_size n -> n > 0
-  | T_add(t1,t2) | T_max(t1,t2) -> size_is_not_zero t1 || size_is_not_zero t2
-  | T_var _ -> false
-  | _ -> false
-
-
+(*
 (** pretty printer for types *)
 let pp_ty (fmt:fmt) (ty:ty) : unit =
   let h_assoc_tvars = Hashtbl.create 10 in
@@ -132,7 +122,7 @@ let pp_ty (fmt:fmt) (ty:ty) : unit =
       )fmt ()
   in
   pp_type ~paren:false fmt ty
-
+*)
 
 (** pretty printer for identifiers *)
 let pp_ident (fmt:fmt) (x:x) : unit =
@@ -172,13 +162,14 @@ let pp_vector (fmt:fmt) pp vs =
         pp fmt vs;
   fprintf fmt "|]"
 
+
 (** pretty printer for constants *)
 let rec pp_const (fmt:fmt) (c:c) : unit =
   match c with
   | Int (n,tz) ->
       fprintf fmt "(";
       if !hexa_int_pp_flag then fprintf fmt "0x%x" n else fprintf fmt "%d" n;
-      fprintf fmt " : int<%a>)" pp_ty tz
+      fprintf fmt " : int<%a>)" pp_size tz
   | Bool b -> fprintf fmt "%b" b
   | Unit -> fprintf fmt "()"
   | String s -> fprintf fmt "\"%s\"" s
@@ -194,7 +185,8 @@ let rec pp_const (fmt:fmt) (c:c) : unit =
   | C_size n -> fprintf fmt "size<%d>" n
   | Inj x ->
       fprintf fmt "%s" x
-
+  | C_appInj(x,c,_) ->
+      fprintf fmt "%s(%a)" x pp_const c
 (** pretty printer for patterns *)
 let rec pp_pat (fmt:fmt) (p:p) : unit =
   match p with
@@ -231,10 +223,15 @@ let pp_exp (fmt:fmt) (e:e) : unit =
           (pp_e ~paren:false) e1
           (pp_e ~paren:false) e2) fmt ()
   | E_case(e,hs,e_els) ->
+      let pp_cs fmt cs =
+         pp_print_list
+        ~pp_sep:(fun fmt () -> fprintf fmt " | ")
+          pp_const fmt cs
+      in 
       fprintf fmt "(@[<v>match %a with@,%a@,| _ -> %a@])"
         (pp_e ~paren:false) e
         (pp_print_list
-            (fun fmt (c,e) -> fprintf fmt "| %a -> %a" pp_const c (pp_e ~paren:false) e))
+            (fun fmt (cs,e) -> fprintf fmt "| %a -> %a" pp_cs cs (pp_e ~paren:false) e))
          hs
         (pp_e ~paren:false) e_els
   | E_match(e,hs,eo) ->
@@ -294,26 +291,6 @@ let pp_exp (fmt:fmt) (e:e) : unit =
           pp_ident x
           (pp_e ~paren:false) e1
           (pp_e ~paren:false) e2) fmt ()
-  | E_local_static_matrix(e1,es,_) ->
-     fprintf fmt "%a" (pp_e ~paren:true) e1;
-     List.iter (fun e -> fprintf fmt "^%a" (pp_e ~paren:true) e) es
-  | E_matrix_size(x,n) ->
-      fprintf fmt "@[<v>%a.(%d).size@]"
-        pp_ident x n
-  | E_matrix_get(x,es) ->
-      fprintf fmt "@[<v>";
-      pp_ident fmt x;
-      List.iter (fun e -> 
-        fprintf fmt ".(%a)" (pp_e ~paren:false) e
-      ) es;
-      fprintf fmt "@]";
-  | E_matrix_set(x,es,e2) ->
-      fprintf fmt "@[<v>";
-      pp_ident fmt x;
-      List.iter (fun e -> 
-        fprintf fmt ".(%a)" (pp_e ~paren:false) e
-      ) es;
-      fprintf fmt " <- %a@]" (pp_e ~paren:false) e2;
   | E_par(es) ->
       fprintf fmt "(";
       pp_print_list
@@ -350,9 +327,6 @@ let pp_static (fmt:fmt) (g:static) : unit =
       fprintf fmt "array of %a" pp_ty t
   | Static_array(c,n) ->
       fprintf fmt "(%a)^%d" pp_const c n
-  | Static_matrix(c,n_list) ->
-      fprintf fmt "(%a)" pp_const c;
-      List.iter (fun n -> fprintf fmt "^%d" n) n_list 
   | Static_const(c) ->
       fprintf fmt "(%a)" pp_const c
 

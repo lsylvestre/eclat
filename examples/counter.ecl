@@ -25,8 +25,8 @@
 
 *)
 
-let counter(reset) =
+let counter(rst) =
   let inc(c) = 
-    if reset then 0 else c + 1 
+    if rst then 0 else c + 1 
   in
-  reg inc last 0 ;;
+  reg inc init 0 ;;

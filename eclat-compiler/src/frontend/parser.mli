@@ -6,7 +6,6 @@ type token =
   | WITH
   | WHEN
   | VECTOR_MAPI
-  | VECTOR_CREATE
   | UP_IDENT of (string)
   | UNROLL
   | TYPE
@@ -33,6 +32,7 @@ type token =
   | REC
   | RBRACKET
   | QUOTE
+  | QUESTION_MARK
   | PLUS
   | PIPE_RBRACKET
   | PIPE_PIPE
@@ -114,9 +114,7 @@ exception Error
 
 (* The monolithic API. *)
 
-val pi: (Lexing.lexbuf -> token) -> Lexing.lexbuf -> ((Ast.x * Ast.static) list * (Ast.x * (Ast.x * Types.sz) list) list *
+val pi: (Lexing.lexbuf -> token) -> Lexing.lexbuf -> ((Ast.x * Ast.static) list * (Ast.x * (Ast.x * Types.tyB) list) list *
   ((Ast.p * Ast.e_static) * Prelude.loc) list)
 
 val exp_eof: (Lexing.lexbuf -> token) -> Lexing.lexbuf -> (Ast.e_static)
-
-val decl_opt: (Lexing.lexbuf -> token) -> Lexing.lexbuf -> (((Ast.p * Ast.e_static) * Prelude.loc) option)

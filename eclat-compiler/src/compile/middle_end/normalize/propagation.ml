@@ -27,6 +27,20 @@ let linear_bindings (e:e) : set =
   Hashtbl.fold keep h SMap.empty
 
 
+let linear_bindings2 x (e:e) : bool =
+  let r = ref 0 in
+  let exception Found in
+  let rec aux e = match e with
+  | E_deco(e,_) ->
+      aux e
+  | E_var y ->  
+      if x = y then ((if !r > 0 then (raise Found)); incr r)
+  | E_const _ ->
+      ()
+  | _ -> Ast_mapper.iter aux e
+  in
+  try aux e; true with Found -> false
+
 
 let rec simple_atom e =
   match e with
@@ -37,8 +51,14 @@ let rec simple_atom e =
 
 
 let propagation e =
-  let propagable e =
-    if !flag_propagate_combinational_linear then Combinational.combinational e else
+  let _propagable e =
+    if !flag_propagate_combinational_linear then Instantaneous.combinational e 
+                                  && (SMap.cardinal (linear_bindings e) <= 1) else
+    simple_atom e 
+  in
+  let propagable2 x e =
+    if !flag_propagate_combinational_linear then Instantaneous.combinational e 
+                                  && linear_bindings2 x e else
     simple_atom e 
   in
   let rec prop e =
@@ -47,7 +67,7 @@ let propagation e =
         prop @@ List.fold_right2 (fun pi ei e -> E_letIn(pi,ei,e)) ps es e2
     | E_letIn(P_var x as p,e1,e2) ->
         let e1' = prop e1 in
-        if propagable e1'
+        if propagable2 x e1'
         then prop (subst_p_e p e1' e2)
         else E_letIn(p,e1',prop e2)
     | E_letIn(p,e1,e2) ->

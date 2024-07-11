@@ -13,7 +13,7 @@ type op =
   | Resize_int of int
   | Tuple_of_int of int
   | Int_of_tuple of int
-  | Size_of_val of Types.ty * Types.ty 
+  | Size_of_val of Types.ty * Types.size  (* ty * size_int *)
   | String_length
 
   | GetBit
@@ -22,95 +22,25 @@ type op =
   | Unroll of int (* experimental *)
 
   | Vector_make
-  | Vector_length of Types.ty * Types.ty
-  | Vector_get of Types.ty
-  | Vector_update of Types.ty
+  | Vector_length of Types.size * Types.size  (* size * size_int *)
+  | Vector_get of Types.tyB
+  | Vector_update of Types.size
 
   (* for simulation only *)
   | Print | Print_string | Print_int | Print_newline | Assert
 
+  | Bvect_of_int
+  | Int_of_bvect
 
 let combinational p =
   match p with
   | Print | Print_string | Print_int | Print_newline | Assert -> false
   | _ -> true
 
-let ty_op op =
-  let open Types in
-  match op with
-  | Abs ->
-      let sz = unknown() in
-      let t = tint sz in
-      t ==> t
-  | Add|Sub|Mult|Div|Mod|Land|Lor|Lxor|Lsl|Lsr|Asr ->
-      let sz = unknown() in
-      let t = tint sz in
-      (T_tuple[t;t]) ==> t
-  | Lt|Gt|Le|Ge|Eq|Neq ->
-      let sz = unknown() in
-      let t = tint sz in
-      (T_tuple[t;t]) ==> tbool
-  | Not ->
-      tbool ==> tbool
-  | And|Or|Xor ->
-      (T_tuple[tbool;tbool]) ==> tbool
-  | Resize_int k ->
-      let sz = unknown() in
-      (tint sz) ==> tint (T_size k)
-  | Tuple_of_int k ->
-      let t = T_tuple (List.init k (fun _ -> tbool)) in
-      tint (T_size k) ==> t
-  | Int_of_tuple k ->
-      let t = T_tuple (List.init k (fun _ -> tbool)) in
-      t ==> tint (T_size k)
-  | GetBit ->
-      let sz = unknown() in
-      let t = tint sz in
-      (T_tuple [t;tint (T_size(32))]) ==> tbool
-  | UpdateBit ->
-      let sz = unknown() in
-      let t = tint sz in
-      (T_tuple [t;tint (T_size(32));tbool]) ==> t
-  | Unroll _ ->
-      let v = unknown() in
-      let d = unknown() in
-      let v' = unknown() in
-      fun_ty (T_tuple[fun_ty v d v'; v]) d v'
-  | Vector_make ->
-      let v = unknown() in
-      let v' = unknown() in
-      (T_tuple[v; v']) ==> T_vector{size=v;elem=v'}
-  | Vector_length (sz,sz_res) ->
-      let v = unknown() in
-      (T_vector{size=sz;elem=v}) ==> tint sz_res
-  | Vector_get v ->
-      let sz = unknown() in
-      (T_tuple[T_vector{size=sz;elem=v}; tint (T_size 32)]) ==> v
-  | Vector_update sz ->
-      let v = unknown() in
-      let t = T_vector{size=sz;elem=v} in
-      (T_tuple[t; tint (T_size 32);v]) ==> t
-  | Size_of_val (ty,tsz) ->
-      ty ==> tint tsz
-  | Print ->
-      (unknown()) ==> tunit
-  | Print_string ->
-      (T_string (unknown())) ==> tunit
-  | Print_int ->
-      (tint (unknown())) ==> tunit
-  | Print_newline ->
-      tunit ==> tunit
-  | Assert ->
-      tbool ==> tunit
-  | String_length ->
-      (* enforce result to be a 16-bit integer *)
-      let tz_int = T_size 16 in
-      (T_string(unknown ())) ==> (tint tz_int)
-
 
 (* improved typing with level of types *)
 let ty_op2 op =
-  let open Types.Ty in
+  let open Types in
   match op with
   | Abs ->
       let sz = new_size_unknown() in
@@ -169,18 +99,15 @@ let ty_op2 op =
       let sz = new_size_unknown() in
       let v = new_tyB_unknown() in
       Ty_fun(Ty_base (TyB_tuple[TyB_size sz;v]),Dur_zero,TyB_vector(sz,v))
-  | Vector_length (_sz,_sz_res) ->
-      let sz = new_size_unknown() in (* todo: unify sz and _sz, iem for _sz_res *)
+  | Vector_length (sz,sz_res) ->
       let v = new_tyB_unknown() in
-      let sz_int = new_size_unknown() in
+      let sz_int = sz_res in
       Ty_fun(Ty_base(TyB_vector(sz,v)),Dur_zero,TyB_int sz_int)
-  | Vector_get _ ->
+  | Vector_get v ->
       let sz = new_size_unknown() in
-      let v = new_tyB_unknown() in
       Ty_fun(Ty_base (TyB_tuple[TyB_vector(sz,v);
                                 TyB_int (Sz_lit 32)]),Dur_zero,v)
-  | Vector_update _ ->
-      let sz = new_size_unknown() in
+  | Vector_update sz ->
       let v = new_tyB_unknown() in
       let t = TyB_vector(sz,v) in
       Ty_fun(Ty_base (TyB_tuple[t;TyB_int (Sz_lit 32);v]),Dur_zero,t)
@@ -190,7 +117,13 @@ let ty_op2 op =
       (* enforce result to be a 16-bit integer *)
       let sz = new_size_unknown() in
       Ty_fun(Ty_base (TyB_string(sz)),Dur_zero,TyB_int (Sz_lit 16))
-
+  | Bvect_of_int ->
+       let sz = new_size_unknown() in
+       Ty_fun(Ty_base(TyB_int(sz)),Dur_zero,TyB_vector(sz,TyB_bool))
+  | Int_of_bvect ->
+       let sz = new_size_unknown() in
+       Ty_fun(Ty_base(TyB_vector(sz,TyB_bool)),Dur_zero,TyB_int(sz))
+  
 
 (** pretty printer for operators *)
 let pp_op fmt (op:op) : unit =
@@ -235,14 +168,16 @@ let pp_op fmt (op:op) : unit =
   | Print_newline -> "print_newline"
   | Assert -> "assert"
   | String_length -> "string_length"
-
+  | Bvect_of_int -> "Bvect_of_int"
+  | Int_of_bvect -> "int_of_bvect"
+  
 
 
 (** code generator for operators *)
 let gen_op fmt (op:op) pp a : unit =
   let open Format in
   let funcall fmt s = fprintf fmt "%s(%a)" s pp a in
-  let procall fmt s = fprintf fmt "%s(%a)" s pp a in
+  let procall fmt s = fprintf fmt "if rising_edge(clk) then %s(%a); end if" s pp a in
   let skip_when b fmt f s =
     if b then fprintf fmt "eclat_skip(eclat_unit)"
     else f fmt s 
@@ -306,3 +241,5 @@ let gen_op fmt (op:op) pp a : unit =
               pp a) ()
   | String_length ->
       procall fmt "eclat_string_length"
+  | Bvect_of_int -> funcall fmt "eclat_bvect_of_int"
+  | Int_of_bvect -> funcall fmt "eclat_int_of_bvect"

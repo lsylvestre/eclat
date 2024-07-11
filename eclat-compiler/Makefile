@@ -28,6 +28,7 @@ MENHIR=menhir --unused-tokens --unused-precedence-levels --infer --ocamlc "ocaml
 OBJS= $(SRC_DIR)/prelude.cmx \
       \
       $(SRC_DIR)/frontend/current_filename.cmx \
+      $(SRC_DIR)/compile/backend/flag_mealy.cmx \
       \
       $(SRC_DIR)/typing/types.cmx \
       $(SRC_DIR)/operators.cmx \
@@ -44,7 +45,7 @@ OBJS= $(SRC_DIR)/prelude.cmx \
       \
       $(SRC_DIR)/frontend/fix_int_lit_size.cmx \
       \
-      $(SRC_DIR)/compile/combinational.cmx \
+      $(SRC_DIR)/compile/instantaneous.cmx \
       $(SRC_DIR)/typing/typing.cmx \
       $(SRC_DIR)/syntax/ast_mk.cmx \
       $(SRC_DIR)/compile/middle_end/check_tail_call.cmx \
@@ -85,12 +86,15 @@ OBJS= $(SRC_DIR)/prelude.cmx \
       $(SRC_DIR)/compile/backend/optim/target_propagation.cmx \
       $(SRC_DIR)/compile/backend/optim/remove_assigned_but_not_read_vars.cmx \
       \
+      $(SRC_DIR)/compile/backend/gen_vhdl_aux.cmx \
       $(SRC_DIR)/compile/backend/gen_vhdl.cmx \
+      $(SRC_DIR)/compile/backend/gen_vhdl_moore.cmx \
       \
       $(SRC_DIR)/compile/compile.cmx \
       $(SRC_DIR)/compile/gen_testbench/gen_testbench.cmx\
       \
       $(SRC_DIR)/interp/norm.cmx \
+      $(SRC_DIR)/interp/special_subst.cmx \
       $(SRC_DIR)/interp/interp.cmx \
       \
       $(SRC_DIR)/frontend/parser.cmx \

@@ -6,14 +6,14 @@ let wrap_fix_in_fun e =
   let rec aux env e = match e with
   | E_letIn(P_var f, E_fix(f',(p,e1)), e2) ->
       ((* Printf.printf "-->%s / %s\n" f f'; *)
-       let t = try Hashtbl.find Typing.signatures f with Not_found -> Types.unknown() (*TODO : check *) in
+       let t = try Hashtbl.find Typing.signatures f with Not_found -> Types.new_ty_unknown() (*TODO : check *) in
        let open Types in
-       let targ = match canon t with T_fun{arg} -> arg | _ -> Types.unknown() (* assert false*) in
-       let rec has_ref t = match canon t with 
-        | T_ref _ | T_array _ -> true 
-        | T_tuple ts -> List.exists has_ref ts
-        | T_fun{arg} -> has_ref arg (* warning: should not happen *)
-        | T_var{contents=Ty t} -> has_ref t
+       let targ = match canon_ty t with Ty_fun(arg,_,_) -> arg | _ -> Types.new_ty_unknown() (* assert false*) in
+       let rec has_ref t = match canon_ty t with 
+        | Ty_ref _ | Ty_array _ -> true 
+        | Ty_tuple ts -> List.exists has_ref ts
+        | Ty_fun(arg,_,_) -> has_ref arg (* warning: should not happen *)
+        | Ty_var{contents=Is t} -> has_ref t
         | _ -> false in
         
         
@@ -29,14 +29,14 @@ let wrap_fix_in_fun e =
      | Some (None, targ) -> 
        let open Types in
             let rec aux2 t e = (* Printf.printf "====>--\n"; *)
-             let t = match canon t with T_var{contents=Ty t} -> t | t -> t in  
+             let t = match canon_ty t with Ty_var{contents=Is t} -> t | t -> t in  
              (* Format.fprintf Format.std_formatter "%s -- /////////////// %a\n" g Ast_pprint.pp_ty t;
              Format.fprintf Format.std_formatter "%s -- /////////////// %a\n" g Ast_pprint.pp_exp e;*)
              match (t,e) with
              | _,E_const _ -> e
-             | (T_ref _ | T_array _),E_var _ -> E_const Unit
-             | (T_ref _ | T_array _),_ -> assert false
-             | T_tuple ts, E_tuple es ->
+             | (Ty_ref _ | Ty_array _),E_var _ -> E_const Unit
+             | (Ty_ref _ | Ty_array _),_ -> assert false
+             | Ty_tuple ts, E_tuple es ->
                 let rec loop acce ts es =
                   match ts,es with
                   | [],_|_,[] -> 
@@ -51,12 +51,12 @@ let wrap_fix_in_fun e =
      | Some (Some (E_fix(f,(p,e0))), targ) -> 
             let open Types in
             let rec aux2 t p e = 
-             let t = match canon t with T_var{contents=Ty t} -> t | t -> t in
+             let t = match canon_ty t with Ty_var{contents=Is t} -> t | t -> t in
              (* Format.fprintf Format.std_formatter "-- /////////////// %a\n" Ast_pprint.pp_ty t; *)
              match (t,p,e) with
              | _,P_unit,_ -> P_unit,e
-             | (T_ref _ | T_array _ ),P_var x,E_var y -> P_unit, E_const Unit
-             | T_tuple ts, P_tuple ps, E_tuple es ->
+             | (Ty_ref _ | Ty_array _ ),P_var x,E_var y -> P_unit, E_const Unit
+             | Ty_tuple ts, P_tuple ps, E_tuple es ->
                 let rec loop accp acce ts ps es =
                   match ts,ps,es with
                   | [],_,_|_,[],_|_,_,[] -> 

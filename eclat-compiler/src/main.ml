@@ -16,9 +16,7 @@ let interp_flag = ref false
 let top_flag = ref false
 let simul_flag = ref true
 
-let typing_with_tyB = ref true
-
-let prop_fsm_flag = ref false
+let prop_fsm_flag = ref true
 
 let tailrec_check_flag = ref true
 
@@ -74,8 +72,6 @@ let () =
 
     ("-ty",       Arg.Set show_ty_and_exit_flag,
                   "type and exit.");
-    ("-notyB",      Arg.Clear typing_with_tyB,
-                  "do not run an additional type checking phase.");
     ("-no-tailrec-check", Arg.Clear tailrec_check_flag,
                   "do not check that recursive functions are tail-recursive");
     ("-pp",      Arg.String Display_internal_steps.set_print_mode,
@@ -150,7 +146,9 @@ let () =
 
     ("-nb-it", Arg.Set_int nb_iterations_interp,
                "Number of reactions for interpretation");
-
+   ("-moore", Arg.Clear Flag_mealy.mealy_flag,
+               "force the generated circuit to be a Moore Finite State Machine (default: Mealy)");
+    
     ]
       add_input "Usage:\n  ./eclat file"
 ;;
@@ -159,7 +157,7 @@ let main () : unit =
   (** Lexing/parsing of source code *)
   let (pi,arg_list) =
       Frontend.frontend ~inputs:!inputs !top_flag
-                        ~when_repl:Typing.Typing2.when_repl
+                        ~when_repl:Typing.when_repl
                         ~relax:!Typing.relax_flag
                         !Ast_mk.main_symbol
                         !arguments
@@ -172,15 +170,12 @@ let main () : unit =
   end;
 
   (** Typing *)
-  if !typing_with_tyB then
-    (let _,_ = Typing.Typing2.typing ~collect_sig:false ~statics:pi.statics ~sums:[] pi.main in
-     ());
   let (ty,response_time) = Typing.typing_with_argument pi arg_list in
 
   (** Type only, when [show_ty_and_exit_flag] is setted. *)
   if !show_ty_and_exit_flag then begin
     let open Ast_pprint in
-    Format.fprintf Format.std_formatter "@,%a\n" pp_ty ty;
+    Format.fprintf Format.std_formatter "@,%a\n" Types.pp_ty ty;
     exit 0;
   end;
 

@@ -17,7 +17,6 @@ let rec flat = function
 | A_ptr_taken _
 | A_ptr_write_taken _
 | A_buffer_length _
-| A_buffer_matrix_length _
 | A_encode _
 | A_decode _ as a ->  (* no sub-atoms*)
     [],a
@@ -40,30 +39,20 @@ let rec flat_s s =
   | S_set(x,a) ->
      let bs,a' = flat a in
      s_let_bindings bs @@ S_set(x,a')
-  | (S_buffer_set _) as s -> (* no sub-instructions *)
-     s
-  | S_setptr_read(x,a) ->
+  | S_read_start(x,a) ->
       let bs,a' = flat a in
       s_let_bindings bs @@
-      S_setptr_read(x,a')
-  | S_setptr_write(x,a,a_upd) ->
+      S_read_start(x,a')
+  | S_acquire_lock _ | S_release_lock _ -> s
+  | S_read_stop(x,l) ->
+      s
+  | S_write_start(x,a,a_upd) ->
       let bs,a' = flat a in
       let bs2,a_upd' = flat a_upd in
       s_let_bindings bs @@
       s_let_bindings bs2 @@
-      S_setptr_write(x,a',a_upd')
-  | S_setptr_matrix_read(x,aaas) ->
-      let bss,aas' = List.map flat aaas |> List.split in
-      s_let_bindings (List.concat bss) @@
-      S_setptr_matrix_read(x,aas')
-  | S_setptr_matrix_write(x,aaas,a2) ->
-      let bss,aas' = List.map flat aaas |> List.split in
-      let bs2,a2' = flat a2 in
-      s_let_bindings ((List.concat bss)@bs2) @@
-      S_setptr_matrix_write(x,aas',a2')
-  | S_ptr_take(x,_) 
-  | S_ptr_write_take(x,_) ->
-      s
+      S_write_start(x,a',a_upd')
+  | S_write_stop _ -> s
   | S_seq(s1,s2) -> S_seq(flat_s s1,flat_s s2)
   | S_letIn(x,a,s) ->
       let bs,a' = flat a in

@@ -19,7 +19,7 @@ let syntax_error_handler f lexbuf =
     with Parser.Error -> 
            Prelude.Errors.syntax_error (Lexer.get_loc lexbuf)
 
-let frontend ~(inputs : string list) repl ?(when_repl=(fun _ -> ())) ?(relax=false) main str_arg : pi * e list =
+let frontend ~(inputs : string list) repl ?(when_repl=(fun _ _ _ -> ())) ?(relax=false) main str_arg : pi * e list =
   let gss_from_files,tss_from_files,dss_from_files =
     Prelude.map_split3 (fun path ->
                 let ic = open_in path in
@@ -42,34 +42,28 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ -> ())) ?(relax=fal
                ) inputs in
   let gs_from_files,ts_from_files, ds_from_files =
     List.concat gss_from_files, List.concat tss_from_files, List.concat dss_from_files in
-  let ds = (if repl || ds_from_files = [] then
-            let () = List.iter when_repl ds_from_files in
+  let gs,ts,ds = (if repl || ds_from_files = [] then
+            let () = List.iter (when_repl [] []) ds_from_files in
             (Current_filename.current_file_name := "%stdin";
              Printf.printf "=== eclat (experimental toploop, do not support type declaration) ===.\nEnter phrases (separated by ';;') then compile (or run) with ``#exit.''\n";
              flush stdout;
-             let rec loop ds =
+             let rec loop gs ts ds =
                Printf.printf "\n> ";
                let l = read_phrase () in
-               if String.contains l '#' then ds else
+               if String.contains l '#' then gs,ts,ds else
                try
                  (let lexbuf = (Lexing.from_string l) in
-                  syntax_error_handler (fun lexbuf ->
-                  match Parser.decl_opt Lexer.token lexbuf with
-                 | Some d -> begin
-                    caml_error_handler ~on_error:(fun _ ->
+                  let gs',ts',ds' = Parser.pi Lexer.token lexbuf in
+                  caml_error_handler ~on_error:(fun _ ->
                       Format.print_flush ();
-                      let () = List.iter when_repl (List.rev ds) in
-                      (* todo: reset when_repl and retype all previous declaration, ignoring the last (eronous) one *)
-                      loop ds
-                    )
-                    (fun () -> when_repl d; loop (d::ds)) ()
-                  end
-                 | None -> loop ds) lexbuf)
-                with End_of_file -> ds
-            in
-             loop (List.rev ds_from_files))
-             |> List.rev
-            else ds_from_files) in
+                      let () = List.iter (when_repl gs ts) ds in
+                      loop (gs@gs') (ts@ts') (ds@ds'))
+                  (fun () -> List.iter (when_repl (gs@gs') (ts@ts')) ds'; loop (gs@gs') (ts@ts') (ds@ds'))
+                  ())
+                with End_of_file -> gs,ts,ds
+             in
+             loop [] [] (List.rev ds_from_files))
+            else [],[],ds_from_files) in
 
   let values_list =
 
@@ -108,5 +102,5 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ -> ())) ?(relax=fal
 
   (* return both parsed program and its inputs *)
 
-  ({statics=gs_from_files;sums=ts_from_files;main}, values_list)
+  ({statics=gs_from_files@gs;sums=ts_from_files@ts;main}, values_list)
 

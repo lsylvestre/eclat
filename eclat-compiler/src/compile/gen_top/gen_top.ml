@@ -103,7 +103,6 @@ architecture rtl of %s is
 
     component main is
         port (signal clk : in std_logic;
-              signal run : in std_logic;
               signal reset : in std_logic;
               signal rdy : out value(0 to 0);
               signal argument : in value(0 to %d);
@@ -114,8 +113,10 @@ architecture rtl of %s is
   fprintf fmt "
     signal RST : std_logic := '1';
     signal argument : value(0 to %d);
+    signal next_result : value(0 to %d);
     signal result : value(0 to %d);
-    signal ready : value (0 to 0);" (argument_size-1) (result_size-1);
+    signal ready : value (0 to 0);" 
+      (argument_size-1) (result_size-1) (result_size-1);
 
   fprintf fmt "
     begin
@@ -134,12 +135,21 @@ architecture rtl of %s is
 
   fprintf fmt "main_CC : component main
         port map (clk => %s,
-                  run => '1',
                   reset => RST,
                   rdy => ready,
                   argument => argument,
-                  result => result
+                  result => next_result
                   );@," clock;
+
+  fprintf fmt "
+      process (RST, %s) 
+      begin
+        if RST = '1' then
+          result <= (others => '0');
+        elsif (rising_edge(%s)) then
+          result <= next_result;   -- resynchronize output
+        end if;
+      end process;@," clock clock;
 
     let rec loop pos = function
     | [] -> ()

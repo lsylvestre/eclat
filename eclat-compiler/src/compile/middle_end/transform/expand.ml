@@ -22,16 +22,8 @@ let eval_static_exp_int ~loc ~statics e =
          | _ -> raise Cannot)
     | E_array_length(x) ->
        (match List.assoc_opt x statics with
-       | Some (Static_array(_,n)) -> (n,Types.unknown())
+       | Some (Static_array(_,n)) -> (n,Types.new_size_unknown())
        | _ -> Ast_pprint.pp_exp Format.std_formatter e; assert false (* ill-typed *) ) 
-    | E_matrix_size(x,n) ->
-       (match List.assoc_opt x statics with
-        | Some (Static_matrix(_,n_list)) -> 
-          let num = try List.nth n_list n
-                    with _ -> assert false (* ill-typed *)
-          in
-          (num,Types.unknown())
-       | _ -> Printf.printf "---> %s\n" x; assert false (* ill-typed *) ) 
     | _ -> raise Cannot
   in 
   try eval e with
@@ -42,12 +34,6 @@ let eval_static_exp_int ~loc ~statics e =
            "@[<v>Cannot statically evaluate expression %a@]" 
                Ast_pprint.pp_exp e)
 
-
-(* inline a program given in ANF, lambda-lifted form. The resulting program is
-   in lambda-lifted-form but not necessarily in ANF-form. *)
-
-(** [inline e] returns a non-ANF expression in which non-recursive functions
-    are inlined *)
 let rec expand ~statics e =
   match e with
   (*
@@ -75,11 +61,11 @@ let rec expand ~statics e =
               E_const Unit)
 *)
 
-  | E_vector_mapi(_is_par,(p,e1),e2,ty) ->
+  | E_vector_mapi(_is_par,(p,e1),e2,sz) ->
       has_changed := true;
       let e1' = expand ~statics @@ e1 in
-      (match Types.canon ty with
-      | T_size n ->
+      (match Types.canon_size sz with
+      | Sz_lit n ->
           Matching.matching @@
           let y = gensym () in
           E_letIn(P_var y,e2,
@@ -87,21 +73,21 @@ let rec expand ~statics e =
             if i >= n then E_vector(List.rev_map (fun x -> E_var x) xs) else
             let z = gensym () in
             let x = gensym () in
-            let ii = E_const(Int(i,Types.unknown())) in
+            let ii = E_const(Int(i,Types.new_size_unknown())) in
             E_letIn(P_var x, E_letIn(P_var z,
-                                  E_app(E_const(Op(Runtime (Vector_get (Types.unknown())))),
+                                  E_app(E_const(Op(Runtime (Vector_get (Types.new_tyB_unknown())))),
                                   E_tuple[E_var y;ii]),
                               Ast_subst.subst_p_e p (E_tuple[ii;E_var z]) (Ast_rename.rename_e ~statics e1')),
             loop (x::xs) (i+1)) in loop [] 0)
             (* Ast_pprint.pp_exp Format.std_formatter e0; *)
       | _ -> assert false (* todo error *)
       )
-  | E_int_mapi(_is_par,(p,e1),e2,ty) ->
+  | E_int_mapi(_is_par,(p,e1),e2,sz0) ->
       has_changed := true;
       let e1' = expand ~statics @@ e1 in
-      let t = match e2 with E_const(Int(_,size)) -> size | _ -> ty in
-      (match Types.canon t with
-      | T_size n ->
+      let sz = match e2 with E_const(Int(_,size)) -> size | _ -> sz0 in
+      (match Types.canon_size sz with
+      | Sz_lit n ->
           Matching.matching @@
           let y = gensym () in
           E_letIn(P_var y,e2,
@@ -109,7 +95,7 @@ let rec expand ~statics e =
             if i < 0 then E_app(E_const(Op(Runtime(Int_of_tuple n))),E_tuple(List.rev_map (fun x -> E_var x) xs)) else
             let z = gensym () in
             let x = gensym () in
-            let ii = E_const(Int(i,Types.unknown())) in
+            let ii = E_const(Int(i,Types.new_size_unknown())) in
             E_letIn(P_var x, E_letIn(P_var z,
                                   E_app(E_const(Op(Runtime (GetBit))),
                                   E_tuple[E_var y;ii]),

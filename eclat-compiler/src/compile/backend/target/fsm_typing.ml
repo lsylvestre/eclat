@@ -99,38 +99,62 @@ let compute_tag_size cs =
   let n = int_of_float @@ Float.ceil @@ Float.log2 @@ float @@ List.length cs in
   max 4 n
 
-let rec translate_ty =
+
+let rec translate_tyB =
+  let open Types in
   let hvar = Hashtbl.create 10 in
   function
-  | Types.T_const(TInt tz) -> TInt (translate_ty tz)
-  | Types.T_const(TBool) -> TBool
-  | Types.T_const(TUnit) -> TUnit
-  | Types.T_tuple(ts) -> TTuple (List.map translate_ty ts)
-  | Types.T_var r ->
-      if Hashtbl.mem hvar r then Hashtbl.find hvar r else
+  | TyB_int sz -> TInt (translate_size sz)
+  | TyB_bool -> TBool
+  | TyB_unit -> TUnit
+  | TyB_tuple tyBs -> TTuple (List.map translate_tyB tyBs)
+  | TyB_vector(sz,tyB) -> TVector{elem=translate_tyB tyB;size=translate_size sz}
+  | TyB_var r -> 
+     if Hashtbl.mem hvar r then Hashtbl.find hvar r else
       (let t = TVar(ref @@ match !r with
                    | Unknown n -> V (string_of_int n)
-                   | Ty t -> T (translate_ty t)) in
+                   | Is t -> T (translate_tyB t)) in
       Hashtbl.add hvar r t;
       t)
-  | Types.T_string tz ->
-      (match Types.canon tz with
-      | T_size n -> TString (TSize (n*8))
-      | T_var _ -> new_tvar()
-      | _ -> assert false) (* TODO *)
-  | Types.T_static(t) -> translate_ty t
-  | Types.T_sum cs ->
+  | TyB_sum(cs) ->
       let size_tag = compute_tag_size cs in
-      let n = List.fold_left (max) 0 @@ List.map (fun (_,t) -> size_ty (translate_ty t)) cs in
+      let n = List.fold_left (max) 0 @@ List.map (fun (_,t) -> size_ty (translate_tyB t)) cs in
       TTuple[TInt(TSize size_tag);TVect(n)]
-  | Types.T_size n -> TSize n
-  | Types.T_ref t -> translate_ty t
-  | Types.T_array{elem=te;size=tz} -> TStatic{elem=translate_ty te;size=translate_ty tz}
-  | Types.T_matrix{elem=te;size=tz} -> TStatic{elem=translate_ty te;size=translate_ty tz}
-  | Types.T_vector{elem=te;size=tz} -> TVector{elem=translate_ty te;size=translate_ty tz}
-  | Types.(T_response_time _|T_infinity|T_fun _|T_add (_, _)|T_max (_, _)|T_le (_, _)) ->
-     assert false (* already expanded *)
+  | TyB_string sz -> TString (translate_size sz)
+  | TyB_size sz -> translate_size sz
 
+  and translate_size = 
+    let open Types in
+  let hvar = Hashtbl.create 10 in
+  function
+  | Sz_lit n -> TSize n
+  | Sz_var r -> 
+     if Hashtbl.mem hvar r then Hashtbl.find hvar r else
+      (let t = TVar(ref @@ match !r with
+                   | Unknown n -> V (string_of_int n)
+                   | Is sz -> T (translate_size sz)) in
+      Hashtbl.add hvar r t;
+      t)
+
+let rec translate_ty =
+  let hvar = Hashtbl.create 10 in
+  let open Types in
+  function
+  | Ty_base(tyB) -> translate_tyB tyB
+  | Ty_tuple(ts) -> TTuple (List.map translate_ty ts)
+  | Ty_var r -> 
+     if Hashtbl.mem hvar r then Hashtbl.find hvar r else
+      (let t = TVar(ref @@ match !r with
+                   | Unknown n -> V (string_of_int n)
+                   | Is t -> T (translate_ty t)) in
+      Hashtbl.add hvar r t;
+      t) (*todo*) 
+  (* *)
+  (* | Types.T_static(t) -> translate_ty t
+  *)
+  | Ty_ref tyB -> translate_tyB tyB
+  | Ty_array(sz,tyB) -> TStatic{elem=translate_tyB tyB;size=translate_size sz}
+  | Ty_fun _ -> assert false
 
 let rec typing_c = function
   |  Unit -> TUnit
@@ -148,14 +172,17 @@ let rec typing_c = function
        TVector{elem=v;size=TSize (List.length cs)}
   |  (String s) -> TString (TSize(String.length s))
   |  (CSize n) -> TSize n
+  | C_encode(c,n) ->
+      let _ = typing_c c in
+      TVect n
 
 let rec typing_op h t op =
   match op with
   | Runtime p ->
-      (match Operators.ty_op p with
-       | Types.T_fun{arg;dur;ret} ->
+      (match Operators.ty_op2 p with
+       | Types.Ty_fun(arg,dur,ret) ->
           unify (translate_ty arg) t;
-          translate_ty ret
+          translate_tyB ret
        | _ -> assert false)
   | If ->
          let a = new_tvar () in
@@ -216,11 +243,6 @@ let rec typing_a h a =
       add_typing_env h x (TStatic{elem=new_tvar();size=new_tvar()});
       TInt ty
 
-  | A_buffer_matrix_length(x,n,ty) ->
-      add_typing_env h x (TStatic{elem=new_tvar();
-                                  size=new_tvar()});
-      TInt ty
-
   | A_encode(x,ty,n) ->
       add_typing_env h x ty;
       assert (size_ty ty <= n);
@@ -239,42 +261,33 @@ let rec typing_s ~result h s =
       let t = typing_a h a in
       (* (Format.fprintf Format.std_formatter "======> (%s : %a)\n" x Fsm_syntax.Debug.pp_ty (canon t)); *)
       add_typing_env h x t
-  | S_setptr_read(x,idx) ->
+  | S_acquire_lock(l) 
+  | S_release_lock(l) ->
+      let telem = new_tvar () in
+      let tz = new_tvar () in
+      add_typing_env h l (TStatic{elem=telem;size=tz})
+  | S_read_start(x,idx) ->
       let telem = new_tvar () in
       let tz = new_tvar () in
       let tz2 = new_tvar () in
       add_typing_env h x (TStatic{elem=telem;size=tz});
       let tidx = typing_a h idx in
       unify tidx (TInt tz2)
-  | S_setptr_write(x,idx,a) ->
+  | S_read_stop(x,l) ->
+      let telem = new_tvar () in
+      let tz = new_tvar () in
+      add_typing_env h x telem;
+      add_typing_env h l (TStatic{elem=telem;size=tz})
+  | S_write_start(x,idx,a) ->
       let telem = typing_a h a in
       let tz = new_tvar () in
       let tz2 = new_tvar () in
       add_typing_env h x (TStatic{elem=telem;size=tz});
       let tidx = typing_a h idx in
       unify tidx (TInt tz2)
-  | S_setptr_matrix_read(x,idx_list) ->
-      let telem = new_tvar () in
-      let tz_list = List.map (fun _ -> new_tvar ()) idx_list in
-      let tz2 = new_tvar () in
-      add_typing_env h x (TStatic{elem=telem;size=TTuple tz_list});
-      let tidx_list = List.map (typing_a h) idx_list in
-      List.iter2 (fun tidx tz -> unify tidx (TInt tz2)) tidx_list tz_list
-  | S_setptr_matrix_write(x,idx_list,a) ->
-      let telem = typing_a h a in
-      let tz_list = List.map (fun _ -> new_tvar ()) idx_list in
-      let tz2 = new_tvar () in
-      add_typing_env h x (TStatic{elem=telem;size=TTuple tz_list});
-      let tidx_list = List.map (typing_a h) idx_list in
-      List.iter2 (fun tidx tz -> unify tidx (TInt tz2)) tidx_list tz_list
-  | S_ptr_take(x,_)
-  | S_ptr_write_take(x,_) ->
-      let telem = new_tvar () in
-      let tz = new_tvar () in
-      add_typing_env h x (TStatic{elem=telem;size=tz})
-  | S_buffer_set(x) ->
+  | S_write_stop(x) ->
       let t = new_tvar () in
-      add_typing_env h x t
+      add_typing_env h x t 
   | S_if(x,s,so) ->
       add_typing_env h x TBool;
       typing_s ~result h s;
@@ -282,8 +295,8 @@ let rec typing_s ~result h s =
   | S_case(x,hs,os) ->
       let t = new_tvar () in
       add_typing_env h x t;
-      List.iter (fun (c,s) ->
-          unify (typing_c c) t;
+      List.iter (fun (cs,s) ->
+          List.iter (fun c -> unify (typing_c c) t) cs;
           typing_s ~result h s) hs;
       (match os with
       | None -> ()
@@ -331,24 +344,20 @@ let typing_circuit ~statics ty (rdy,result,fsm) =
     List.iter (function 
       | x,Static_array_of ty -> add_typing_env h x ty
       | x,Static_array(c,n) -> add_typing_env h x (TStatic{elem=typing_c c;size=TSize n})
-      | x,Static_matrix(c,n_list) -> 
-            add_typing_env h x (TStatic{elem=typing_c c;
-                                        size=TTuple (List.map (fun n -> TSize n) n_list)})
           ) statics;
 
-    let t1,t2 = match ty with Types.T_fun{arg=t1;dur=_;ret=t2} -> t1,t2 | _ -> assert false (* err *)
+    let t1,t2 = match ty with Types.Ty_fun(t1,_,t2) -> t1,t2 | _ -> assert false (* err *)
     in
-    typing_fsm h ~rdy ~result ~ty_result:(translate_ty t2) fsm;
+    typing_fsm h ~rdy ~result ~ty_result:(translate_tyB t2) fsm;
 
 
     (* why two times ? *)
     List.iter (function 
       | x,Static_array_of ty -> add_typing_env h x ty
       | x,Static_array(c,n) -> add_typing_env h x (TStatic{elem=typing_c c;size=TSize n})
-      | x,Static_matrix(c,n_list) -> add_typing_env h x (TStatic{elem=typing_c c;size=TTuple (List.map (fun n -> TSize n) n_list)})
     ) statics;
 
-    add_typing_env h "argument" (translate_ty @@ Types.canon t1);   (* NB: does not work without canon *)
-    add_typing_env h result (translate_ty @@ Types.canon t2);
+    add_typing_env h "argument" (translate_ty @@ Types.canon_ty t1);   (* NB: does not work without canon *)
+    add_typing_env h result (translate_tyB @@ Types.canon_tyB t2);
 
     h

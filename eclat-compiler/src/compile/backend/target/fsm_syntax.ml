@@ -21,6 +21,7 @@ type c = Unit
        | CVector of c list
        | String of string (* non synthesizable *)
        | CSize of int
+       | C_encode of c * int
   
 type op = If (* i.e., a multiplexer *)
         | Runtime of Operators.op
@@ -33,7 +34,6 @@ type op = If (* i.e., a multiplexer *)
 type global =
   | Static_array_of of ty
   | Static_array of c * int
-  | Static_matrix of c * int list
 
 type a = A_letIn of x * a * a
   | A_tuple of a list
@@ -46,27 +46,26 @@ type a = A_letIn of x * a * a
   | A_ptr_write_taken of x
   | A_buffer_get of x
   | A_buffer_length of x * ty (* [ty] is the size of the resulting integer *)
-  | A_buffer_matrix_length of x * int * ty
   | A_decode of x * ty
   | A_encode of x * ty * int
 
 type write = Delayed | Immediate
 
 type q = x
+type l = x
 
 type s = (* all instructions terminates in one clock cycle *)
   | S_skip
   | S_continue of q
   | S_if of x * s * s option
-  | S_case of x * (c * s) list * s option
+  | S_case of x * (c list * s) list * s option
   | S_set of x * a
-  | S_setptr_read of x * a
-  | S_setptr_write of x * a * a
-  | S_setptr_matrix_read of x * a list
-  | S_setptr_matrix_write of x * a list * a
-  | S_ptr_take of x * bool
-  | S_ptr_write_take of x * bool
-  | S_buffer_set of x
+  | S_acquire_lock of l
+  | S_release_lock of l
+  | S_read_start of l * a
+  | S_read_stop of x * l
+  | S_write_start of x * a * a
+  | S_write_stop of x
   | S_seq of s * s
   | S_letIn of x * a * s
   | S_fsm of id * x * x * q * t list * s (* id * rdy * result * compute * transition * start instruction *)
@@ -118,6 +117,8 @@ let pp_vector = Ast_pprint.pp_vector
     | CSize n ->
         fprintf fmt "size%d" n
     | String s -> fprintf fmt "\"%s\"" s
+    | C_encode (c,n) ->
+        fprintf fmt "encode<%d>(%a)" n pp_c c
 
   let pp_op fmt = function
   | If -> fprintf fmt "eclat_if"
@@ -141,7 +142,6 @@ let pp_vector = Ast_pprint.pp_vector
   | A_ptr_write_taken(x) -> fprintf fmt "ptr_write_taken<%s>" x
   | A_buffer_get(x) -> fprintf fmt "static_get_value(%s)" x
   | A_buffer_length(x,_) -> fprintf fmt "%s.length" x
-  | A_buffer_matrix_length(x,n,_) -> fprintf fmt "%s.(%d).length" x n
   | A_decode(x,_) -> fprintf fmt "decode(%s)" x
   | A_encode(x,_,n) -> fprintf fmt "encode(%s,%d)" x n
 
@@ -156,30 +156,24 @@ let pp_vector = Ast_pprint.pp_vector
       fprintf fmt "end if;"
   | S_case(x,hs,so) ->
       fprintf fmt "@[<v>case %s is@," x;
-      List.iter (fun (c,s) -> fprintf fmt "@[<v 2>when %a =>@,%a@]@," pp_c c pp_s s) hs;
+      let pp_cs fmt cs = 
+        pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt " | ") pp_c fmt cs in
+      List.iter (fun (cs,s) -> 
+        fprintf fmt "@[<v 2>when %a =>@,%a@]@," pp_cs cs pp_s s) hs;
       Option.iter (fun s -> fprintf fmt "@[<v 2>when others => %a@]@," pp_s s) so;
       fprintf fmt "@]end case;";
   | S_set(x,a) ->
       fprintf fmt "@[<v>%s := %a;@]" x pp_a a
-  | S_setptr_read(x,idx) ->
-      fprintf fmt "@[<v>setptr<%s>[%a];@]" x pp_a idx
-  | S_setptr_write(x,idx,a) ->
-      fprintf fmt "@[<v>setptr<%s>[%a] <- %a;@]" x pp_a idx pp_a a
-  | S_setptr_matrix_read(x,idx_list) ->
-      fprintf fmt "@[<v>setptr_matrix<%s>" x;
-      List.iter (fun a -> fprintf fmt "[%a]" pp_a a) idx_list;
-      fprintf fmt "@]"
-  | S_setptr_matrix_write(x,idx_list,a) ->
-      fprintf fmt "@[<v>setptr_matrix<%s>" x;
-      List.iter (fun a -> fprintf fmt "[%a]" pp_a a) idx_list;
-      fprintf fmt " <- %a;@]" pp_a a;
-      fprintf fmt "@]"
-  | S_ptr_take(x,b) ->
-      fprintf fmt "@[<v>ptr_take<%s> := %b;@]" x b
-  | S_ptr_write_take(x,b) ->
-      fprintf fmt "@[<v>ptr_write_take<%s> := %b;@]" x b
-  | S_buffer_set(x) ->
-      fprintf fmt "@[<v>static_set<%s>_end;@]" x
+  | S_acquire_lock(l) -> fprintf fmt "@[<v>acquire_lock(%s);@]" l
+  | S_release_lock(l) -> fprintf fmt "@[<v>release_lock(%s);@]" l
+  | S_read_start(x,idx) ->
+      fprintf fmt "@[<v>read_start<%s>(%a);@]" x pp_a idx
+  | S_read_stop(x,l) ->
+      fprintf fmt "@[<v>%s <- read_stop<%s>();@]" x l
+  | S_write_start(x,idx,a) ->
+      fprintf fmt "@[<v>write_start<%s>[%a] <- %a;@]" x pp_a idx pp_a a
+  | S_write_stop(x) ->
+      fprintf fmt "@[<v>write_stop<%s>_end;@]" x
   | S_seq(s1,s2) ->
       fprintf fmt "@[<v>%a@,%a@]" pp_s s1 pp_s s2
   | S_letIn(x,a,s) ->

@@ -9,4 +9,4 @@ let main(i,b) =
   exec 
     print_int (fact(i)); 
     print_newline () 
-  default () reset when b ;;
+  default () reset b ;;
