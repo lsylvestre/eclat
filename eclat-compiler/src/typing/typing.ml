@@ -25,8 +25,8 @@ exception Cyclic_dur of int * dur * Prelude.loc
 exception Cyclic_ty of int * ty * Prelude.loc
 
 let rec unify_size ~loc sz1 sz2 =
-  (*  Format.fprintf Format.std_formatter "####-- ====> %a / %a\n"  pp_size  sz1  pp_size  sz2; *)
-  let sz1, sz2 = canon_size sz1, canon_size sz2 in
+  (*Format.fprintf Format.std_formatter "####-- ====> %a / %a\n"  pp_size  sz1  pp_size  sz2;
+  *)let sz1, sz2 = canon_size sz1, canon_size sz2 in
   match sz1, sz2 with
   | sz1,Sz_var {contents=Is sz2}
   | Sz_var {contents=Is sz1},sz2 -> unify_size ~loc sz1 sz2
@@ -40,7 +40,10 @@ let rec unify_size ~loc sz1 sz2 =
     if test_occur (occur_size n) sz1 then raise (Cyclic_size(n,sz1,loc));
     r2 := Is sz1
   | Sz_lit n1, Sz_lit n2 ->
-    if n1 <> n2 then raise @@ CannotUnify_size(loc,sz1,sz2)
+    if n1 <= 0 || n2 <= 0 then
+      Prelude.Errors.error ~loc (fun fmt -> Format.fprintf fmt "type size should be strictly positive")
+    else 
+      if n1 <> n2 then raise @@ CannotUnify_size(loc,sz1,sz2)
 
 
 let rec unify_dur ~loc d1 d2 =
@@ -58,16 +61,16 @@ let rec unify_dur ~loc d1 d2 =
   | Dur_one,Dur_one -> ()
   | d1,Dur_var {contents=Is d2}
   | Dur_var {contents=Is d1},d2 ->
-    unify_dur ~loc d1 d2
+      unify_dur ~loc d1 d2
   | Dur_var {contents=(Unknown n)},
     Dur_var ({contents=Unknown m} as v) ->
-    if n = m then () else v := Is d1
+      if n = m then () else v := Is d1
   | d1,Dur_var ({contents=Unknown n} as r2) ->
-    if test_occur (occur_dur n) d1 then raise (Cyclic_dur(n,d1,loc));
-    r2 := Is d1
+      if test_occur (occur_dur n) d1 then raise (Cyclic_dur(n,d1,loc));
+      r2 := Is d1
   | Dur_var ({contents=Unknown n} as r1),d2 ->
-    if test_occur (occur_dur n) d2 then raise (Cyclic_dur(n,d2,loc));
-    r1 := Is d2
+      if test_occur (occur_dur n) d2 then raise (Cyclic_dur(n,d2,loc));
+      r1 := Is d2
   | Dur_max(Dur_zero,d1),d2
   | Dur_max(d1,Dur_zero),d2
   | d1,Dur_max(d2,Dur_zero)
@@ -76,7 +79,11 @@ let rec unify_dur ~loc d1 d2 =
   | Dur_max(_,Dur_one),d
   | d,Dur_max(Dur_one,_)
   | d,Dur_max(_,Dur_one) ->
-    unify_dur ~loc d Dur_one
+      unify_dur ~loc d Dur_one
+  | Dur_max(d1,d2),Dur_zero
+  | Dur_zero,Dur_max(d1,d2) ->
+      unify_dur ~loc d1 Dur_zero;
+      unify_dur ~loc d1 Dur_zero;
   | Dur_max(Dur_var ({contents=(Unknown n)} as r1),Dur_var ({contents=(Unknown m)} as r2)),d2 ->
     if n = m then let d = Dur_var r1 in r2 := Is d; unify_dur ~loc d d2 else
       (warning_loss_of_precision d1 d2 r1;
@@ -112,18 +119,31 @@ let rec unify_tyB ~loc tyB1 tyB2 =
   | TyB_var {contents=Is tyB1},tyB2 -> unify_tyB ~loc tyB1 tyB2
   | TyB_bool,TyB_bool
   | TyB_unit,TyB_unit -> ()
-  | TyB_int sz1, TyB_int sz2 ->  unify_size ~loc sz1 sz2
+  | TyB_int sz1, TyB_int sz2 ->
+      (try unify_size ~loc sz1 sz2
+      with CannotUnify_size _  -> 
+        raise @@ CannotUnify_tyB(loc,Ty_base tyB1,Ty_base tyB2))
   | TyB_string sz1, TyB_string sz2 ->
     (try unify_size ~loc sz1 sz2
      with CannotUnify_size _ -> raise @@ CannotUnify_tyB(loc,Ty_base tyB1,Ty_base tyB2))
+  | TyB_abstract(x1,szs1,tyB_list1),TyB_abstract(x2,szs2,tyB_list2) ->
+      if x1 <> x2 || List.compare_lengths tyB_list1 tyB_list2 <> 0
+                  || List.compare_lengths szs1 szs2 <> 0
+      then raise @@ CannotUnify_tyB(loc,Ty_base tyB1,Ty_base tyB2) 
+      else
+      (try List.iter2 (unify_size ~loc) szs1 szs2;
+           List.iter2 (unify_tyB ~loc) tyB_list1 tyB_list2
+       with CannotUnify_size _ | CannotUnify_tyB _ -> 
+        raise @@ CannotUnify_tyB(loc,Ty_base tyB1,Ty_base tyB2))
+
   | TyB_tuple tyB_list1, TyB_tuple tyB_list2 ->
     if List.compare_lengths tyB_list1 tyB_list2 <> 0 then
       raise @@ CannotUnify_tyB(loc,Ty_base tyB1,Ty_base tyB2);
     List.iter2 (unify_tyB ~loc) tyB_list1 tyB_list2
-  | TyB_vector(sz1,tyB1),TyB_vector(sz2,tyB2) ->
-    unify_size ~loc sz1 sz2;
-    unify_tyB ~loc tyB1 tyB2
-  | TyB_size sz1, TyB_size sz2 -> unify_size ~loc sz1 sz2
+  | TyB_size sz1, TyB_size sz2 -> 
+      (try unify_size ~loc sz1 sz2
+      with CannotUnify_size _ ->
+        raise @@ CannotUnify_tyB(loc,Ty_base tyB1,Ty_base tyB2))
   | TyB_sum(ctors),TyB_sum(ctors') ->
     if List.compare_lengths ctors ctors' <> 0 then raise (CannotUnify_tyB (loc,Ty_base tyB1,Ty_base tyB2));
     List.iter2 (fun (x1,tyB1) (x2,tyB2) ->
@@ -247,24 +267,30 @@ let group_tyB_list = function
   | [tyB] -> tyB
   | tyB_list -> TyB_tuple tyB_list
 
-let ty_op op =
-  match op with
-  | Runtime(p) ->
-    Operators.ty_op2 p
-  | Wait n ->
-    let tyB = new_tyB_unknown () in
-    Ty_fun(Ty_base tyB,Dur_one,tyB)
-  | TyConstr ty -> new_ty_unknown () (* (* todo *)
-                                        let v = unknown() in
-                                        unify ~loc ty v;
-                                        fun_ty ty (T_response_time 0) v
-                                        Ty_fun(Ty_base tyB,Dur_zero,tyB) *)
-  | GetTuple{pos;arity} ->
-    let tyB_list = List.init arity (fun _ -> new_tyB_unknown ()) in
-    assert (0 <= pos && pos <= arity);
-    Ty_fun(Ty_base (group_tyB_list tyB_list),
-           Dur_zero,
-           List.nth tyB_list pos)
+let ty_op ~externals ~loc op =
+  let ty = 
+    match op with
+    | Runtime(p) ->
+      Operators.ty_op ~externals p
+    | Wait n ->
+      let tyB = new_tyB_unknown () in
+      Ty_fun(Ty_base tyB,Dur_one,tyB)
+    | TyConstr ty -> new_ty_unknown () (* (* todo *)
+                                          let v = unknown() in
+                                          unify ~loc ty v;
+                                          fun_ty ty (T_response_time 0) v
+                                          Ty_fun(Ty_base tyB,Dur_zero,tyB) *)
+    | GetTuple{pos;arity} ->
+      let tyB_list = List.init arity (fun _ -> new_tyB_unknown ()) in
+      assert (0 <= pos && pos <= arity);
+      Ty_fun(Ty_base (group_tyB_list tyB_list),
+             Dur_zero,
+             List.nth tyB_list pos)
+  in
+  let tyB1 = new_tyB_unknown () in
+  let tyB2 = new_tyB_unknown () in
+  unify_ty ~loc ty (Ty_fun(Ty_base tyB1,Dur_zero,tyB2));
+  ty
 
 let rec typ_const ~loc g = function
   | Int(n,sz) ->
@@ -293,7 +319,7 @@ let rec typ_const ~loc g = function
   | C_vector(cs) ->
     let v = new_tyB_unknown () in
     List.iter (fun c -> unify_tyB ~loc v (typ_const ~loc g c)) cs;
-    TyB_vector(Sz_lit (List.length cs),v)
+    Operators.vect_ (Sz_lit (List.length cs)) v
   | C_size n -> TyB_size (Sz_lit n)
   | C_appInj(x,c,tyB) ->
     let tx = typ_ident ~loc g x in
@@ -304,11 +330,16 @@ let rec typ_const ~loc g = function
   | Inj _ -> assert false (* to remove from constants *)
   | _ -> assert false
 
-let rec typ_exp ?(collect_sig=false) ~statics ~sums ?(toplevel=false) ~loc g e =
+let rec typ_exp ?(collect_sig=false) ~statics ~externals ~sums ?(toplevel=false) ~loc g e =
   match e with
-  | E_const (Op op) -> let t = ty_op op in
-    (* Format.fprintf Format.std_formatter "|///|||--->%a\n" pp_ty  t; *)
-    t,Dur_zero
+  | E_const (Op (Runtime(External_fun(x,tyx)))) ->
+      let t = typ_ident ~loc g x in
+      unify_ty ~loc tyx t;
+      t, Dur_zero
+  | E_const (Op op) -> 
+      let t = ty_op ~externals ~loc op in
+      (* Format.fprintf Format.std_formatter "|///|||--->%a\n" pp_ty  t; *)
+      t,Dur_zero
   | E_const(Inj x) ->
     let tx = typ_ident ~loc g x in
     tx,Dur_zero
@@ -320,31 +351,31 @@ let rec typ_exp ?(collect_sig=false) ~statics ~sums ?(toplevel=false) ~loc g e =
     (*with UnboundVariable _ -> typ_ident_static ~loc x statics*) in
     (tx,Dur_zero)
   | E_deco(e1,loc) ->
-    typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1
+    typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g e1
   | E_if(e1,e2,e3) ->
-    let t1,d1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
-    let t2,d2 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e2 in
-    let t3,d3 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e3 in
+    let t1,d1 = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g e1 in
+    let t2,d2 = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g e2 in
+    let t3,d3 = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g e3 in
     unify_ty ~loc t1 (Ty_base TyB_bool);
     let vTyB = new_tyB_unknown () in
     unify_ty ~loc:(loc_of e2) t2 (Ty_base vTyB);
     unify_ty ~loc:(loc_of e3) t3 (Ty_base vTyB);
     t2,Dur_max(d1,Dur_max(d2,d3))
   | E_case(e1,hs,e_els) ->
-    let ty1,d1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
+    let ty1,d1 = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g e1 in
     List.iter (fun (cs,_) -> List.iter (fun c -> unify_ty ~loc (Ty_base (typ_const ~loc g c)) ty1) cs) hs;
-    let ty_els,d_els = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e_els in
+    let ty_els,d_els = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g e_els in
     let d_list = List.map (fun (_,ei) ->
-        let ty,d = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g ei in
+        let ty,d = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g ei in
         unify_ty ~loc:(loc_of ei) ty_els ty; d) hs in
     let d = List.fold_left (fun d1 d2 -> Dur_max(d1,d2)) d_els d_list in
     ty_els,Dur_max(d,d1)
 
   | E_letIn(p,e1,e2) ->
-    let ty1,d1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc:(loc_of e1) g e1 in
+    let ty1,d1 = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc:(loc_of e1) g e1 in
     (* Format.fprintf Format.std_formatter "--->%a\n" pp_ty  ty1;*)
-    let g' = env_extend ~loc:Prelude.dloc ~gen:(evaluated e1) g p ty1 in
-    (*    Format.fprintf Format.std_formatter "--->%a\n" pp_ty  ty2;*)
+    let gen = evaluated e1 (* && match un_deco e1 with E_fix _ -> false | _ -> true *) in
+    let g' = env_extend ~loc:Prelude.dloc ~gen g p ty1 in
 
     (if toplevel && !print_signature_flag then
        begin
@@ -363,13 +394,13 @@ let rec typ_exp ?(collect_sig=false) ~statics ~sums ?(toplevel=false) ~loc g e =
            Ast_pprint.pp_pat p pp_ty (canon_ty ty1) pp_dur (canon_dur d1);
        end);
 
-    let ty2,d2 = typ_exp ~collect_sig ~statics ~sums ~toplevel:true ~loc:(loc_of e2) g' e2 in
+    let ty2,d2 = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:true ~loc:(loc_of e2) g' e2 in
 
     (ty2, Dur_max(d1,d2))
 
   | E_tuple(es) ->
     let ts,ds = List.split @@ List.map (fun ei ->
-        typ_exp ~collect_sig ~statics ~sums
+        typ_exp ~collect_sig ~statics ~externals ~sums
           ~toplevel:false ~loc:(loc_of ei) g ei) es in
     let d = List.fold_left (fun d1 d2 -> Dur_max(d1,d2)) Dur_zero ds in
     Ty_tuple ts,d
@@ -377,7 +408,7 @@ let rec typ_exp ?(collect_sig=false) ~statics ~sums ?(toplevel=false) ~loc g e =
   | E_fun(p,e1) ->
     let v = new_ty_unknown() in
     let g' = env_extend ~loc:Prelude.dloc g p v in
-    let ty,dur = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc:(loc_of e1) g' e1 in
+    let ty,dur = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc:(loc_of e1) g' e1 in
     let tyB = new_tyB_unknown() in
     unify_ty ~loc ty (Ty_base tyB);
     (Ty_fun(v,canon_dur dur,tyB), Dur_zero)
@@ -388,18 +419,18 @@ let rec typ_exp ?(collect_sig=false) ~statics ~sums ?(toplevel=false) ~loc g e =
     let tf = Ty_fun(ty1,Dur_one,tyB2) in
     let g' = env_extend ~loc g (P_var f) tf in
     let g' = env_extend ~loc g' p ty1 in
-    let ty,d = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g' e1 in
+    let ty,d = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g' e1 in
     unify_ty ~loc:(loc_of e1) ty (Ty_base tyB2);
-    (tf, d)
+    (tf, Dur_zero)
   | E_app(e1,e2) ->
     (match un_deco e1 with
      | E_const (Op (TyConstr ty)) ->
-       let ty2,d2 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false g ~loc:(loc_of e2) e2 in
+       let ty2,d2 = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false g ~loc:(loc_of e2) e2 in
        unify_ty ~loc:(loc_of e2) ty ty2;
        ty2,d2
      | _ ->
-       let ty1,d1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false g ~loc:(loc_of e1) e1 in
-       let ty2,d2 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false g ~loc:(loc_of e2) e2 in
+       let ty1,d1 = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false g ~loc:(loc_of e1) e1 in
+       let ty2,d2 = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false g ~loc:(loc_of e2) e2 in
        let tyB = new_tyB_unknown () in
        let d = new_dur_unknown () in
        unify_ty ~loc (Ty_fun(ty2,d,tyB)) ty1;
@@ -413,7 +444,7 @@ let rec typ_exp ?(collect_sig=false) ~statics ~sums ?(toplevel=false) ~loc g e =
           | _ -> assert false (* compilation error ! *)
           );*)
        if collect_sig then (
-         match e1 with
+         match Ast_undecorated.remove_all e1 with
          | E_var f -> Hashtbl.add signatures f ty1
          | E_const _ -> ()
          | _ -> assert false (* compilation error ! *)
@@ -423,7 +454,7 @@ let rec typ_exp ?(collect_sig=false) ~statics ~sums ?(toplevel=false) ~loc g e =
 
   | E_par(es) ->
     let ts,ds = List.split @@ List.map (fun ei ->
-        let ti,d = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc:(loc_of ei) g ei in
+        let ti,d = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc:(loc_of ei) g ei in
         ti,d) es
     in
     let d = List.fold_left (fun d1 d2 -> Dur_max(d1,d2)) Dur_zero ds in
@@ -431,9 +462,9 @@ let rec typ_exp ?(collect_sig=false) ~statics ~sums ?(toplevel=false) ~loc g e =
 
   (* *************************************************** *)
   | E_reg((p,e1),e0,_) ->
-    let ty0,d0 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e0 in
+    let ty0,d0 = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g e0 in
     let g' = env_extend ~loc g p ty0 in
-    let ty1,d1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g' e1 in
+    let ty1,d1 = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g' e1 in
     unify_ty ~loc ty0 ty1;
     unify_dur ~loc d0 Dur_zero;
     unify_dur ~loc d1 Dur_zero;
@@ -442,14 +473,14 @@ let rec typ_exp ?(collect_sig=false) ~statics ~sums ?(toplevel=false) ~loc g e =
     (ty0, Dur_zero)
 
   | E_exec(e1,e2,eo,_) ->
-    let ty1,_ = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
-    let ty2,d2 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e2 in
+    let ty1,_ = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g e1 in
+    let ty2,d2 = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g e2 in
     unify_ty ~loc ty1 ty2;
     unify_dur ~loc d2 Dur_zero;
     let tyB = new_tyB_unknown () in
     unify_ty ~loc:(loc_of e1) (Ty_base tyB) ty1;
     Option.iter (fun e3 ->
-        let ty3,d3 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e3 in
+        let ty3,d3 = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g e3 in
         let loc = loc_of e3 in
         unify_ty ~loc ty3 (Ty_base (TyB_bool));
         unify_dur ~loc d3 Dur_zero) eo;
@@ -461,7 +492,7 @@ let rec typ_exp ?(collect_sig=false) ~statics ~sums ?(toplevel=false) ~loc g e =
     let error_unbound_constructor ctor =
       Prelude.Errors.error ~loc (fun fmt -> Format.fprintf fmt "Unbound constructor %s" ctor)
     in
-    let ty1,d1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
+    let ty1,d1 = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g e1 in
     (* todo : error if there is no clause *)
     let c_witness = match hs with (x,_)::_ -> x | _ -> assert false in
     let _,sum,_ = try Types.find_ctor c_witness sums
@@ -474,13 +505,13 @@ let rec typ_exp ?(collect_sig=false) ~statics ~sums ?(toplevel=false) ~loc g e =
           | None -> error_unbound_constructor inj
         in
         let g' = env_extend ~loc g p t_inj in
-        let tyi,di = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g' ei in
+        let tyi,di = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g' ei in
         unify_ty ~loc tyi ty_result;
         r := Dur_max(!r,di)) hs;
 
     Option.iter (fun ew -> 
         (* wildcard clause *)
-        let tyw,dw = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g ew in
+        let tyw,dw = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g ew in
         unify_ty ~loc tyw ty_result;
         r := Dur_max(!r,dw)) eo;
 
@@ -495,20 +526,20 @@ let rec typ_exp ?(collect_sig=false) ~statics ~sums ?(toplevel=false) ~loc g e =
   (* *************************************************** *)
 
   | E_ref(e1) ->
-    let ty,d = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc:(loc_of e1) g e1 in
+    let ty,d = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc:(loc_of e1) g e1 in
     (* Format.fprintf Format.std_formatter "|///|||--->%a\n" pp_ty  ty; *)
     let tyB = new_tyB_unknown () in
     unify_ty ~loc (Ty_base tyB) ty;
     (* Format.fprintf Format.std_formatter "||||--->%a\n" pp_tyB  tyB; *)
     (Ty_ref(tyB),d)
   | E_get(e1) ->
-    let ty1,d = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
+    let ty1,d = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g e1 in
     let tyB = new_tyB_unknown () in
     unify_ty ~loc:(loc_of e1) (Ty_ref tyB) ty1;
     (Ty_base tyB, d)
   | E_set (e1,e2) ->
-    let ty1,d1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
-    let ty2,d2 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e2 in
+    let ty1,d1 = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g e1 in
+    let ty2,d2 = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g e2 in
     let tyB = new_tyB_unknown () in
     unify_ty ~loc:(loc_of e1) (Ty_ref tyB) ty1;
     unify_ty ~loc:(loc_of e2) (Ty_base tyB) ty2;
@@ -516,30 +547,14 @@ let rec typ_exp ?(collect_sig=false) ~statics ~sums ?(toplevel=false) ~loc g e =
 
   (* *************************************************** *)
 
-  | E_local_static_array(e2,_) ->
-    let ty1 = new_ty_unknown() in
-    let ty2,d2 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e2 in
-    unify_dur ~loc d2 Dur_zero;
-    let sz = new_size_unknown () in
-    unify_ty ~loc ty2 (Ty_base (TyB_int sz));
-    let sz2 = new_size_unknown () in (* todo: infer the size *)
-    let tyB1 = new_tyB_unknown () in
-    unify_ty ~loc ty1 (Ty_base tyB1);
-    begin
-      match un_annot e2 with
-      | E_array_length(y) ->
-        let tx = typ_ident ~loc g y in
-        let tyB2 = new_tyB_unknown () in
-        unify_ty ~loc tx (Ty_array(sz2,tyB2))
-      | E_const (Int(n,_)) ->
-        unify_size ~loc sz2 (Sz_lit n)
-      | _ -> let open Prelude.Errors in
-        error ~loc:(loc_of e2) (fun fmt ->
-            Format.fprintf fmt "Expression %a should be an integer literal or the length of another array"
-              (emph_pp bold Ast_pprint.pp_exp) e2)
-    end;
-    (Ty_array(sz2,tyB1)),Dur_zero
-
+  | E_array_make(sz,e1,_) ->
+      let tyB = new_tyB_unknown() in
+      let ty1,d = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g e1 in
+      unify_ty ~loc ty1 (Ty_base tyB);
+      (Ty_array(sz,tyB)),Dur_one
+  | E_array_create(sz,_) ->
+      let tyB = new_tyB_unknown() in
+      (Ty_array(sz,tyB)),Dur_zero
   | E_array_length(x) ->
     let tyx = typ_ident ~loc g x in
     let sz = new_size_unknown () in
@@ -547,15 +562,15 @@ let rec typ_exp ?(collect_sig=false) ~statics ~sums ?(toplevel=false) ~loc g e =
     unify_ty ~loc (Ty_array(sz,v)) tyx;
     (Ty_base (TyB_int (new_size_unknown ())), Dur_zero)
   | E_array_get(x,e1) ->
-    let ty1,d = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
+    let ty1,d = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g e1 in
     unify_ty ~loc ty1 (Ty_base (TyB_int (new_size_unknown ())));
     let tyx = typ_ident ~loc g x in
     let tyB = new_tyB_unknown () in
     unify_ty ~loc (Ty_array(new_size_unknown(),tyB)) tyx;
     (Ty_base tyB,dur_add d Dur_one)
   | E_array_set(x,e1,e2) ->
-    let ty1,d1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e1 in
-    let ty2,d2 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e2 in
+    let ty1,d1 = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g e1 in
+    let ty2,d2 = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g e2 in
     unify_ty ~loc ty1 (Ty_base (TyB_int (new_size_unknown ())));
     let tyx = typ_ident ~loc g x in
     let tyB = new_tyB_unknown () in
@@ -564,58 +579,62 @@ let rec typ_exp ?(collect_sig=false) ~statics ~sums ?(toplevel=false) ~loc g e =
     (Ty_base TyB_unit, dur_add (Dur_max(d1,d2)) Dur_one)
 
   | E_for(x,e_st1,e_st2,e3,_) ->
-    let  vsize = new_size_unknown() in
-    let intv = Ty_base (TyB_int vsize) in
-    let ty1,d1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e_st1 in
-    unify_ty ~loc ty1 intv;
+    let  vsize1 = new_size_unknown() in
+      let  vsize2 = new_size_unknown() in
+    let intv1 = Ty_base (TyB_size vsize1) in
+    let intv2 = Ty_base (TyB_size vsize2) in
+    let ty1,d1 = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g e_st1 in
+    unify_ty ~loc ty1 intv1;
     unify_dur ~loc d1 Dur_zero;
-    let t2,d2 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e_st2 in
-    unify_ty ~loc t2 intv;
+    let t2,d2 = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g e_st2 in
+    unify_ty ~loc t2 intv2;
     unify_dur ~loc d2 Dur_zero;
-    let g' = env_extend ~loc g (P_var x) intv in
-    typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g' e3  (* todo *)
+    let g' = env_extend ~loc g (P_var x) (Ty_base (TyB_int (new_size_unknown()))) in
+    let (ty3,d3) = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g' e3 in (* todo *)
+    unify_ty ~loc ty3 (Ty_base TyB_unit);
+    (Ty_base TyB_unit, d3)
 
   | E_generate((p,e1),e2,e_st3,_) ->
-    let ty3,d3 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g e_st3 in
+    let ty3,d3 = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g e_st3 in
     let  vsize0 = new_size_unknown() in
     let intv0 = Ty_base (TyB_int vsize0) in
     unify_ty ~loc ty3 intv0;
     unify_dur ~loc d3 Dur_zero;
     let vsize1 = new_size_unknown() in
     let intv1 = Ty_base (TyB_int vsize1) in
-    let ty2,d2 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc:(loc_of e2) g e2 in (* TODO: force ty2 to be a base type *)
+    let ty2,d2 = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc:(loc_of e2) g e2 in (* TODO: force ty2 to be a base type *)
     let g' = env_extend ~loc g p (Ty_tuple[intv1;ty2]) in
-    let ty1,d1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc:(loc_of e1) g' e1 in
+    let ty1,d1 = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc:(loc_of e1) g' e1 in
     ty1,Dur_max(d1,d2) (* n1+n1+ ... n fois *)
 
   | E_vector(es) ->
     let v = new_tyB_unknown () in
     let ns = List.map (fun ei ->
-        let t,n = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc g ei in
+        let t,n = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g ei in
         unify_ty ~loc:(loc_of ei) t (Ty_base v);
         n) es
     in
     let n = List.fold_left (fun acc n -> Dur_max(acc,n)) Dur_zero ns in
-    Ty_base(TyB_vector(Sz_lit(List.length es),v)),n
+    Ty_base(Operators.vect_ (Sz_lit(List.length es)) v),n
 
   | E_vector_mapi(_,(p,e1),e2,size_vect) ->
     let elem = new_tyB_unknown () in
     let vsize1 = new_size_unknown() in
     let intv1 = TyB_int vsize1 in
-    let ty2,d2 = typ_exp ~collect_sig ~statics ~sums
+    let ty2,d2 = typ_exp ~collect_sig ~statics ~externals ~sums
                     ~toplevel:false ~loc:(loc_of e2) g e2 in (* TODO: force ty2 to be a base type *)
     let w = new_tyB_unknown () in
     unify_ty ~loc:(loc_of e2) (Ty_base w) ty2;
-    unify_tyB ~loc:(loc_of e2) w (TyB_vector(size_vect,elem));
+    unify_tyB ~loc:(loc_of e2) w (Operators.vect_ size_vect elem);
     let g' = env_extend ~loc g p (Ty_base (TyB_tuple[intv1;elem])) in 
     (* todo: better type error message, here, it says:
        "An expression has type (int<~z76>, ...) but was expected of type ..." 
     *)
-    let ty1,d1 = typ_exp ~collect_sig ~statics ~sums
+    let ty1,d1 = typ_exp ~collect_sig ~statics ~externals ~sums
                       ~toplevel:false ~loc:(loc_of e2) g' e1 in
     let w1 = new_tyB_unknown () in
     unify_ty ~loc:(loc_of e1) (Ty_base w1) ty1;
-    Ty_base (TyB_vector(size_vect,w1)),d1 (* n times d1 *)
+    Ty_base (Operators.vect_  size_vect w1),d1 (* n times d1 *)
 
 
   | E_int_mapi(_,(p,e1),e2,_) ->
@@ -623,18 +642,29 @@ let rec typ_exp ?(collect_sig=false) ~statics ~sums ?(toplevel=false) ~loc g e =
     let size_vect = new_size_unknown() in
     let vsize1 = new_size_unknown() in
     let intv1 = TyB_int vsize1 in
-    let ty2,d2 = typ_exp ~collect_sig ~statics ~sums
+    let ty2,d2 = typ_exp ~collect_sig ~statics ~externals ~sums
                        ~toplevel:false ~loc:(loc_of e2) g e2 in (* TODO: force ty2 to be a base type *)
     let w = new_tyB_unknown () in
     unify_ty ~loc:(loc_of e2) (Ty_base w) ty2;
     unify_tyB ~loc:(loc_of e2) w (TyB_int(size_vect));
     let g' = env_extend ~loc g p (Ty_base (TyB_tuple[intv1;elem])) in
-    let ty1,d1 = typ_exp ~collect_sig ~statics ~sums ~toplevel:false ~loc:(loc_of e2) g' e1 in
+    let ty1,d1 = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc:(loc_of e2) g' e1 in
     let w1 = new_tyB_unknown () in
     unify_ty ~loc:(loc_of e1) (Ty_base w1) ty1;
     (Ty_base (TyB_int(size_vect))),d1 (* n times d1 *)
 
-
+  | E_run (i,e1) ->
+    let ty1,d1 = typ_exp ~collect_sig ~statics ~externals ~sums
+                       ~toplevel ~loc:(loc_of e1) g e1 in (* TODO: force ty2 to be a base type *)
+    (match List.assoc_opt i (fst externals) with
+    | Some (ty,shared) ->
+        let d2 = (if shared then Dur_one else Dur_zero) in
+        let tyB = new_tyB_unknown () in
+        let d3 = new_dur_unknown() in
+        let ty2 = Ty_fun(ty1, d3, tyB) in
+        unify_ty ~loc ty ty2;
+        Ty_base tyB,Dur_max(Dur_max(d1,d2),d3)
+    | None -> Prelude.Errors.raise_error ~msg:("unbound external circuit "^i) ())
 
 let typing_handler ?(msg="") f () =
   let open Format in
@@ -689,24 +719,33 @@ let env_extend_statics env statics =
     SMap.add x (Forall(Vs.empty,ty)) env) env statics ;;
 
 
-let typing ?collect_sig ?(env=SMap.empty) ?(msg="") ~statics ~sums e =
+let env_extend_externals env externals =
+  List.fold_left (fun env (x,(ty,_)) ->
+    SMap.add x (generalize (SMap.bindings env) ty) env) env (snd externals) ;;
+
+
+
+let typing ?collect_sig ?(env=SMap.empty) ?(msg="") ~statics ~externals ~sums e =
   Hashtbl.clear signatures;
   let loc = loc_of e in
   typing_handler (fun () ->
 
       let env = env_extend_statics env statics in
+      let env = env_extend_externals env externals in
 
-      let t,n = typ_exp ?collect_sig ~statics ~sums ~toplevel:true ~loc env e in
+      let t,n = typ_exp ?collect_sig ~statics ~externals ~sums ~toplevel:true ~loc env e in
       (* let tyB = new_tyB_unknown () in*)
       (* unify_ty ~loc (Ty_fun(Ty_base tyB,new_dur_unknown(),new_tyB_unknown())) t; *)
       canon_ty t, n) ()
+;;
 
-
-let when_repl statics sums : ((p * e) * Prelude.loc) -> unit =
+let when_repl externals statics sums : bool -> ((p * e) * Prelude.loc) -> unit =
   let r = ref SMap.empty in
 
-  fun ((p,e),loc) ->
+  fun show_val ((p,e),loc) ->
     typing_handler (fun () ->
+
+        (* todo: manage externals *)
 
         let env = List.fold_left (fun env (x,cases) ->
             let tyB = TyB_sum (cases) in
@@ -715,12 +754,13 @@ let when_repl statics sums : ((p * e) * Prelude.loc) -> unit =
               env cases) !r sums
         in
         let env = env_extend_statics env statics in
-
+        let env = env_extend_externals env externals in
+        
         r := env;
 
-        let (ty,_) = typing ~env ~statics ~sums e in
+        let (ty,_) = typing ~env ~statics ~externals ~sums e in
         r := typing_handler (fun () -> (env_extend ~loc ~gen:(evaluated e) !r p ty)) ();
-        Format.fprintf Format.std_formatter "val %a : %a@."  Ast_pprint.pp_pat p pp_ty ty
+        if show_val then Format.fprintf Format.std_formatter "val %a : %a@."  Ast_pprint.pp_pat p pp_ty ty
       ) ()
 
 let get_vector_size_ref = ref true ;;
@@ -731,9 +771,7 @@ let get_vector_size_ref = ref true ;;
 let fun_shape (t_arg : ty) : ty =
   Ty_fun(t_arg,new_dur_unknown(),new_tyB_unknown())
 
-let typing_with_argument ?(get_vector_size=true) ?collect_sig ({statics;sums;main} : pi) (arg_list : e list) : ty * dur =
-
-  (*get_vector_size_ref := get_vector_size; *)
+let typing_with_argument ?(get_vector_size=true) ?collect_sig ({statics;externals;sums;main} : pi) (arg_list : e list) : ty * dur =
   typing_handler (fun () ->
       (* caution: [typing_handler] put a message about **expressions**
          when CannotUnify is raised, wherever it is raised *)
@@ -745,15 +783,13 @@ let typing_with_argument ?(get_vector_size=true) ?collect_sig ({statics;sums;mai
           List.fold_left (fun env (ctor,targ) ->
               SMap.add ctor (generalize (SMap.bindings env) (Ty_fun(Ty_base targ,Dur_zero,t))) env) env cases) env sums
       in
-      let env = List.fold_left (fun env (x,glob) ->
-          let ty = typing_static ~loc:Prelude.dloc env glob in
-          SMap.add x (Forall(Vs.empty,ty)) env) env statics
-      in
+      let env = env_extend_statics env statics in
+      let env = env_extend_externals env externals in
       let loc = loc_of main in
       let e = mk_loc loc @@ ty_annot ~ty:(fun_shape t_arg) main in
       let statics_env = [] (*TODO: List.map (fun (x,st) -> x,typing_static env st) statics*) in
       let (ty,response_time) =
-        typing ?collect_sig ~env ~statics:statics_env ~sums e
+        typing ?collect_sig ~env ~statics:statics_env ~externals ~sums e
       in
       (if !relax_flag then () else
          let t = canon_ty ty in
@@ -767,9 +803,11 @@ let typing_with_argument ?(get_vector_size=true) ?collect_sig ({statics;sums;mai
                    (emph_pp green pp_ty) t)
          | _ -> assert false);
       List.iter (fun a -> typing ~env ~msg:"checking inputs given by option -arg, "
-                    ~statics:statics_env ~sums
+                    ~statics:statics_env ~externals ~sums
                     (ty_annot ~ty:t_arg a)
                           |> ignore) arg_list;
+
+      unify_ty ~loc:(Prelude.dloc) (Ty_fun(t_arg,new_dur_unknown(),new_tyB_unknown())) ty;
 
       (canon_ty ty, response_time)
     ) ()

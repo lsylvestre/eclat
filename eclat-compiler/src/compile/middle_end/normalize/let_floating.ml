@@ -78,9 +78,11 @@ let rec lfloat (e:e) : e =
       ds1@ds2, E_set(e1',e2')
   | E_array_length _ ->
       [],e
-  | E_local_static_array(e1,loc) ->
+  | E_array_make(sz,e1,loc) ->
       let ds1,e1' = glob e1 in
-      ds1,E_local_static_array(e1',loc)
+      ds1,E_array_make(sz,e1',loc)
+  | E_array_create _ ->
+      [],e
   | E_array_get(x,e1) ->
       let ds1,e1' = glob e1 in
       ds1,E_array_get(x,e1')
@@ -107,6 +109,9 @@ let rec lfloat (e:e) : e =
   | E_int_mapi(is_par,(p,e1),e2,ty) ->
       let ds2,e2' = glob e2 in
       ds2,E_int_mapi(is_par,(p,lfloat e1),e2',ty) 
+  | E_run(i,e) ->
+      let ds,e' = glob e in
+      ds,E_run(i,e)
   in 
   let ds,e' = glob e in 
   declare_p ds e'

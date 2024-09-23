@@ -62,8 +62,10 @@ let fv ?(get_arrays=true) ?(xs=SMap.empty) e =
   | E_set(e1,e2) ->
       (if get_arrays then aux xs e1 else SMap.empty) 
       ++ aux xs e2
-  | E_local_static_array(e1,_) ->
+  | E_array_make(_,e1,_) ->
       aux xs e1
+  | E_array_create _ ->
+      SMap.empty
   | E_array_length(x) ->
       if get_arrays 
       then fv_var xs x
@@ -98,6 +100,7 @@ let fv ?(get_arrays=true) ?(xs=SMap.empty) e =
       let ys = vars_of_p p in
       let xs' = xs++ys in
       aux xs' e1 ++ aux xs e2
+  | E_run(_x,e) -> aux xs e (* what about _x ? *)
   in
   aux xs e
 
@@ -161,8 +164,10 @@ let fv_arrays ?(xs=SMap.empty) e =
   | E_set(e1,e2) ->
       aux xs e1
       ++ aux xs e2
-  | E_local_static_array(e1,_) ->
+  | E_array_make(_,e1,_) ->
       aux xs e1
+  | E_array_create _ ->
+      SMap.empty
   | E_array_length(x) ->
       SMap.singleton x () 
   | E_array_get(x,e1) ->
@@ -191,6 +196,8 @@ let fv_arrays ?(xs=SMap.empty) e =
       let ys = vars_of_p p in
       let xs' = xs++ys in
       aux xs' e1 ++ aux xs e2
+  | E_run(_x,e1) -> (* what about _x ? *)
+      aux xs e1
   in
   aux xs e
 

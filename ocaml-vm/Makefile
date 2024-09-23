@@ -17,7 +17,7 @@ byte:
 
 
 CUSTOM=
-CUSTOM_PATH= #$(foreach f,$(OCAML_VM)/$(CUSTOM),../$(f))$
+CUSTOM_PATH=$(foreach f,$(CUSTOM),../$(f))$
 
 CLK=clk
 

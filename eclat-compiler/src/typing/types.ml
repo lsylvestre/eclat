@@ -3,192 +3,6 @@ type x = string
 
 (** associative array having key of type [string] *)
 module SMap = Map.Make(String)
-(*
-type ty =                (** type *)
-  | T_const of tconst    (** type constant *)
-  | T_var of tvar ref    (** type variable *)
-  | T_tuple of ty list   (** type constructor for tuples *)
-  | T_fun of {
-      arg:ty ;  (** functional type constructor annotated with a response time [dur] *)
-      dur:ty ;  (* [arg -(dur)-> ret] is the type of a function which, given a value of *)
-      ret:ty    (* type [arg], produces a value of type [ret] after no more than [dur] clock ticks *)
-    }
-  | T_sum of (x * ty) list
-  | T_string of ty (** string parameterized by its size using a the size type [ty] *)
-  | T_ref of ty   (* mutable reference cell *)
-  | T_array of {
-      elem : ty ; (** static array of elements of type [elem], *)
-      size : sz   (** parameterized by its size using a the size type [size] *)
-    }
-  | T_matrix of {
-      elem : ty ; (** static matrix of elements of type [elem], *)
-      size : sz   (** parameterized by its size using a the size type [size] as tuple *)
-    }
-  | T_vector of {
-      elem : ty ;
-      size : sz
-    } (** type for immediate vector *)
-  | T_static of ty
-  (* sized types for check response time and static datastructures *)
-  | T_size of int      (** n *)
-  | T_response_time of int
-  | T_infinity         (** plus infinite *)
-  | T_add of ty * ty   (** t + t'  *)
-  | T_max of ty * ty   (** max(t,t') *)
-  | T_le of ty * ty    (** t such that t <= t' *)
-and sz = ty
-
-and tconst = (** type constant *)
-  | TBool      (** boolean type [bool] *)
-  | TInt of ty (** integer type [int<ty>]
-                 where [ty] is a size type denoting the size of the interger.
-                 All integers are signed. *)
-  | TUnit      (** unit type [unit] *)
-
-and tvar =              (** type variable *)
-  | Unknown of int      (** type unknown 'a identified by a unique integer *)
-  | Ty of ty            (* instantiated type variable *)
-
-
-
-let tint tz = T_const (TInt tz)
-let tbool = T_const TBool
-let tunit = T_const TUnit
-let fun_ty t1 n t2 =
-  T_fun { arg = t1;
-          dur = n;
-          ret = t2 }
-
-let rec size_ty ty =
-  match ty with
-  | T_const tc ->
-      (match tc with
-       | TInt ts -> size_ty ty
-       | TBool -> 1
-       | TUnit -> 1)
-  | T_var{contents=Ty t'} ->
-      size_ty t'
-  | T_var{contents=Unknown _} -> 1 (* ok ? *)
-  | T_tuple (ts) ->
-      List.fold_left (fun s t -> s + size_ty t) 0 ts
-  | T_fun _ ->
-      invalid_arg "size_ty (types.ml)"
-  | T_string tz ->
-      size_ty tz * 8
-  | T_sum cs -> List.fold_left max 0 (List.map (fun (_,ty) -> 8 + size_ty ty) cs) (* 8 is ok ? *)
-  | T_ref(t) -> size_ty t
-  | T_array {elem=t;size=tz} -> size_ty t * size_ty tz
-  | T_matrix {elem=t;size=tz} -> assert false (* todo *)
-  | T_vector {elem=t;size=tz} -> size_ty t * size_ty tz
-  | T_static t -> size_ty t
-  | T_size n -> n
-  | (T_response_time _ | T_infinity 
-     | T_add _ | T_max _ | T_le _) -> assert false
-
-
-
-(* instantaneous function type *)
-let (==>) t1 t2 =
-  fun_ty t1 (T_response_time 0) t2
-
-let unknown =
-  let c = ref 0 in
-  fun () ->
-    let ty = T_var (ref (Unknown (!c))) in
-    incr c; ty
-
-let rec no_unknown_in_ty t =
-  let exception Found in
-  let rec find t =
-    match t with
-    | T_const _ -> ()
-    | T_var{contents=Ty t'} ->
-        find t'
-    | T_var{contents=Unknown _} -> raise Found
-    | T_tuple (ts) ->
-        List.iter find ts
-    | T_fun{arg;dur;ret} ->
-        find arg; find dur; find ret
-    | T_string tz ->
-        find tz
-    | T_sum cs -> List.iter (fun (_,t) -> find t) cs
-    | T_ref(t) -> find t
-    | T_array {elem=t;size=tz} -> find t; find tz
-    | T_matrix {elem=t;size=tz} -> find t; find tz
-    | T_vector {elem=t;size=tz} -> find t; find tz
-    | T_static t -> find t
-    | T_size _ -> find t
-    | (T_response_time _ | T_infinity) -> ()
-    | (T_add(t1,t2) | T_max(t1,t2) | T_le(t1,t2)) -> 
-       find t1; find t2
-  in
-  try find t; false with Found -> true
-
-
-
-let simplify_response_time t =
-  let rec simpl t = match t with
-  | T_size _ -> t
-  | T_response_time _ | T_infinity -> t
-  | T_add(t1,t2) ->
-      (match simpl t1, simpl t2 with
-      | T_add(ta,tb),t -> simpl @@ T_add(ta,T_add(tb,t))
-      | T_response_time n,T_add(T_response_time m,tb) -> 
-          simpl @@ T_add(T_response_time (n+m),tb)
-      | T_var _ as t1',t2'
-      | t2',(T_var _ as t1') -> T_add(t2',t1')
-      | T_response_time n,T_response_time m -> T_response_time (n+m)
-      | T_infinity,T_response_time _
-      | T_infinity,T_infinity
-      | T_response_time _ , T_infinity -> T_infinity
-      | t,T_response_time 0 | T_response_time 0,t -> t
-      | t1',t2' -> T_add(t1',t2'))
-  | T_max(t1,t2) ->
-      (match simpl t1, simpl t2 with
-      | T_response_time n,T_response_time m -> 
-          T_response_time (max n m)
-      | T_infinity,T_response_time _
-      | T_infinity,T_infinity
-      | T_response_time _ , T_infinity -> T_infinity
-      | t,T_response_time 0 | T_response_time 0,t -> t
-      | t1',t2' -> T_max(t1',t2'))
-  | T_le _ -> failwith "todo T_le"
-  | T_var({contents=Ty t'} as v) ->
-      let t2 = simpl t' in
-      v := Ty t2; t2
-  | T_var{contents=Unknown _} ->
-      t
-  | _ -> assert false (* hill kinded *)
-  in simpl t
-
-(** [canon t] put the type [t] in canonical form by replacing
-  instantiated variables free in [t] by their definition,
-  themselves put in canonical form. *)
-let rec canon t =
-  match t with
-  | T_const(TInt t) -> T_const(TInt (canon t))
-  | T_const _ -> t
-  | T_var({contents=Ty t'} as v) ->
-      let t2 = canon t' in
-      v := Ty t2; t2
-  | T_var{contents=Unknown _} ->
-      t
-  | T_tuple (ts) ->
-      T_tuple (List.map canon ts)
-  | T_fun{arg;dur;ret} ->
-      T_fun{ arg = canon arg;
-             dur = canon dur;
-             ret = canon ret }
-  | T_string tz -> T_string (canon tz)
-  | T_sum cs -> T_sum (List.map (fun (x,t) -> (x,canon t)) cs)
-  | T_ref(t) -> T_ref (canon t)
-  | T_array {elem=t;size=tz} -> T_array {elem=canon t;size=canon tz}
-  | T_matrix {elem=t;size=tz} -> T_matrix {elem=canon t;size=canon tz}
-  | T_vector {elem=t;size=tz} -> T_vector {elem=canon t;size=canon tz}
-  | T_static t -> T_static (canon t)
-  | T_size _ -> t
-  | (T_response_time _ | T_infinity | T_add _ | T_max _ | T_le _) as t -> simplify_response_time t
-*)
 
 let find_ctor x sums =
   (* find number and type of ctor [x] in the sum type definition [sum] *)
@@ -205,8 +19,6 @@ let find_ctor x sums =
   aux sums
 
 
-
-
 type 'a var = 'a var_content ref
 and 'a var_content = Unknown of int
                    | Is of 'a
@@ -221,8 +33,8 @@ type tyB = TyB_var of tyB var
          | TyB_tuple of tyB list
          | TyB_sum of (tag * tyB) list
          | TyB_string of size
-         | TyB_vector of size * tyB
          | TyB_size of size
+         | TyB_abstract of x * size list * tyB list (* size in number of bits *)
 
 and tag = string
 
@@ -258,14 +70,14 @@ let rec canon_tyB = function
 | TyB_unit -> TyB_unit
 | TyB_tuple tyB_list ->
     TyB_tuple (List.map canon_tyB tyB_list)
-| TyB_vector(sz,tyB) ->
-    TyB_vector(canon_size sz, canon_tyB tyB)
 | TyB_size(sz) ->
     TyB_size(canon_size sz)
 | TyB_sum(ctors) ->
     TyB_sum(List.map (fun (tag,tyB) -> (tag,canon_tyB tyB)) ctors)
 | TyB_string sz ->
     TyB_string (canon_size sz)
+| TyB_abstract (x,szs,tyB_list) ->
+    TyB_abstract (x,List.map canon_size szs, List.map canon_tyB tyB_list)
 
 let rec canon_dur = function
 | Dur_var ({contents=Is d} as v) ->
@@ -351,7 +163,7 @@ let pp_tuple fmt pp vs =
 let open Format in
 fprintf fmt "(";
 pp_print_list
-      ~pp_sep:(fun fmt () -> fprintf fmt ", ")
+      ~pp_sep:(fun fmt () -> fprintf fmt " * ")
       pp fmt vs;
 fprintf fmt ")"
 
@@ -365,8 +177,6 @@ let pp_tyB fmt (tyB:tyB) : unit =
   | TyB_unit -> fprintf fmt "unit"
   | TyB_int sz -> fprintf fmt "int<%a>" pp_size sz
   | TyB_tuple tyB_list -> pp_tuple fmt pp tyB_list
-  | TyB_vector(sz,tyB) ->
-      fprintf fmt "vector<%a,%a>" pp_size sz pp tyB
   | TyB_size(sz) ->
       fprintf fmt "size<%a>" pp_size sz
   | TyB_sum(ctors) ->
@@ -377,6 +187,17 @@ let pp_tyB fmt (tyB:tyB) : unit =
            fprintf fmt "%s of %a" x pp t) fmt ctors;
         fprintf fmt ")"
   | TyB_string sz -> fprintf fmt "string<%a>" pp_size sz
+  | TyB_abstract (x,szs,tyB_list) -> 
+      if tyB_list <> [] then 
+        (fprintf fmt "(";
+         pp_print_list
+           ~pp_sep:(fun fmt () -> fprintf fmt ", ") pp fmt tyB_list;
+         fprintf fmt ") ") else ();
+
+         (fprintf fmt "%s<" x;
+         pp_print_list
+           ~pp_sep:(fun fmt () -> fprintf fmt ", ") pp_size fmt szs;
+         fprintf fmt ">")
  in pp fmt tyB
 
 let pp_ty fmt (ty:ty) : unit =
@@ -454,11 +275,11 @@ let rec occ = function
 | TyB_size sz -> occur_size v sz
 | TyB_tuple tyB_list ->
     List.iter occ tyB_list
-| TyB_vector(sz,tyB) ->
-     occur_size v sz; occ tyB
 | TyB_sum ctors ->
     List.iter (fun (_,tyB) -> occ tyB) ctors
 | TyB_string sz -> occur_size v sz
+| TyB_abstract(_,szs,tyB_list) ->
+    List.iter (occur_size v) szs; List.iter occ tyB_list
 in occ tyB
 
 let rec occur_ty v ty =
@@ -508,10 +329,12 @@ let rec vars s = function
   | TyB_tuple tyB_list ->
       List.fold_left vars s tyB_list
   | TyB_size sz -> vars_of_size ~s sz
-  | TyB_vector(sz,tyB) -> vars_of_size ~s:(vars s tyB) sz
   | TyB_sum ctors ->
       List.fold_left (fun s (_,tyB) -> vars s tyB) s ctors
   | TyB_string sz -> vars_of_size ~s:s sz
+  | TyB_abstract(_,szs,tyB_list) -> 
+      let s = List.fold_left (fun s -> vars_of_size ~s) s szs in
+      List.fold_left vars s tyB_list
 in
 vars s tyB
 
@@ -566,13 +389,14 @@ let rec inst_tyB = function
 | TyB_int sz -> TyB_int (inst_size sz)
 | TyB_tuple tyB_list ->
     TyB_tuple (List.map inst_tyB tyB_list)
-| TyB_vector(sz,tyB) ->
-    TyB_vector(inst_size sz,inst_tyB tyB)
 | TyB_size sz ->
     TyB_size(inst_size sz)
 | TyB_sum ctors ->
     TyB_sum (List.map (fun (tag,tyB) -> tag,inst_tyB tyB) ctors)
-| TyB_string sz -> TyB_string (inst_size sz) in
+| TyB_string sz -> TyB_string (inst_size sz)
+| TyB_abstract(x,szs,tyB_list) ->
+    TyB_abstract (x,List.map inst_size szs,List.map inst_tyB tyB_list)
+in
 
 let rec inst_ty = function
 | Ty_var {contents=Unknown n} as ty ->
@@ -612,9 +436,10 @@ let generalize r ty =
   | ty -> Forall(Vs.empty,ty)
 
 
-let as_tyB ~loc ty = 
+let rec as_tyB ~loc ty = 
   match ty with
   | Ty_base tyB -> tyB
+  | Ty_tuple(tys) -> TyB_tuple(List.map (as_tyB ~loc) tys)
   | _ -> Prelude.Errors.raise_error ~loc ()
                  ~msg:"basic type expected"
 

@@ -7,18 +7,19 @@ let eval_static_exp_int ~loc ~statics e =
   let exception Cannot in 
   let rec eval e =
     match e with
+    | E_const (C_size(n)) -> (n,Types.new_size_unknown())
     | E_const (Int(n,w)) -> (n,w)
-    | E_app(E_const(Op(Runtime op)),e) ->
+    | E_app(E_const(Op(Runtime (External_fun (op,_)))),e) ->
         let app_binop (f,e1,e2) = 
           let (v1,size) = eval e1 in
           let (v2,_) = eval e2 in
           (f v1 v2, size)
         in
         (match op,e with 
-         | Add,E_tuple [e1;e2] -> app_binop((+),e1,e2)
-         | Sub,E_tuple [e1;e2] -> app_binop((-),e1,e2)
-         | Mult,E_tuple [e1;e2] -> app_binop(( * ),e1,e2)
-         | Div,E_tuple [e1;e2] -> app_binop((/),e1,e2)
+         | "Int.add",E_tuple [e1;e2] -> app_binop((+),e1,e2)
+         | "Int.sub",E_tuple [e1;e2] -> app_binop((-),e1,e2)
+         | "Int.mul",E_tuple [e1;e2] -> app_binop(( * ),e1,e2)
+         | "Int.div",E_tuple [e1;e2] -> app_binop((/),e1,e2)
          | _ -> raise Cannot)
     | E_array_length(x) ->
        (match List.assoc_opt x statics with
@@ -36,6 +37,27 @@ let eval_static_exp_int ~loc ~statics e =
 
 let rec expand ~statics e =
   match e with
+    | E_generate((p,e1),init,e_st3,loc) ->
+        has_changed := true;
+        let (n,w) = eval_static_exp_int ~loc ~statics e_st3 in
+        let rec loop i =
+          if i < n then
+            E_letIn(p,E_tuple[E_const (Int(i,w)); loop(i+1)],e1)
+          else init
+         in loop 0
+
+    | E_for(x,e_st1,e_st2,e3,loc) ->
+        has_changed := true;
+        let (n,w) = eval_static_exp_int ~loc ~statics e_st1 in
+        let (m,w') = eval_static_exp_int ~loc ~statics e_st2 in
+        (* assert(w = w'); *)
+        let ignore = gensym () in
+        E_letIn(P_var ignore,
+                (let es = List.init (m-n+1) (fun i -> 
+                   E_letIn(P_var x, E_const (Int(n+i,w)),e3)) in
+                E_par(es)),
+                E_const Unit)
+
   (*
   | E_generate((p,e1),init,e_st3,loc) ->
       has_changed := true;
@@ -75,9 +97,9 @@ let rec expand ~statics e =
             let x = gensym () in
             let ii = E_const(Int(i,Types.new_size_unknown())) in
             E_letIn(P_var x, E_letIn(P_var z,
-                                  E_app(E_const(Op(Runtime (Vector_get (Types.new_tyB_unknown())))),
+                                  E_app(E_const(Op(Runtime (External_fun("Vect.nth",Types.new_ty_unknown())))),
                                   E_tuple[E_var y;ii]),
-                              Ast_subst.subst_p_e p (E_tuple[ii;E_var z]) (Ast_rename.rename_e ~statics e1')),
+                              Ast_subst.subst_p_e p (E_tuple[ii;E_var z]) (Ast_rename.rename_e ~statics:(List.map fst statics) e1')),
             loop (x::xs) (i+1)) in loop [] 0)
             (* Ast_pprint.pp_exp Format.std_formatter e0; *)
       | _ -> assert false (* todo error *)
@@ -99,7 +121,7 @@ let rec expand ~statics e =
             E_letIn(P_var x, E_letIn(P_var z,
                                   E_app(E_const(Op(Runtime (GetBit))),
                                   E_tuple[E_var y;ii]),
-                              Ast_subst.subst_p_e p (E_tuple[ii;E_var z]) (Ast_rename.rename_e ~statics e1')),
+                              Ast_subst.subst_p_e p (E_tuple[ii;E_var z]) (Ast_rename.rename_e ~statics:(List.map fst statics) e1')),
             loop (x::xs) (i-1)) in loop [] (n-1))
       (* Ast_pprint.pp_exp Format.std_formatter e0; *)
       | _ -> Ast_pprint.pp_exp Format.std_formatter e; assert false (* todo error *)
@@ -109,5 +131,5 @@ let rec expand ~statics e =
 
 
 let expand_pi pi =
-  let main = expand ~statics:(List.map fst pi.statics) pi.main in
+  let main = expand ~statics:pi.statics pi.main in
   { pi with main }

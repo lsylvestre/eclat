@@ -27,11 +27,10 @@
        "fix",   FIX;
        "true",  BOOL_LIT true;
        "false", BOOL_LIT false;
-       "not",   NOT;
        "or",    OR;
        "mod",   MOD;
-       "last",  LAST;
-       "init",  LAST;
+       "last",  INIT; (* for compatibility with previous papers *)
+       "init",  INIT;
        "default",  DEFAULT;
        "static", STATIC;
        "match", MATCH;
@@ -68,7 +67,15 @@
        "length", LENGTH;
        "size_create", SIZE_CREATE;
        "vect_mapi", VECTOR_MAPI;
-       "int_mapi", INT_MAPI
+       "int_mapi", INT_MAPI;
+       "external", EXTERNAL;
+       "operator", OPERATOR;
+       "shared", SHARED;
+       "run", RUN;
+       "array",ARRAY;
+       "impure",IMPURE;
+       "vect_create",VECT_CREATE;
+       "make", ARRAY_MAKE
      ]
 
 
@@ -85,15 +92,21 @@ let get_loc lexbuf =
 }
 
 (* let tvar_ident = [''']['a'-'z'] ['a'-'z''A'-'Z''0'-'9''_''A'-'Z'''']* *)
-let ident = ['a'-'z''_'] ['a'-'z''A'-'Z''0'-'9''_''A'-'Z']*
+let ident = ['a'-'z''_'] ['a'-'z''A'-'Z''0'-'9''_''A'-'Z']*[''']*
 let up_ident = ['A'-'Z']['a'-'z''A'-'Z''0'-'9''_''A'-'Z']*
-let tvar_ident = ['''] ident
+let tvar_ident = ['''] ['a'-'z''A'-'Z''0'-'9''_''A'-'Z']*
+let tyB_var_ident = ['`''~'] ['a'-'z''A'-'Z''0'-'9''_''A'-'Z']*
+
+
+let op_ident = up_ident '.' ident
 
 rule token = parse
 | ident as id         { try Hashtbl.find keywords id with
                         | Not_found -> IDENT id }
 | up_ident as id      { UP_IDENT id }
 | tvar_ident as lxm   { TVAR_IDENT lxm }
+| tyB_var_ident as lxm   { TYB_VAR_IDENT lxm }
+| op_ident as id{ OPERATOR_IDENT id }
 | '('                 { incr paren_lvl; LPAREN }
 | ')'                 { if !paren_lvl <= 0 then
                            Prelude.Errors.raise_error ~loc:(get_loc lexbuf)
@@ -106,10 +119,13 @@ rule token = parse
                               ~msg:"unbalanced bracket" ()
                         else ();
                         decr brack_lvl; RBRACKET }
+| "%with_sizes"       { WITH_SIZES }
 | "#exit"             { EXIT_REPL }
 | "#[|"               { SHARP_PIPE_LBRACKET }
 | "|]"                { PIPE_RBRACKET }
 | "[|"                { LBRACKET_PIPE }
+| "{"                { LCUR }
+| "}"                { RCUR }
 | '@'                 { AT }
 | "@@"                { AT_AT }
 | ','                 { COMMA }

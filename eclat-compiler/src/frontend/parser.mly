@@ -30,16 +30,53 @@
     | _ -> Format.fprintf Format.std_formatter "--->%a\n" Ast_pprint.pp_exp e;
     Prelude.Errors.raise_error ~loc:(with_file loc)
               ~msg:"this expression should be a constant" ()
+
+  let hash_size_tvar = Hashtbl.create 10 ;;
+  let decl_size_var x =
+    if Hashtbl.mem hash_size_tvar x then
+    Hashtbl.find hash_size_tvar x else
+    (let v = (new_size_unknown ()) in
+     Hashtbl.add hash_size_tvar x v; v)
+
+  let hash_ty_tvar = Hashtbl.create 10 ;;
+  let decl_ty_var x =
+    if Hashtbl.mem hash_ty_tvar x then
+    Hashtbl.find hash_ty_tvar x else
+    (let v = (new_ty_unknown ()) in
+     Hashtbl.add hash_ty_tvar x v; v)
+
+  let hash_tyB_tvar = Hashtbl.create 10 ;;
+  let decl_tyB_var x =
+    if Hashtbl.mem hash_tyB_tvar x then
+    Hashtbl.find hash_tyB_tvar x else
+    (let v = (new_tyB_unknown ()) in
+     Hashtbl.add hash_tyB_tvar x v; v)
+
+
+  let clear_tyvar_constraints () =
+    Hashtbl.clear hash_size_tvar;
+    Hashtbl.clear hash_ty_tvar;
+    Hashtbl.clear hash_tyB_tvar 
+
+  let infix_operators : (x, x) Hashtbl.t = Hashtbl.create 10
+
+  let get_arity ty = 
+    match ty with
+    | Ty_fun(Ty_base(TyB_tuple ts),_,_) -> List.length ts
+    | Ty_fun(Ty_base _,_,_) -> 1
+    | _ -> assert false (* todo *)
+
 %}
 
-%token LPAREN RPAREN LBRACKET RBRACKET COMMA PIPE_PIPE PIPE_COMMA_PIPE EQ EQ_EQ COL SEMI HAT STATIC DOT_LENGTH ARRAY_LENGTH
+%token LPAREN RPAREN LCUR RCUR LBRACKET RBRACKET COMMA PIPE_PIPE PIPE_COMMA_PIPE EQ EQ_EQ COL SEMI HAT STATIC DOT_LENGTH ARRAY_LENGTH
 %token SHARP_PIPE_LBRACKET LBRACKET_PIPE PIPE_RBRACKET
-%token FUN AMP DOT REGISTER EXEC LAST DEFAULT RESET WHEN
+%token FUN AMP DOT REGISTER EXEC INIT DEFAULT RESET WHEN
 %token NODE IMPLY
 %token MATCH WITH PIPE END
 %token OF
 %token LET REC AND IN IF THEN ELSE FIX
-%token <string> IDENT UP_IDENT TVAR_IDENT
+%token ARRAY IMPURE
+%token <string> IDENT UP_IDENT TVAR_IDENT TYB_VAR_IDENT 
 %token <bool> BOOL_LIT
 %token <int> INT_LIT
 %token PLUS MINUS TIMES LT LE GT GE NEQ NOT MOD DIV AMP_AMP OR
@@ -48,6 +85,10 @@
 %token UNROLL AT AT_AT
 %token GET SET LENGTH CREATE
 %token SIZE_CREATE
+%token WITH_SIZES
+%token EXTERNAL OPERATOR SHARED RUN
+%token <string> SYM
+%token <string> OPERATOR_IDENT
 
 %token EOF
 %token SEMI_SEMI
@@ -59,9 +100,9 @@
 %token MACRO_FOR PARFOR FOR TO DO DONE
 %token REF COL_EQ BANG QUESTION_MARK
 %token IMMEDIATE
-%token ARRAY_CREATE
+%token ARRAY_CREATE ARRAY_MAKE
 %token INIT_TUPLE INIT_INT
-%token VECTOR_MAPI INT_MAPI
+%token VECTOR_MAPI INT_MAPI VECT_CREATE
 /* The precedences must be listed from low to high. */
 
 %right    PIPE_PIPE PIPE_COMMA_PIPE /* parallel construct */
@@ -82,17 +123,46 @@
 %nonassoc DOT
 %nonassoc BOOL_LIT IDENT LPAREN
 
-%start <(x * static) list * (x * (x * tyB) list) list * ((p*e)*Prelude.loc) list> pi
+%start <((x * (ty * bool)) list * (x * (ty * (bool * int * bool))) list) 
+          * (x * static) list * (x * (x * tyB) list) list * ((p*e)*Prelude.loc) list> pi
 %start <e> exp_eof
 
 %%
 
 pi:
-| g=static pi=pi { let gs,ts,ds= pi in (g::gs,ts,ds) }
-| d=typ_sum pi=pi { let gs,ts,ds= pi in (gs,d::ts,ds) }
-| d=decl pi=pi { let gs,ts,ds= pi in (gs,ts,d::ds) }
-| type_alias pi=pi { pi }
-| EOF { [],[],[] }
+| ec=ext_circ pi=pi   { let (ecs,efs),gs,ts,ds = pi in
+                        let (x,t) = ec in
+                        let f = String.capitalize_ascii x in
+                        let arg = gensym ~prefix:"arg" () in
+                        let v = E_fun(P_var arg, E_run(f,E_var arg)) in
+                        (((f,t)::ecs,efs), gs,    ts,    (((P_var x,v),with_file $loc)::ds)) }
+| ef=ext_fun pi=pi    { let (ecs,efs),gs,ts,ds = pi in ((ecs,ef::efs), gs,    ts,    ds   ) }
+| g=static pi=pi      { let (ecs,efs),gs,ts,ds = pi in ((ecs,    efs), g::gs, ts,    ds   ) }
+| d=typ_sum pi=pi     { let (ecs,efs),gs,ts,ds = pi in ((ecs,    efs), gs,    d::ts, ds   ) }
+| d=decl pi=pi        { let (ecs,efs),gs,ts,ds = pi in ((ecs,    efs), gs,    ts,    d::ds) }
+| type_alias pi=pi    { pi }
+| EOF                 { ([],[]),[],[],[] }
+
+ext_fun:
+/*| OPERATOR x=SYM COL t=ty EQ y=STRING_LIT SEMI_SEMI 
+   { Hashtbl.add infix_operators x y; 
+     Hashtbl.clear hash_size_tvar;
+     (y, (t,false)) }*/
+| OPERATOR x=OPERATOR_IDENT COL t=ty imp=is_impure SEMI_SEMI 
+   { Hashtbl.clear hash_size_tvar;
+     (x, (t,(false,get_arity t,imp))) }
+| OPERATOR WITH_SIZES x=OPERATOR_IDENT COL t=ty imp=is_impure SEMI_SEMI 
+   { Hashtbl.clear hash_size_tvar;
+     (x, (t,(true,get_arity t,imp))) }
+
+%inline is_impure:
+| AT IMPURE { true }
+| {false}
+
+ext_circ:
+| EXTERNAL x=IDENT COL t=ty SEMI_SEMI { (x, (t, false)) }
+| SHARED EXTERNAL x=IDENT COL t=ty SEMI_SEMI { (x, (t, true)) }
+
 
 static: /* todo: add loc and type annotation [tyopt] */
 | LET STATIC x=IDENT EQ ec=aexp e=static_dim_exp SEMI_SEMI
@@ -129,6 +199,11 @@ exp_eof:
 | e=exp EOF {e}
 
 decl:
+| d=decl_all 
+  { clear_tyvar_constraints();
+    d }
+
+decl_all:
 | LET b=after_let(SEMI_SEMI)
         { b,(with_file $loc) }
 | NODE b=fun_decl(SEMI_SEMI)
@@ -141,10 +216,32 @@ decl:
 
 type_alias: /* todo: avoid side effect, which depends on the left-to-right evaluation order */
 | TYPE x=IDENT EQ tyB=tyB SEMI_SEMI? { add_alias x tyB (with_file $loc) }
+| TYPE tyB=tyB r=rest_abstract
+    { 
+      let x,szs = (match tyB with
+                  | TyB_abstract(x,szs,_) -> x,szs
+                      (* take the type declaration into account *)
+                  | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc) 
+                           ~msg:"type definition expected" ()
+                  ) in
+      match r with
+      | None -> ()
+      | Some (op,intl) ->
+          Hashtbl.add Ast.typ_decl_abstract x (op,szs,intl)
+   ;
+   clear_tyvar_constraints () 
+   }
+%inline rest_abstract:
+| SEMI_SEMI? { None }
+| AT op=IDENT SEMI_SEMI? { Some (op,[]) }
+| op=IDENT LBRACKET intl=separated_nonempty_list(COMMA,INT_LIT) RBRACKET SEMI_SEMI?
+   { Some (op,intl) } 
+
 
 typ_sum:
 | TYPE x=IDENT EQ ts=separated_nonempty_list(PIPE,ty_case) SEMI_SEMI? 
    { add_alias x (TyB_sum ts) (with_file $loc);
+     clear_tyvar_constraints();
      x,ts }
 
 ty_case:
@@ -212,39 +309,56 @@ tyB_ident:
             | "bool" -> TyB_bool
             | "int" -> TyB_int(Sz_lit 32)
             | "string" -> TyB_string (new_size_unknown()) 
-            | s -> (match Hashtbl.find_opt alias_types s with
+            | s -> 
+                (match Hashtbl.find_opt alias_types s with
                     | Some (t,_) -> t
-                    | None -> Prelude.Errors.raise_error ~loc:(with_file $loc)
-                              ~msg:("unbound type constructor "^s) ()) }
-
+                    | None ->  TyB_abstract(x,[Sz_lit 1],[])) (* Prelude.Errors.raise_error ~loc:(with_file $loc)
+                              ~msg:("unbound type constructor "^s) ()) *) }
 
 
 ty_ident:
 | tyB=tyB_ident { Ty_base tyB }
 
 tyB:
+| LT sz=size GT { TyB_size(sz) }
 | tyB=tyB_next TIMES tyBs=separated_nonempty_list(TIMES,tyB_next) 
     { TyB_tuple (tyB::tyBs) }
 | tyB=tyB_next {tyB}
 
 tyB_next:
+| x=TYB_VAR_IDENT { decl_tyB_var x }
 | tyB=tyB_ident { tyB }
 | LPAREN tyB=tyB RPAREN { tyB }
-| x=IDENT LT sz=size GT 
+| x=IDENT szs=size_list
      { match x with
-       | "int" -> TyB_int(sz)
-       | ("array" | "vector") -> 
+       | "int" -> (match szs with 
+                   | sz::[] -> 
+                      TyB_int(sz)
+                   | _ -> assert false) 
+       | ("array" (* | "vect"*)) -> 
             Prelude.Errors.raise_error ~loc:(with_file $loc)
                  ~msg:("type parameter expected for type constructor "^x) ()
-       | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
-                 ~msg:("unknown type constructor "^x) () }
-| tyB=tyB_next x=IDENT LT sz=size GT 
+       | _ -> TyB_abstract(x,szs,[]) }
+| tyBs=tyB_list x=IDENT szs=size_list
      { match x with
        | "array" -> Prelude.Errors.raise_error ~loc:(with_file $loc) ()
                  ~msg:(x^" is not a basic type constructor")
-       | "vector" -> TyB_vector(sz,tyB)
-       | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc) ()
-                 ~msg:("unknown type constructor "^x) }
+       (* | "vect" -> (match szs,tyBs with 
+                   | sz::[],tyB::[] -> 
+                      TyB_vector(sz,tyB)
+                   | _ -> assert false)*)
+       | x -> TyB_abstract(x,szs,tyBs)
+       (* Prelude.Errors.raise_error ~loc:(with_file $loc) ()
+                 ~msg:("unknown type constructor "^x) *) }
+
+size_list:
+| sz=size { [sz] }
+| LT szs=separated_nonempty_list(COMMA,size) GT { szs }
+
+%inline tyB_list:
+| tyB=tyB_next { [tyB] }
+| LPAREN tyBs=separated_nonempty_list(COMMA,tyB) RPAREN { tyBs }
+
 
 ty:
 | ty=ty_next TIMES tys=separated_nonempty_list(TIMES,ty_next) 
@@ -253,14 +367,19 @@ ty:
 
 
 ty_next:
-| ty=ty_ident { ty }
+| x=TVAR_IDENT { decl_ty_var x }
+| ty_tyB=ty_next  ARRAY LT sz=size GT 
+    { let tyB = as_tyB ~loc:(with_file $loc) ty_tyB in
+      Ty_array(sz,tyB) }
+/*| ty=ty_ident { ty }
 | ty_tyB=ty_next x=IDENT LT sz=size GT 
      { let tyB = as_tyB ~loc:(with_file $loc) ty_tyB in
        match x with
        | "array" -> Ty_array(sz,tyB)
-       | "vector" -> Ty_base(TyB_vector(sz,tyB))
-       | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc) ()
-                 ~msg:("unknown type constructor "^x) }
+       | "vect" -> Ty_base(TyB_vector(sz,tyB))
+       | x -> Ty_base (TyB_abstract(x,[sz],[tyB]))
+       (* | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc) ()
+                 ~msg:("unknown type constructor "^x)  *) }*/
 | ty=ty_next RIGHT_ARROW tyB=tyB { Ty_fun(ty,Dur_one,tyB) } 
 | ty=ty_next QUESTION_MARK RIGHT_ARROW tyB=tyB { Ty_fun(ty,new_dur_unknown(),tyB) } 
 | ty=ty_next IMPLY tyB=tyB { Ty_fun(ty,Dur_zero,tyB) } 
@@ -269,7 +388,9 @@ ty_next:
 
 size:
 | n=INT_LIT { Sz_lit n }
-| TVAR_IDENT { new_size_unknown () } /* TODO: hashmap to constrain occurrences */
+| x=TVAR_IDENT {
+    decl_size_var x
+  }
 
 aty:
 ty=ty { ty } 
@@ -393,8 +514,9 @@ app_exp:
   e=app_exp_desc { mk_loc (with_file $loc) e }
 
 app_exp_desc:
-| ARRAY_CREATE e1=aexp
-| CREATE e1=aexp { E_local_static_array(e1,with_file $loc) }
+| ARRAY_MAKE LT sz=size GT e=aexp { E_array_make(sz, e, with_file $loc) }
+| ARRAY_CREATE LT sz=size GT LPAREN RPAREN
+| CREATE LT sz=size GT LPAREN RPAREN { E_array_create(sz, with_file $loc) }
 | e1=aexp e2=aexp AT v=lvalue
 | e1=aexp e2=aexp AT_AT v=lvalue 
     { 
@@ -433,7 +555,7 @@ app_exp_desc:
                    ~msg:"expression in functional position should be a variable or a constante" ())
         | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
                    ~msg:"All functions and primitives should be unary. Hints: use a tuple as argument" () }
-| MINUS e1=aexp %prec prec_unary_minus { E_app(E_const(Op(Runtime(Sub))),E_tuple[E_const(Int(0,new_size_unknown()));e1]) }
+| MINUS e1=aexp %prec prec_unary_minus { E_app(E_const(Op(Runtime(External_fun("Int.neg",new_ty_unknown ())))),e1) }
 | e1=app_exp op=binop e2=app_exp
         { E_app (mk_loc (with_file $loc) @@ E_const (Op (Runtime(op))),
                  mk_loc (with_file $loc) @@ E_tuple [e1;e2])
@@ -446,13 +568,13 @@ app_exp_desc:
         { let e2 = mk_loc (with_file $loc) @@ E_const (Bool true) in
           E_if(e1,e2,e3)
         }
-| REGISTER ev=exp last_kw e0=aexp
+| REGISTER ev=exp INIT e0=aexp
        { match un_annot ev with
          | E_fun(p,e1) -> E_reg((p,e1),e0,Ast.gensym ())
          | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
                                ~msg:"This expression should be a function" ()
        }
-| REGISTER f=IDENT last_kw e0=aexp
+| REGISTER f=IDENT INIT e0=aexp
        {
         let y = gensym () in
          E_reg((P_var y,E_app(E_var f,E_var y)),e0,Ast.gensym ())
@@ -490,17 +612,12 @@ app_exp_desc:
               E_tuple (List.init k (fun i -> E_app(e,E_const(Int(i,unknown()))))))
     }*/
 
+| RUN i=UP_IDENT e=aexp 
+     { E_run(i, e) }
+
+
 
 | e=aexp { e }
-
-
-last_kw:
-LAST {()}
-/*| x=IDENT {
-    if x = "init" then () else
-     Prelude.Errors.raise_error ~loc:(with_file $loc)
-            ~msg:"``init'' keyword expected" ()
- }*/
 
 
 dot_get:
@@ -516,7 +633,7 @@ aexp_desc:
 | LPAREN e=exp COL ty=ty RPAREN { ty_annot ~ty e }
 | c=const { E_const c }
 
-| RESIZE_INT LT k=INT_LIT GT { E_const (Op(Runtime(Resize_int k))) }
+| RESIZE_INT LT k=size GT { E_const (Op(Runtime(Resize_int k))) }
 | TUPLE_OF_INT LT k=INT_LIT GT { E_const (Op(Runtime(Tuple_of_int k))) }
 | INT_OF_TUPLE LT k=INT_LIT GT { E_const (Op(Runtime(Int_of_tuple k))) }
 | VECTOR_MAPI e=aexp {
@@ -534,12 +651,10 @@ aexp_desc:
                                   E_int_mapi(false,(P_var x,E_app(v,E_var x)), e, new_size_unknown ())
                 | _ -> assert false (* todo error *) }
 | x=UNROLL AT k=INT_LIT { E_const (Op(Runtime(Unroll k))) }
+| VECT_CREATE LT l=size GT { E_const (Op(Runtime(Vector_create l))) } 
 | x=IDENT { match x with
-            | "vect_create"|"vect_make" -> E_const (Op(Runtime(Vector_make)))
-            | "vect_size" | "vector_length" -> E_const (Op(Runtime(Vector_length(new_size_unknown(),new_size_unknown()))))
-            | "vect_nth"| "vector_get" -> E_const (Op(Runtime(Vector_get(new_tyB_unknown()))))
-            | "vect_copy_with" -> E_const (Op(Runtime(Vector_update (new_size_unknown()))))
-            | "abs" -> E_const (Op(Runtime(Abs)))
+            | "abs" -> E_const (Op(Runtime(External_fun("Int.absv",new_ty_unknown ()))))
+            | "not" -> E_const (Op(Runtime(External_fun("Bool.lnot",new_ty_unknown ()))))
             | "print" -> E_const (Op(Runtime(Print)))
             | "print_string" -> E_const (Op(Runtime(Print_string)))
             | "print_int" -> E_const (Op(Runtime(Print_int)))
@@ -575,14 +690,17 @@ aexp_desc:
         E_letIn(P_var n0, e1,
         E_letIn(P_var n, e2,
         E_letIn(P_var loop,E_fix(loop,(P_var i,
-                              E_if(E_app(E_const(Op(Runtime(Gt))),E_tuple[E_var i;E_var n]),
+                              E_if(E_app(E_const(Op(Runtime(External_fun("Int.gt",new_ty_unknown ())))),E_tuple[E_var i;E_var n]),
                                    E_const(Unit),
-                                   E_letIn(P_unit,e,E_app(E_var loop,E_app(E_const(Op(Runtime(Add))),E_tuple[E_var i;E_const (Int (1,new_size_unknown()))])))))), 
+                                   E_letIn(P_unit,e,E_app(E_var loop,
+                                    E_app(E_const(Op(Runtime(External_fun("Int.add",new_ty_unknown ())))),
+                                        E_tuple[E_var i;E_const (Int (1,new_size_unknown()))])))))), 
                  E_app(E_var loop,E_var n0))))
                 }
 
 | MACRO_FOR x=IDENT EQ e_st1=exp TO e_st2=exp DO e=exp DONE 
       { E_for(x,e_st1,e_st2,e,with_file $loc) }
+
 
 match_case_const:
 | cs=separated_nonempty_list(PIPE,const) RIGHT_ARROW e=exp PIPE { (cs,e) }
@@ -633,29 +751,36 @@ const:
                 string_of_int k ^">") ()
       else Int (n,Sz_lit k) }
 | s=STRING_LIT           { String s }
-| NOT                    { Op(Runtime(Not)) }
+| x=OPERATOR_IDENT { Op(Runtime(External_fun(x,new_ty_unknown()))) }
 | x=UP_IDENT             { Inj x }
 | LPAREN op=binop RPAREN { Op(Runtime(op)) }
-| LBRACKET_PIPE cs=separated_nonempty_list(SEMI,const) PIPE_RBRACKET
+| LCUR cs=separated_nonempty_list(COMMA,const) RCUR
     { C_vector cs }
 
+
 %inline binop:
-| PLUS       { Add }
-| MINUS      { Sub }
-| TIMES      { Mult }
-| DIV        { Div }
-| MOD        { Mod }
-| LT         { Lt }
-| GT         { Gt }
-| LE         { Le }
-| GE         { Ge }
-| EQ | EQ_EQ { Eq }
-| NEQ        { Neq }
-| AMP        { And }
-| XOR        { Xor }
-| LXOR       { Lxor }
-| LAND       { Land }
-| LOR        { Lor }
-| LSL        { Lsl }
-| LSR        { Lsr }
-| ASR        { Asr }
+/*| x=SYM        { let y = match Hashtbl.find_opt infix_operators x with 
+                       | None -> x
+                       | Some y -> y in
+                 External_fun(y,new_ty_unknown ())
+                }*/
+| PLUS       { External_fun("Int.add",new_ty_unknown ()) }
+| MINUS      { External_fun("Int.sub",new_ty_unknown ()) }
+| TIMES      { External_fun("Int.mul",new_ty_unknown ()) }
+| DIV        { External_fun("Int.div",new_ty_unknown ()) }
+| MOD        { External_fun("Int.modulo",new_ty_unknown ()) }
+| LT         { External_fun("Int.lt",new_ty_unknown ()) }
+| GT         { External_fun("Int.gt",new_ty_unknown ()) }
+| LE         { External_fun("Int.le",new_ty_unknown ()) }
+| GE         { External_fun("Int.ge",new_ty_unknown ()) }
+| EQ | EQ_EQ { External_fun("Int.eq",new_ty_unknown ()) }
+| NEQ        { External_fun("Int.neq",new_ty_unknown ()) }
+| AMP        { External_fun("Bool.land",new_ty_unknown ()) }
+| XOR        { External_fun("Bool.lxor",new_ty_unknown ()) }
+| LXOR       { External_fun("Int.lxor",new_ty_unknown ()) }
+| LAND       { External_fun("Int.land",new_ty_unknown ()) }
+| LOR        { External_fun("Int.lor",new_ty_unknown ()) }
+| LSL        { External_fun("Int.lsl",new_ty_unknown ()) }
+| LSR        { External_fun("Int.lsr",new_ty_unknown ()) }
+| ASR        { External_fun("Int.asr",new_ty_unknown ()) }
+

@@ -8,17 +8,17 @@ let eval_static_exp_int ~loc ~statics e =
   let rec eval e =
     match e with
     | E_const (Int(n,w)) -> (n,w)
-    | E_app(E_const(Op(Runtime op)),e) ->
+    | E_app(E_const(Op(Runtime (External_fun (op,_)))),e) ->
         let app_binop (f,e1,e2) = 
           let (v1,size) = eval e1 in
           let (v2,_) = eval e2 in
           (f v1 v2, size)
         in
         (match op,e with 
-         | Add,E_tuple [e1;e2] -> app_binop((+),e1,e2)
-         | Sub,E_tuple [e1;e2] -> app_binop((-),e1,e2)
-         | Mult,E_tuple [e1;e2] -> app_binop(( * ),e1,e2)
-         | Div,E_tuple [e1;e2] -> app_binop((/),e1,e2)
+         | "Int.add",E_tuple [e1;e2] -> app_binop((+),e1,e2)
+         | "Int.sub",E_tuple [e1;e2] -> app_binop((-),e1,e2)
+         | "Int.mul",E_tuple [e1;e2] -> app_binop(( * ),e1,e2)
+         | "Int.div",E_tuple [e1;e2] -> app_binop((/),e1,e2)
          | _ -> raise Cannot)
     | E_array_length(x) ->
        (match List.assoc_opt x statics with
@@ -56,7 +56,7 @@ let inline_with_statics ~statics e =
            since e2 could be a function (fun x -> e3)       (* no, first order now *) (* ah ? *) *)
         inline @@ E_letIn(p,e2,e1)
 
-    | E_generate((p,e1),init,e_st3,loc) ->
+(*     | E_generate((p,e1),init,e_st3,loc) ->
         has_changed := true;
         let (n,w) = eval_static_exp_int ~loc ~statics e_st3 in
         inline @@
@@ -78,7 +78,7 @@ let inline_with_statics ~statics e =
                    E_letIn(P_var x, E_const (Int(n+i,w)),e3)) in
                 E_par(es)),
                 E_const Unit)
-
+*)
     | e -> Ast_mapper.map inline e
   in 
   inline e

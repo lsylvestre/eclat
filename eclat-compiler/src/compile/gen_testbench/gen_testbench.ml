@@ -4,7 +4,7 @@ let size_ty_opt = function
 | None -> 1
 | Some t -> Gen_vhdl_aux.size_ty t
 
-let gen_testbench fmt ?(vhdl_comment="") typing_env name ty ((argument,ta),(result,tr)) (args_for_simul: _ list) =
+let gen_testbench fmt ?(vhdl_comment="") ~externals typing_env name ty ((argument,ta),(result,tr)) (args_for_simul: _ list) =
   let argument_size = size_ty_opt ta in
   let result_size = size_ty_opt tr in
 
@@ -14,7 +14,7 @@ let gen_testbench fmt ?(vhdl_comment="") typing_env name ty ((argument,ta),(resu
       let s_arg = Flat_let_atom.flat_s (Fsm_syntax.set_ tmp arg_for_simul) in
       Fsm_typing.typing_error_handler @@ (fun () ->
         Option.iter (fun t -> Fsm_typing.add_typing_env typing_env_tb tmp t) ta;
-        Fsm_typing.typing_s ~result:tmp typing_env_tb s_arg;
+        Fsm_typing.typing_s ~externals ~result:tmp typing_env_tb s_arg;
         s_arg)) args_for_simul in
 
   fprintf fmt "@[<v>%s@]" vhdl_comment;
@@ -31,13 +31,12 @@ entity tb_%s is@," name;
 
 architecture tb of tb_%s is
   " name;
-  fprintf fmt "component main
+  fprintf fmt "component %s
     port(
       signal clk    : in std_logic;
       signal reset  : in std_logic;
-      signal rdy    : out value(0 to 0);
       signal %s : in value(0 to %d);
-      signal result : out value(0 to %d)" argument (argument_size-1) (result_size-1);
+      signal result : out value(0 to %d)" name argument (argument_size-1) (result_size-1);
 
   fprintf fmt ");@,end component;";
 
@@ -45,7 +44,6 @@ architecture tb of tb_%s is
   signal tb_argument: std_logic_vector(0 to %d) := (others => '0');
   signal tb_result: std_logic_vector(0 to %d);
   signal tb_next_result: std_logic_vector(0 to %d);
-  signal tb_rdy: value(0 to 0);
   signal tb_clk: std_logic;
   signal rst: std_logic;" (argument_size-1) (result_size-1) (result_size-1);
 
@@ -69,7 +67,7 @@ architecture tb of tb_%s is
     wait for 5 ns;
   end process;
 
-  U1: main port map(tb_clk,rst,tb_rdy,tb_argument,tb_next_result";
+  U1: %s port map(tb_clk,rst,tb_argument,tb_result" name;
 
   fprintf fmt ");";
 
@@ -77,9 +75,9 @@ architecture tb of tb_%s is
       process (RST,tb_clk) 
       begin
         if RST = '1' then
-          tb_result <= (others => '0');
+         -- tb_result <= (others => '0');
         elsif (rising_edge(tb_clk)) then
-          tb_result <= tb_next_result;   -- resynchronize output
+         -- tb_result <= tb_next_result;   -- resynchronize output
         end if;
       end process;@,";
 
@@ -96,14 +94,9 @@ architecture tb of tb_%s is
     wait for 5 ns;@,";
 
   List.iter (fun s_arg ->
-    fprintf fmt "      @[<v>%a@]@," (Gen_vhdl.pp_s ~st:"fake") s_arg;
+    fprintf fmt "      @[<v>%a@]@," (Gen_vhdl.pp_s externals ~st:"fake") s_arg;
     fprintf fmt "      tb_argument <= %a;@," Gen_vhdl_aux.pp_ident tmp; (* (Gen_vhdl.default_zero_value argument_size);*)
-    fprintf fmt "
-      wait for 10 ns;
-      while tb_rdy = \"0\" loop
-        wait for 10 ns;
-      end loop;@,";
-      (** -- not equivalent to wait until*)
+    fprintf fmt "wait for 10 ns;@,"
   ) ss_args;
 
   fprintf fmt "

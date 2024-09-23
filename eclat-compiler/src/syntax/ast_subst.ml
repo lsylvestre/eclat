@@ -42,8 +42,11 @@ let subst_e x ex e =
     | E_array_length(y) ->
         let z = if x <> y then y else as_ident ex in
         E_array_length(z)
-    | E_local_static_array(e1,deco) ->
-        E_local_static_array(ss e1,deco)
+    | E_array_make(sz,e1,deco) ->
+        let e1' = ss e1 in
+        E_array_make(sz,e1',deco)
+    | E_array_create(sz,deco) ->
+        E_array_create(sz,deco)
     | E_array_get(y,e1) ->
         let z = if x <> y then y else as_ident ex in
         E_array_get(z, ss e1)

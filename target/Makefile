@@ -5,14 +5,15 @@ GHDLOPTS=
 NAME=main
 
 MAIN=$(NAME).vhdl
-RUNTIME=runtime.vhdl
+EXTERNALS=
+RUNTIME=runtime.vhdl stdlib.vhdl
 
 
 
 NS=2000
 
 vhdl.run: $(RUNTIME) $(MAIN) tb_$(NAME).vhdl
-	$(GHDL) -a $(GHDLOPTS) $(RUNTIME)
+	$(GHDL) -a $(GHDLOPTS) $(RUNTIME) $(EXTERNALS)
 	$(GHDL) -a $(GHDLOPTS) $(MAIN)
 	$(GHDL) -a $(GHDLOPTS) tb_$(NAME).vhdl
 	$(GHDL) -e $(GHDLOPTS) tb_$(NAME)

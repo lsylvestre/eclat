@@ -22,14 +22,15 @@ let rec list_machines_s s =
   | S_seq(s1,s2) ->
       seq_ (list_machines_s s1)
            (list_machines_s s2)
-  | S_fsm(id,rdy,result2,compute,ts,s,b) ->
+  | S_fsm(id,rdy,result2,compute,ts,s) ->
       let sv = Ast.gensym ~prefix:"state_var" () in
-      (* todo: when b is true, we should remove the [compute] state (dead code) *)
       extra_machines := (id,(sv,compute,List.map fst ts)) :: !extra_machines;
       let ts,s = list_machines (ts,s) in
-      S_fsm(id,rdy,result2,compute,ts,s,b)
+      S_fsm(id,rdy,result2,compute,ts,s)
   | S_in_fsm(id,s) -> S_in_fsm(id,list_machines_s s)
   | S_call _ -> s
+  | S_external_run _ -> s
+
 
 and list_machines (ts,s) =
  let f s = list_machines_s s in

@@ -49,6 +49,7 @@ OBJS= $(SRC_DIR)/prelude.cmx \
       $(SRC_DIR)/typing/typing.cmx \
       $(SRC_DIR)/syntax/ast_mk.cmx \
       $(SRC_DIR)/compile/middle_end/check_tail_call.cmx \
+      $(SRC_DIR)/compile/middle_end/check_exec_mem.cmx \
       $(SRC_DIR)/compile/middle_end/normalize/fun_assign_name.cmx \
       \
       $(SRC_DIR)/compile/middle_end/normalize/propagation.cmx \
@@ -79,6 +80,7 @@ OBJS= $(SRC_DIR)/prelude.cmx \
       $(SRC_DIR)/compile/inspect/display_target.cmx \
       $(SRC_DIR)/compile/backend/target/fsm_typing.cmx \
       $(SRC_DIR)/compile/backend/fsm_comp.cmx \
+      $(SRC_DIR)/compile/backend/count_externals.cmx \
       \
       $(SRC_DIR)/compile/backend/flat_let_atom.cmx \
       $(SRC_DIR)/compile/backend/list_machines.cmx \
@@ -93,7 +95,6 @@ OBJS= $(SRC_DIR)/prelude.cmx \
       $(SRC_DIR)/compile/compile.cmx \
       $(SRC_DIR)/compile/gen_testbench/gen_testbench.cmx\
       \
-      $(SRC_DIR)/interp/norm.cmx \
       $(SRC_DIR)/interp/special_subst.cmx \
       $(SRC_DIR)/interp/interp.cmx \
       \

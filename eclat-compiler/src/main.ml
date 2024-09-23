@@ -4,7 +4,7 @@
  *)
 
 (* input files *)
-let inputs : string list ref = ref []
+let inputs : string list ref = ref ["stdlib.ecl"]
 
 let target = ref "../target"
 
@@ -29,6 +29,10 @@ let clock_top_intel_max10 = "MAX10_CLK1_50"
 
 let top_wrapper_intel_max10 =
   "SW:10,KEY:2|LEDR:10,HEX0:8,HEX1:8,HEX2:8,HEX3:8,HEX4:8,HEX5:8"
+
+let top_wrapper_intel_max10_extended =
+  "SW:10,KEY:2,GSENSOR_INT:2|LEDR:10,HEX0:8,HEX1:8,HEX2:8,HEX3:8,HEX4:8,HEX5:8,GSENSOR_CS_N:1,GSENSOR_SCLK:1,VGA_HS:1,VGA_VS:1,VGA_R:4,VGA_G:4,VGA_B:4|GSENSOR_SDO:1,GSENSOR_SDI:1"
+
 
 (* ******************** *)
 let clock_top_xilinx_zybo = "clk"
@@ -95,10 +99,6 @@ let () =
     ("-noassert",   Arg.Set Operators.flag_no_assert, "remove assertion after typing");
     ("-noprint",   Arg.Set Operators.flag_no_print, "remove printing primitives after typing");
 
-    ("-bus",     Arg.Set_int Interp.flag_bus_proba,
-                "[for -interp mode only] set the probability to wait a new\
-                 \ clock tick during a bus transation");
-
     ("-top",     Arg.Set_string top_wrapper,
                 "generate a top wrapper for the whole architecture");
 
@@ -113,6 +113,16 @@ let () =
                                  clock_top := clock_top_intel_max10;
                                  top_wrapper := top_wrapper_intel_max10),
      "synthesis for Intel MAX 10 FPGA");
+
+    ("-intel-max10-extended", Arg.Unit (fun () ->
+                                 Operators.flag_no_assert := true;
+                                 Operators.flag_no_print := true;
+                                 Gen_vhdl.ram_inference := true;
+                                 Gen_vhdl.intel_max10_target := true;
+                                 clock_top := clock_top_intel_max10;
+                                 top_wrapper := top_wrapper_intel_max10_extended),
+     "synthesis for Intel MAX 10 FPGA (with additional I/Os");
+
 
     ("-xilinx-zybo", Arg.Unit (fun () ->
                                  Operators.flag_no_assert := true;
@@ -148,6 +158,9 @@ let () =
                "Number of reactions for interpretation");
    ("-moore", Arg.Clear Flag_mealy.mealy_flag,
                "force the generated circuit to be a Moore Finite State Machine (default: Mealy)");
+
+    ("-keep-ty", Arg.Set Ast_undecorated.keep_ty_flag,
+                "keep type annotation");
     
     ]
       add_input "Usage:\n  ./eclat file"
@@ -196,7 +209,7 @@ let main () : unit =
 
   (** Interprete only, when [interp_flag] is setted.  *)
   if !interp_flag then begin
-      Interp.interp_pi ~nb_iterations:!nb_iterations_interp pi arg_list |> ignore;
+      Interp.interp_pi ~nb_iterations:!nb_iterations_interp pi arg_list ty |> ignore;
       exit 0
   end;
 
@@ -204,30 +217,32 @@ let main () : unit =
                    String.concat "\n--   " !inputs ^
                    "\n--\n-- with the following command:\n--\n--    " ^ 
                    (String.concat " " @@ List.of_seq @@ Array.to_seq Sys.argv) ^ "\n" in
+                   (* todo : replace \n by -- in Sys.argv *)
 
   (** standard compilation mode *)
 
-  let name = "main" in
+  let name = !Ast_mk.main_symbol in
   let vhdl_name = !target^"/"^name^".vhdl" in
   let oc_vhdl = open_out vhdl_name in
   let oc_tb = open_out (!target^"/tb_"^name^".vhdl") in
   let fmt_vhdl = Format.formatter_of_out_channel oc_vhdl in
   let fmt_tb = Format.formatter_of_out_channel oc_tb in
   let (argument,result,typing_env) = Compile.compile ~vhdl_comment ~prop_fsm:!prop_fsm_flag arg_list name ty fmt_vhdl pi in
-  let args = List.map (Fsm_comp.to_a ~sums:pi.sums) arg_list in
+  let args = List.map (Fsm_comp.to_a ~externals:pi.externals ~sums:pi.sums) arg_list in
 
-  Gen_testbench.gen_testbench fmt_tb ~vhdl_comment typing_env name ty (argument,result) args;
+  Gen_testbench.gen_testbench fmt_tb ~vhdl_comment ~externals:pi.externals typing_env name ty (argument,result) args;
 
   Format.fprintf Format.std_formatter
-      "\nvhdl code generated in %s/main.vhdl\
-      \ \ntestbench generated in %s/tb_main.vhdl for software RTL simulation using GHDL.\n" !target !target;
+      "\nvhdl code generated in %s/%s.vhdl\
+      \ \ntestbench generated in %s/tb_%s.vhdl for software RTL simulation using GHDL.\n" !target name !target name;
 
   close_out oc_vhdl;
   close_out oc_tb ;
 
 
   if !top_wrapper <> "" then (
-    Gen_top.gen_wrapper ~vhdl_comment
+    Gen_top.gen_wrapper ~name
+                        ~vhdl_comment
                         ~argument
                         ~result
                         ~clock:!clock_top

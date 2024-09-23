@@ -7,9 +7,30 @@ open Ast_subst
 let rec globalize_arrays_e (e:e) : ((x * e) list * e) =
   Ast_mapper.accum (fun glob e ->
     match e with
-    | E_letIn(P_var x,(E_local_static_array _ as ex),e1) ->
+    | E_letIn(P_var x,(E_array_create _ as ex),e1) ->
         let ds1,e1' = glob e1 in
         Some ((x,ex)::ds1,e1')
+    | E_letIn(P_var x,(E_array_make(sz,e0,loc) as ex),e1) ->
+        let sz_lit = match Types.canon_size sz with
+                     | Sz_lit v -> v
+                     | _ -> assert false (* todo *) in
+        let n = E_const (Int (sz_lit,Sz_lit 16)) in
+        let ds1,e1' = glob e1 in
+        let y = Ast.gensym ~prefix:"y" () in
+        let loop = Ast.gensym ~prefix:"loop" () in
+        let i = Ast.gensym ~prefix:"i" () in
+        let e2 =
+           E_letIn(P_var y, e0,
+           E_letIn(P_var loop,E_fix(loop,(P_var i,
+                              E_if(E_app(E_const(Op(Runtime(External_fun("Int.ge",Types.new_ty_unknown ())))),E_tuple[E_var i;n]),
+                                   e1',
+                                   E_letIn(P_unit,E_array_set(x,E_var i, E_var y),E_app(E_var loop,
+                                    E_app(E_const(Op(Runtime(External_fun("Int.add",Types.new_ty_unknown ())))),
+                                        E_tuple[E_var i;E_const (Int (1,Types.new_size_unknown()))])))))), 
+                 E_app(E_var loop,E_const(Int(0,Sz_lit 16))))) in
+        Some ((x,ex)::ds1,e2)
+
+       
     | _ -> None
   ) e
 
@@ -23,21 +44,10 @@ let globalize_arrays pi =
   | [] -> List.rev acc
   |d::ds -> let d' = 
              (match d with 
-             | (x,E_local_static_array(e1,loc)) ->
-                   (match un_deco e1 with
-                    | E_const (Int(n,_)) -> 
-                        x,Static_array_of(Ty_array(Types.Sz_lit n,Types.new_tyB_unknown()),Prelude.dloc)
-                    | E_array_length(y) ->
-                        let n = (match List.assoc_opt y acc with
-                        | Some(Static_array_of(t,_)) -> 
-                            (match Types.canon_ty t with Ty_array(Types.Sz_lit n,_) -> n
-                            | _ -> assert false)
-                        | Some(Static_array(_,n)) -> n 
-                        | _ -> assert false
-                        ) in
-                        x,Static_array_of(Ty_array(Types.Sz_lit n,Types.new_tyB_unknown()),Prelude.dloc)
-                    | _ -> Prelude.Errors.error ~loc (fun fmt ->
-                      Format.fprintf fmt "the size of local array %a cannot be resolved." Ast_pprint.pp_exp e1))
+             | (x,E_array_create(sz,loc)) ->
+                  x,Static_array_of(Ty_array(sz,Types.new_tyB_unknown()),loc)
+             | (x,E_array_make(sz,e1,loc)) ->
+                  x,Static_array_of(Ty_array(sz,Types.new_tyB_unknown()),loc)
                  (*  let c = try e2c e1 with Not_a_constant ->
                     Prelude.Errors.error ~loc (fun fmt ->
                       Format.fprintf fmt "the default element %a of this local array cannot be resolved." Ast_pprint.pp_exp e1) in

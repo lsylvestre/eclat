@@ -2,45 +2,45 @@
 
 open Ast
 
-let op_combinational (op:op) : bool =
+let op_combinational ~externals (op:op) : bool =
 	match op with
 	| Runtime(p) ->
-	    Operators.combinational p
+	    Operators.combinational ~externals p
 	| GetTuple _ -> true
 	| TyConstr _ -> true
 	| _ -> true
 
 
-let const_combinational (c:c) : bool =
+let const_combinational ~externals (c:c) : bool =
 	match c with
   | _ -> true
 
-let rec combinational (e:e) : bool =
+let rec combinational ~externals (e:e) : bool =
   match e with
 	| E_deco(e1,loc) ->
-      combinational e1
+      combinational ~externals e1
 	| E_var _ ->
 	    true
 	| E_const c ->
-	    const_combinational c
+	    const_combinational ~externals c
 	| E_if(e1,e2,e3) ->
-	    combinational e1 && combinational e2 && combinational e3
+	    combinational ~externals e1 && combinational ~externals e2 && combinational ~externals e3
 	| E_case _ | E_match _ ->
       (* hard to defined as a combinational hardware description being generic in the number of cases *)
       false
 	| E_app(e1,e2) ->
       (match un_deco e1 with
-      | E_const(Inj _) -> combinational e2
+      | E_const(Inj _) -> combinational ~externals e2
       | E_const(Op op) ->
-          op_combinational op && combinational e2
+          op_combinational ~externals op && combinational ~externals e2
       | _ ->
          (* as we can't know locally whether [e1] is combinational,
 	       we return false *)
 	       false)
 	| E_letIn(_,e1,e2) ->
-	    combinational e1 && combinational e2
+	    combinational ~externals e1 && combinational ~externals e2
 	| E_tuple es ->
-	    List.for_all combinational es
+	    List.for_all (combinational ~externals) es
 	| E_fun _ | E_fix _ ->
 	    false
   | E_ref _ | E_get _ | E_set _ | E_par _ ->
@@ -49,53 +49,54 @@ let rec combinational (e:e) : bool =
 	    false (* have an internal state *)
   | E_array_length _ ->
 	    true
-	| E_local_static_array _ ->
+	| E_array_make _ 
+	| E_array_create _ ->
       false
 	| E_array_get _
 	| E_array_set _ ->
 	    false (* side effect *)
 	| E_for(_,e_st1,e_st2,e3,_) ->
-	   combinational e_st1 && combinational e_st2 && combinational e3
+	   combinational ~externals e_st1 && combinational ~externals e_st2 && combinational ~externals e3
 	| E_generate((_,e1),e2,e_st3,_) ->
-	    combinational e1 && combinational e2 && combinational e_st3
-	| E_vector es -> List.for_all combinational es
+	    combinational ~externals e1 && combinational ~externals e2 && combinational ~externals e_st3
+	| E_vector es -> List.for_all (combinational ~externals) es
 	| E_vector_mapi(is_par,(_,e1),e2,_) ->
-	    not(is_par) && combinational e1 && combinational e2
+	    not(is_par) && combinational ~externals e1 && combinational ~externals e2
 	| E_int_mapi(is_par,(_,e1),e2,_) ->
-	    not(is_par) && combinational e1 && combinational e2
-
+	    not(is_par) && combinational ~externals e1 && combinational ~externals e2
+  | E_run _ -> false (* sometimes true, sometimes false, depending on the type *)
 
 
 (* same as combinational, but may contain cas/match, registers or even exec blocks *)
 
-let rec instantaneous (e:e) : bool =
+let rec instantaneous ~externals (e:e) : bool =
   match e with
 	| E_deco(e1,loc) ->
-      instantaneous e1
+      instantaneous ~externals e1
 	| E_var _ ->
 	    true
 	| E_const c ->
-	    const_combinational c
+	    const_combinational ~externals c
 	| E_if(e1,e2,e3) ->
-	    instantaneous e1 && instantaneous e2 && instantaneous e3
+	    instantaneous ~externals e1 && instantaneous ~externals e2 && instantaneous ~externals e3
   | E_case(e1,hs,eothers) ->
-	    instantaneous e1 && List.for_all (fun (_,e) -> instantaneous e) hs && instantaneous eothers
+	    instantaneous ~externals e1 && List.for_all (fun (_,e) -> instantaneous ~externals e) hs && instantaneous ~externals eothers
   | E_match(e1,hs,eo) ->
-      instantaneous e1 && List.for_all (fun (c,(p,e)) -> instantaneous e) hs && 
-      (match eo with None -> true | Some e2 -> instantaneous e2)
+      instantaneous ~externals e1 && List.for_all (fun (c,(p,e)) -> instantaneous ~externals e) hs && 
+      (match eo with None -> true | Some e2 -> instantaneous ~externals e2)
 	| E_app(e1,e2) ->
       (match un_deco e1 with
-      | E_const(Inj _) -> instantaneous e2
+      | E_const(Inj _) -> instantaneous ~externals e2
       | E_const(Op op) ->
-          op_combinational op && instantaneous e2
+          op_combinational ~externals op && instantaneous ~externals e2
       | _ ->
          (* as we can't know locally whether [e1] is instantaneous,
 	       we return false *)
 	       false)
 	| E_letIn(_,e1,e2) ->
-	    instantaneous e1 && instantaneous e2
+	    instantaneous ~externals e1 && instantaneous ~externals e2
 	| E_tuple es ->
-	    List.for_all instantaneous es
+	    List.for_all (instantaneous ~externals) es
 	| E_fun _ | E_fix _ ->
 	    false
   | E_ref _ | E_get _ | E_set _ | E_par _ ->
@@ -104,17 +105,20 @@ let rec instantaneous (e:e) : bool =
 	    true (* have an internal state *)
   | E_array_length _ ->
 	    true
-	| E_local_static_array _ ->
+	| E_array_make _ 
+	| E_array_create _ ->
       false
 	| E_array_get _
 	| E_array_set _ ->
 	    false (* side effect *)
 	| E_for(_,e_st1,e_st2,e3,_) ->
-	   instantaneous e_st1 && instantaneous e_st2 && instantaneous e3
+	   instantaneous ~externals e_st1 && instantaneous ~externals e_st2 && instantaneous ~externals e3
 	| E_generate((_,e1),e2,e_st3,_) ->
-	    instantaneous e1 && instantaneous e2 && instantaneous e_st3
-	| E_vector es -> List.for_all instantaneous es
+	    instantaneous ~externals e1 && instantaneous ~externals e2 && instantaneous ~externals e_st3
+	| E_vector es -> List.for_all (instantaneous ~externals)es
 	| E_vector_mapi(is_par,(_,e1),e2,_) ->
-	    not(is_par) && instantaneous e1 && instantaneous e2
+	    not(is_par) && instantaneous ~externals e1 && instantaneous ~externals e2
 	| E_int_mapi(is_par,(_,e1),e2,_) ->
-	    not(is_par) && instantaneous e1 && instantaneous e2
+	    not(is_par) && instantaneous ~externals e1 && instantaneous ~externals e2
+  | E_run _ -> false (* sometimes true, sometimes false, depending on the type *)
+

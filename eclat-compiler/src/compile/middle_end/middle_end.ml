@@ -30,6 +30,7 @@ let normalize (pi:pi) : pi =
 let compile ?globalize
             ?(propagation=true)
             arg_list
+            ty0
             (pi:pi) : pi =
 
   let pi = Ast_rename.rename_pi pi in
@@ -51,8 +52,9 @@ let compile ?globalize
   (* let pi = Ast_rename.rename_pi pi in *)
   let pi = Lambda_lifting.lambda_lifting_pi ?globalize pi in
    display_pi Lambda_lifting pi;
-  let _ = Typing.typing_with_argument pi arg_list in
-  
+  let (ty1,_) = Typing.typing_with_argument pi arg_list in
+  Typing.unify_ty ~loc:Prelude.dloc ty0 ty1;
+
   let pi = Specialize.specialize_pi pi in
   display_pi Specialize pi;
 
@@ -72,6 +74,8 @@ let compile ?globalize
   display_pi Specialize_ref pi;
   (** compile pattern matching *)
 
+  (* Check_exec_mem.check_pi pi; *)
+
   let pi = Insert_bound_checking.insert_pi pi in
 
   let pi = Matching.matching_pi pi in
@@ -87,7 +91,8 @@ let compile ?globalize
   display_pi Propagation pi;
   (** ensure that transformations preserve typing *)
 
-  let _ = Typing.typing_with_argument ~get_vector_size:false pi arg_list in
+  let (ty2,_) = Typing.typing_with_argument ~get_vector_size:false pi arg_list in
+  Typing.unify_ty ~loc:Prelude.dloc ty0 ty2;
   let pi = Expand.expand_pi pi in
   
   pi

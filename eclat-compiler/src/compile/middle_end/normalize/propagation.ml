@@ -50,14 +50,14 @@ let rec simple_atom e =
     | _ -> false
 
 
-let propagation e =
+let propagation ~externals e =
   let _propagable e =
-    if !flag_propagate_combinational_linear then Instantaneous.combinational e 
+    if !flag_propagate_combinational_linear then Instantaneous.combinational ~externals e 
                                   && (SMap.cardinal (linear_bindings e) <= 1) else
     simple_atom e 
   in
   let propagable2 x e =
-    if !flag_propagate_combinational_linear then Instantaneous.combinational e 
+    if !flag_propagate_combinational_linear then Instantaneous.combinational ~externals e 
                                   && linear_bindings2 x e else
     simple_atom e 
   in
@@ -80,4 +80,4 @@ let propagation e =
   in prop e
 
 let propagation_pi pi =
-  {pi with main = propagation pi.main }
+  {pi with main = propagation ~externals:pi.externals pi.main }

@@ -1,7 +1,8 @@
 open Ast
 open Pattern
 
-(* capture avoiding substitution *)
+(* capture avoiding substitution that is compatible with
+   new constructs [reg] and [exec] *)
 
 
 let prefix id e =
@@ -29,7 +30,9 @@ let rec subst_p x ex = function
 let as_ident ex =
   match ex with
   | E_var z -> z
-  | _ -> Ast_pprint.pp_exp Format.std_formatter ex; assert false (* todo: better error message *)
+  | _ -> 
+      Prelude.Errors.error ~error_kw:"Compile-time Error"
+         (fun fmt -> Format.fprintf fmt "identifier expected instead of %a" Ast_pprint.pp_exp ex)
 
 let subst_e x ex e =
   let rec ss id e =
@@ -39,20 +42,33 @@ let subst_e x ex e =
     | E_var y ->
         if y = x then prefix id @@ ex else e
     | E_const _ -> e
-    | E_if(e1,e2,e3) ->
-        E_if(ss (0::id) e1,ss (1::id) e2, ss (2::id) e3)
-    | E_app(e1,e2) ->
-        E_app(ss (0::id) e1,ss (1::id) e2)
+    | E_if(e1, e2, e3) ->
+        let e1' = ss (0::id) e1 in
+        let e2' = ss (1::id) e2 in
+        let e3' = ss (2::id) e3 in
+        E_if(e1', e2', e3')
+    | E_app(e1, e2) ->
+        let e1' = ss (0::id) e1 in
+        let e2' = ss (1::id) e2 in
+        E_app(e1', e2')
     | E_tuple(es) ->
-        E_tuple(List.mapi (fun i e -> ss (i::id) e) es)
+        let es' = List.mapi (fun i ei -> ss (i::id) ei) es in
+        E_tuple es'
     | E_par(es) ->
-        E_par(List.mapi (fun i e -> ss (i::id) e) es)
-    | E_letIn(p,e1,e2) ->
-        if pat_mem x p then E_letIn(p, ss (0::id) e1, e2)
-        else E_letIn(p, ss (0::id) e1, ss (1::id) e2)
-    | E_fun(p,e1) ->
-        if pat_mem x p then e else E_fun(p,ss (0::id) e1)
-    | E_fix(f,(p,e1)) ->
+        let es' = List.mapi (fun i ei -> ss (i::id) ei) es in
+        E_par es'
+    | E_letIn(p, e1, e2) ->
+        let e1' = ss (0::id) e1 in
+        if pat_mem x p 
+        then E_letIn(p, e1', e2)
+        else let e2' = ss (1::id) e2 in
+             E_letIn(p, e1', e2')
+    | E_fun(p, e1) ->
+        if pat_mem x p 
+        then e 
+        else let e1' = ss (0::id) e1 in
+              E_fun(p, e1')
+    | E_fix(f, (p, e1)) ->
         if x = f || pat_mem x p then e else E_fix(f,(p,ss (0::id) e1))
     | E_match(e1,hs,eo) ->
         let hs' = List.mapi (fun i (inj,(p,ei)) ->
@@ -70,8 +86,11 @@ let subst_e x ex e =
     | E_array_length(y) ->
         let z = if x <> y then y else as_ident ex in
         E_array_length(z)
-    | E_local_static_array(e1,deco) ->
-        E_local_static_array(ss (0::id) e1,deco)
+    | E_array_make(sz,e1,loc) ->
+        let e1' = ss (0::id) e1 in
+        E_array_make(sz,e1',loc)
+    | E_array_create _ ->
+        e
     | E_array_get(y,e1) ->
         let z = if x <> y then y else as_ident ex in
         E_array_get(z, ss (0::id) e1)
@@ -93,11 +112,18 @@ let subst_e x ex e =
     | E_vector(es) ->
         E_vector(List.mapi (fun i e -> ss (i::id) e) es)
     | E_ref(e1) ->
-        E_ref(ss (0::id) e1)
+        let e1' = ss (0::id) e1 in
+        E_ref e1'
     | E_get(e1) ->
-        E_get(ss (0::id) e1)
-    | E_set(e1,e2) ->
-        E_set(ss (0::id) e1,ss (1::id) e2)
+        let e1' = ss (0::id) e1 in
+        E_get e1'
+    | E_set(e1, e2) ->
+        let e1' = ss (0::id) e1 in
+        let e2' = ss (1::id) e2 in
+        E_set(e1', e2')
+    | E_run(i,e1) ->
+        let e1' = ss (0::id) e1 in
+        E_run(i, e1')
   in
   ss [] e
 

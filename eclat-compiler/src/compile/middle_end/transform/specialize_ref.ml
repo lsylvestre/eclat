@@ -83,7 +83,7 @@ let wrap_fix_in_fun e =
 let specialize_ref pi =
   has_changed := false;
   let _ = Typing.typing_with_argument ~collect_sig:true pi [] in
-  let e = wrap_fix_in_fun (Propagation.propagation pi.main) in
+  let e = wrap_fix_in_fun (Propagation.propagation ~externals:pi.externals pi.main) in
           (* Format.fprintf Format.std_formatter "---=> %a\n" Ast_pprint.pp_exp e; *)
   (* if !has_changed then Rename *)
   { pi with main =  e }

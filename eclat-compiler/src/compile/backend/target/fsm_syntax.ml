@@ -6,9 +6,11 @@ and ty = TInt of ty | TBool | TUnit
        | TVar of tvar ref
        | TString of ty
        | TStatic of {elem:ty ; size: ty}
-       | TVector of {elem:ty ; size: ty}
+       | TVector of {elem:size ; size: ty}
        | TVect of int
+       | TAbstract of x * size list * ty list
        | TSize of int
+and size = ty
 
 let new_tvar = let c = ref 0 in fun () -> incr c; TVar (ref (V ("'a"^string_of_int !c)))
 
@@ -69,9 +71,10 @@ type s = (* all instructions terminates in one clock cycle *)
   | S_seq of s * s
   | S_letIn of x * a * s
   | S_fsm of id * x * x * q * t list * s (* id * rdy * result * compute * transition * start instruction *)
-                * bool (* <- restart *)
   | S_in_fsm of id * s
   | S_call of Operators.op * a
+  | S_external_run of x * int * x * x * a (* (f,id,result,rdy,a) *)
+
 
 and t = (x * s)
 
@@ -99,6 +102,13 @@ module Debug = struct
   | TString ty -> fprintf fmt "string<%a>" pp_ty ty
   | TVector {elem ; size} -> fprintf fmt "%a vector<%a>" pp_ty elem pp_ty size
   | TVect n -> fprintf fmt "vect<%d>" n
+  | TAbstract(x,ns,ts) -> 
+      fprintf fmt "%s<" x;
+      pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt ", ") pp_ty fmt ns; 
+      fprintf fmt ">";
+      fprintf fmt "@[<v>[";
+      pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt ", ") pp_ty fmt ts;
+      fprintf fmt "]@]"
   | TSize n -> fprintf fmt "size<%d>" n
   | TStatic {elem ; size} -> fprintf fmt "%a buffer<%a>" pp_ty elem pp_ty size
 
@@ -125,6 +135,7 @@ let pp_vector = Ast_pprint.pp_vector
   | Runtime p -> Operators.pp_op fmt p
   | GetTuple (i,_,_) -> fprintf fmt "eclat_get_%d" i
   | TyConstr _ -> fprintf fmt "eclat_id"
+
 
   let rec pp_a fmt = function
   | A_const c -> pp_c fmt c
@@ -178,13 +189,14 @@ let pp_vector = Ast_pprint.pp_vector
       fprintf fmt "@[<v>%a@,%a@]" pp_s s1 pp_s s2
   | S_letIn(x,a,s) ->
       fprintf fmt "@[<v>let %s = %a in@,%a@]" x pp_a a pp_s s
-  | S_fsm(_,_,result,_,ts,s,b) ->
-      fprintf fmt "@[<v>((%s) -> %a)%s@]" result pp_fsm (ts,s) (if b then "[restart]" else "")
+  | S_fsm(_,_,result,_,ts,s) ->
+      fprintf fmt "@[<v>((%s) -> %a)@]" result pp_fsm (ts,s)
   | S_in_fsm(id,s) ->
       fprintf fmt "@[<v>%a in fsm %s@]" pp_s s id
   | S_call(op,a) ->
      fprintf fmt "@[%a(%a)@]" Operators.pp_op op pp_a a
-
+  | S_external_run(f,i,res,rdy,a) ->
+    fprintf fmt "@[(%s,%s) := run_%d %s %a;@]" res rdy i f pp_a a
   and pp_fsm fmt (ts,s) =
     let pp_t fmt (x,s) = fprintf fmt "@[%s = %a@]@," x pp_s s in
     fprintf fmt "@[<v>let rec ";

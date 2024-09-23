@@ -1,22 +1,24 @@
 open Fsm_syntax
 open Format
 
-let ram_inference = ref false
-let memory_initialization = ref false
-let intel_max10_target = ref false
-let intel_xilinx_target = ref false
-let single_read_write_lock_flag = ref true
-
-
 open Gen_vhdl_aux
 
+let ram_inference = Gen_vhdl_aux.ram_inference
+let memory_initialization = Gen_vhdl_aux.memory_initialization
+let intel_max10_target = Gen_vhdl_aux.intel_max10_target
+let intel_xilinx_target = Gen_vhdl_aux.intel_xilinx_target
+let single_read_write_lock_flag = Gen_vhdl_aux.single_read_write_lock_flag
+
+
+
+
 (** code generator for statements *)
-let rec pp_s ~st fmt = function
+let rec pp_s externals ~st fmt = function
 | S_skip -> ()
 | S_continue q -> fprintf fmt "%a := %a;" pp_ident st pp_state q
 | S_if(z,s1,so) ->
-    fprintf fmt "@[<v 2>if %a(0) = '1' then@,%a@]" pp_ident z (pp_s ~st) s1;
-    Option.iter (fun s2 -> fprintf fmt "@,@[<v 2>else@,%a@]" (pp_s ~st) s2) so;
+    fprintf fmt "@[<v 2>if %a(0) = '1' then@,%a@]" pp_ident z (pp_s externals ~st) s1;
+    Option.iter (fun s2 -> fprintf fmt "@,@[<v 2>else@,%a@]" (pp_s externals ~st) s2) so;
      fprintf fmt "@,end if;"
 | S_case(y,hs,so) ->
     fprintf fmt "@[<v>case %a is@," pp_ident y;
@@ -25,11 +27,11 @@ let rec pp_s ~st fmt = function
         pp_c fmt cs
     in
     List.iter (fun (cs,s) ->
-      fprintf fmt "@[<v 2>when %a =>@,%a@]@," pp_cs cs (pp_s ~st) s) hs;
+      fprintf fmt "@[<v 2>when %a =>@,%a@]@," pp_cs cs (pp_s externals ~st) s) hs;
     Option.iter (fun s ->
-      fprintf fmt "@[<v 2>when others =>@,%a@]@," (pp_s ~st) s) so;
+      fprintf fmt "@[<v 2>when others =>@,%a@]@," (pp_s externals ~st) s) so;
     fprintf fmt "@]end case;";
-| S_set(x,a) -> fprintf fmt "@[<v>%a := %a;@]" pp_ident x pp_a a
+| S_set(x,a) -> fprintf fmt "@[<v>%a := %a;@]" pp_ident x (pp_a externals) a
 | S_acquire_lock(l) ->
       fprintf fmt
          "@[acquire(%a);@]" 
@@ -46,7 +48,7 @@ let rec pp_s ~st fmt = function
          "%d" n
     | _ ->
        fprintf fmt
-         "to_integer(unsigned(%a))" pp_a idx);
+         "to_integer(unsigned(%a))" (pp_a externals) idx);
    fprintf fmt ";@]"
 | S_read_stop(x,l) ->
         fprintf fmt
@@ -61,42 +63,64 @@ let rec pp_s ~st fmt = function
            "%d" n
       | _ ->
          fprintf fmt
-           "to_integer(unsigned(%a))" pp_a idx);
+           "to_integer(unsigned(%a))" (pp_a externals) idx);
       fprintf fmt ";@]";
       fprintf fmt
         "@[%a <= %a; %a <= '1';@]" 
           pp_ident ("$"^x^"_write")
-          pp_a a
+          (pp_a externals) a
           pp_ident ("$"^x^"_write_request")
     | S_write_stop(x) ->
         fprintf fmt
          "@[%a <= '0';@]" 
               pp_ident ("$"^x^"_write_request")
-| S_seq(S_skip,s) | S_seq(s,S_skip) -> pp_s ~st fmt s
-| S_seq(s1,s2) -> fprintf fmt "@[<v>%a@,%a@]" (pp_s ~st) s1 (pp_s ~st) s2
-| S_letIn(x,a,s) -> fprintf fmt "@[<v>%a := %a;@,%a@]" pp_ident x pp_a a (pp_s ~st) s
-| S_fsm(id,rdy,x,cp,ts,s,b) ->
+| S_seq(S_skip,s) | S_seq(s,S_skip) -> pp_s externals ~st fmt s
+| S_seq(s1,s2) ->
+    fprintf fmt "@[<v>%a@,%a@]" 
+      (pp_s externals ~st) s1 
+      (pp_s externals ~st) s2
+| S_letIn(x,a,s) ->
+    fprintf fmt "@[<v>%a := %a;@,%a@]"
+      pp_ident x 
+      (pp_a externals) a 
+      (pp_s externals ~st) s
+| S_fsm(id,rdy,x,cp,ts,s) ->
      let (st2,_,_) = List.assoc id !List_machines.extra_machines in
-     pp_fsm fmt ~restart:b ~state_var:st2 ~idle:cp ~rdy (id,ts,s)
+     pp_fsm externals fmt
+        ~state_var:st2 ~idle:cp ~rdy (id,ts,s)
 | S_in_fsm(id,s) ->
      let (st2,_,_) = List.assoc id !List_machines.extra_machines in
-     pp_s ~st:st2 fmt s
+     pp_s externals ~st:st2 fmt s
 | S_call(op,a) ->
-   fprintf fmt "%a;@," pp_call (Runtime(op),a)
+   fprintf fmt "%a;@," (pp_call externals) (Runtime(op),a)
+| S_external_run(f,id,res,rdy,a) ->
+   fprintf fmt "%a := %s_result_%d(0 to %s_result_%d'length - 2);@,"
+          pp_ident res
+          f id 
+          f id;
+   fprintf fmt "%a := %s_result_%d(%s_result_%d'length - 1 to %s_result_%d'length - 1);@,"
+          pp_ident rdy
+          f id 
+          f id 
+          f id;
+   fprintf fmt "%s_argument_%d_var := \"1\" & %a;@,"
+          f id
+          (pp_a externals) a
+
+
 
 (** code generator for FSMs *)
-and pp_fsm fmt ~restart ~state_var:st ~idle ~rdy (id,ts,s) =
-    if restart then (
-      fprintf fmt "@[<v>case %a is@," pp_ident st;
-      List.iter (fun (x,s) -> fprintf fmt "@[<v 2>when %a =>@,%a@]@," pp_state x (pp_s ~st) s) ts;
-      fprintf fmt "@[<v 2>when %a =>@,%a@]" pp_state idle (pp_s ~st) s;
-      fprintf fmt "@]@,end case;")
-    else (
-    fprintf fmt "@[<v>case %a is@," pp_ident st;
-    List.iter (fun (x,s) -> fprintf fmt "@[<v 2>when %a =>@,%a@]@," pp_state x (pp_s ~st) s) ts;
-    fprintf fmt "@[<v 2>when %a =>@,%a@]@," pp_state idle (pp_s ~st) s;
-    fprintf fmt "@]end case;@,"
-   )
+and pp_fsm externals fmt ~state_var:st ~idle ~rdy (id,ts,s) =
+  fprintf fmt "@[<v>case %a is@," pp_ident st;
+  List.iter (fun (x,s) ->
+      fprintf fmt "@[<v 2>when %a =>@,%a@]@," 
+        pp_state x 
+        (pp_s externals ~st) 
+        s) ts;
+  fprintf fmt "@[<v 2>when %a =>@,%a@]@," 
+    pp_state idle 
+    (pp_s externals ~st) s;
+  fprintf fmt "@]end case;@,"
 
 (* default value as bitvector where each bit is at '0' *)
 let default_zero_value nbits =
@@ -239,7 +263,7 @@ let declare_variable ~argument ~statics typing_env fmt =
 
 
 (* code generator for the whole design *)
-let pp_component fmt ~vhdl_comment ~name ~state_var ~argument ~result ~idle ~rdy ~statics typing_env infos (ts,s) =
+let pp_component fmt ~vhdl_comment ~name ~externals ~state_var ~argument ~result ~idle ~rdy ~statics typing_env infos (ts,s) =
 
   let arty = List.fold_left (fun arty (_,g) ->
       match g with
@@ -273,7 +297,7 @@ use work.runtime.all;
      fprintf fmt ");@]");
   fprintf fmt "@,port(@[<v>signal clk    : in std_logic;@,";
   fprintf fmt "signal reset  : in std_logic;@,";
-  fprintf fmt "signal rdy    : out value(0 to 0);@,";
+  (* fprintf fmt "signal rdy    : out value(0 to 0);@,"; *)
   let st_argument = match t_argument with None -> "argument_width - 1" | Some t -> string_of_int (size_ty t - 1) in
   let st_result = match t_result with None -> "result_width - 1" | Some t -> string_of_int (size_ty t - 1) in
   fprintf fmt "signal %s : in value(0 to %s);@," argument st_argument;
@@ -295,7 +319,13 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
     match st with
    
     | Static_array_of ty ->
-          let ty_elem,n = match ty with TStatic {elem;size=TSize n} -> elem,n | _ -> assert false (* error *) in
+          let ty_elem,sz = match Fsm_typing.canon ty with
+                          | TStatic {elem;size=sz} -> elem,sz
+                          | _ -> assert false (* error *) in
+          let n = match Fsm_typing.canon ty with
+                  | TSize n -> n
+                  | _ ->  Prelude.Errors.error (fun fmt -> 
+                            Format.fprintf fmt "unspecified size for array %s" x) in
           let sz_elem = size_ty ty_elem in 
           array_decl fmt x sz_elem n ((fun fmt () -> fprintf fmt "%s" (default_zero ty_elem)))
          
@@ -305,14 +335,29 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
     ) statics;
 
 
+  List.iter (print_external fmt) (fst externals);
+
+
+
+
   let variables = List.filter (fun (x,t) ->
-          x <> argument && not (List.mem_assoc x statics))
+          x <> argument && not (List.mem_assoc x statics) 
+          && not (List.mem_assoc x (fst externals))
+          && not (List.mem_assoc x (snd externals))
+  )
     @@ List.of_seq (Hashtbl.to_seq typing_env) in
   let variables = variables @ List.map (fun (x,_) -> ptr_taken x, TBool) statics in
+  let variables = variables @ List.filter_map (fun (x,(_,shared)) -> 
+                                 if shared then Some (ptr_taken x, TBool) else None) (fst externals) in
 
   declare_signals variables fmt;
 
   fprintf fmt "@,@[<v 2>begin@,";
+
+
+  (* instantiate externals *)
+  List.iter (instantiate_external fmt) (fst externals);
+
 
 
   List.iter (fun (x,st) ->
@@ -321,24 +366,20 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
     | Static_array _ ->
       fprintf fmt "process (clk)
             begin
-            if (rising_edge(clk)) then
-                 %s if %a = '1' then
+            if rising_edge(clk) then
+                 if %a = '1' then
                     %a(%a) <= %a;
-                 %s else
-                   %a <= %a(%a);
-                 %s end if;
+                 end if;
+                 %a <= %a(%a);
             end if;
         end process;@,@,"
-          (if !ram_inference then "--" else "")
           pp_ident ("$"^x^"_write_request")
           pp_ident x
           pp_ident ("$"^x^"_ptr_write")
           pp_ident ("$"^x^"_write")
-          (if !ram_inference then "--" else "")
           pp_ident ("$"^x^"_value")
           pp_ident x
-          pp_ident ("$"^x^"_ptr")
-          (if !ram_inference then "--" else "");
+          pp_ident ("$"^x^"_ptr");
 
     ) statics;
 
@@ -403,6 +444,19 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
   ) statics;
 
   List.iter (fun (x,_) -> fprintf fmt ", %a" pp_ident (x^"%now")) variables;
+
+
+  (* *************** *)
+  let sensibility_external fmt (n,(_,shared)) =    
+    let instances = match Hashtbl.find_opt Count_externals.external_count n with
+             | None ->  Count_externals.IMap.empty  | Some v -> v in
+      Count_externals.IMap.iter (fun i () ->
+        fprintf fmt ", %s_result_%d" n i
+      ) instances
+    in    
+    List.iter (sensibility_external fmt) (fst externals);
+    (* ***************** *)
+
   fprintf fmt ")@,";
 
   declare_variable ~argument ~statics typing_env fmt;
@@ -416,9 +470,19 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
   List.iter (fun (x,(Static_array_of _ | Static_array _)) ->
       decl_locks fmt x
   ) statics;
+  List.iter (fun (x,(_,shared)) ->
+      if shared then decl_locks fmt x
+  ) (fst externals);
+
+  List.iter (variable_decl_go_external fmt) (fst externals);
+
+  
 
   fprintf fmt "@]@,@[<v 2>begin@,";
 
+  List.iter (variable_init_go_external fmt) (fst externals);
+
+  
   (* fprintf fmt "@,@[<v 2>if rising_edge(clk) then@,";
 
   fprintf fmt "@[<v 2>if (reset = '1') then@,";*)
@@ -435,14 +499,14 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
   ) !List_machines.extra_machines;
 
 
-  fprintf fmt "@,rdy <= \"1\";";
-  fprintf fmt "@,%a := \"0\";@," pp_ident rdy;
+  (* fprintf fmt "@,rdy <= \"1\";"; 
+  fprintf fmt "@,%a := \"0\";@," pp_ident rdy;*)
   (* fprintf fmt "%a <= %a;@," pp_ident state_var pp_ident idle; *)
 
 (*  List.iter (fun (_,(sv,cp,xs)) -> fprintf fmt "%a <= %a;@," pp_ident sv pp_ident cp) !List_machines.extra_machines;
 *)
 
-  pp_fsm ~restart:false fmt ~state_var ~idle ~rdy ("main",ts,s);
+  pp_fsm externals fmt ~state_var ~idle ~rdy ("main",ts,s);
 
   fprintf fmt "%a <= %a;@," pp_ident (state_var^"%next") pp_ident state_var;
   List.iter (fun (_,(sv,_,_)) ->
@@ -454,8 +518,10 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
   ) variables;
 
   fprintf fmt "@,@,result <= %a;@," pp_ident result;
-  fprintf fmt "rdy <= %a;@," pp_ident rdy;
+  (* fprintf fmt "rdy <= %a;@," pp_ident rdy; *)
 
+
+  List.iter (variable_set_go_external fmt) (fst externals);
 
   fprintf fmt
     "end process;

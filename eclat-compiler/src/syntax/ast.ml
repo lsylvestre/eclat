@@ -52,7 +52,8 @@ type e =                      (** expression     [e]                       *)
   | E_reg of (p * e) * e * l  (** register       [reg^l (fun p -> e) last e] *)
   | E_exec of e * e * e option * l   (** exec           [(exec^l e default e [reset when e])]    *)
 
-  | E_local_static_array of e * deco (* [array_crate n], should be resolved at compile time *)
+  | E_array_create of size * deco   (** [create<sz>] *)
+  | E_array_make of size * e * deco (** [make<sz> e] *)
   | E_array_get of x * e      (** static array access        [x.(e)]      *)
   | E_array_length of x       (** static array length access [x.length]   *)
   | E_array_set of x * e * e  (** static array assignment    [x.(e) <- e] *)
@@ -68,6 +69,8 @@ type e =                      (** expression     [e]                       *)
   | E_generate of (p * e) * e * e_static * deco
   | E_for of x * e_static * e_static * e * deco
 
+  | E_run of x * e (* call external code *)
+
 and e_static = e
 
 type static =                         (** static toplevel data *)
@@ -80,6 +83,7 @@ type static =                         (** static toplevel data *)
     referting to one of those definitions *)
 type pi = {
   statics : (x * static) list ;         (** static global arrays *)
+ externals : (x * (ty * bool)) list * (x * (ty * (bool * int * bool))) list ; (* circuits - functions *)
   sums : (x * (x * tyB) list) list ;    (** sum types *)
   main : e                              (** body *)
 }
@@ -226,3 +230,11 @@ let rec e2c e =
                      | Inj(x) -> C_appInj(x,e2c e2,Types.new_tyB_unknown())
                      | _ -> raise Not_a_constant)
   | _ -> raise Not_a_constant
+
+
+
+
+let typ_decl_abstract : (string, string * Types.size list * int list) Hashtbl.t 
+  = Hashtbl.create 10
+
+

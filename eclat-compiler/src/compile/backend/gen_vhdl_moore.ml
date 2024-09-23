@@ -10,12 +10,12 @@ let intel_xilinx_target = ref false
 let single_read_write_lock_flag = ref true
 
 (** code generator for statements *)
-let rec pp_s ~st fmt = function
+let rec pp_s externals ~st fmt = function
 | S_skip -> ()
 | S_continue q -> fprintf fmt "%a <= %a;" pp_ident st pp_state q
 | S_if(z,s1,so) ->
-    fprintf fmt "@[<v 2>if %a(0) = '1' then@,%a@]" pp_ident z (pp_s ~st) s1;
-    Option.iter (fun s2 -> fprintf fmt "@,@[<v 2>else@,%a@]" (pp_s ~st) s2) so;
+    fprintf fmt "@[<v 2>if %a(0) = '1' then@,%a@]" pp_ident z (pp_s externals ~st) s1;
+    Option.iter (fun s2 -> fprintf fmt "@,@[<v 2>else@,%a@]" (pp_s externals ~st) s2) so;
      fprintf fmt "@,end if;"
 | S_case(y,hs,so) ->
     fprintf fmt "@[<v>case %a is@," pp_ident y;
@@ -24,11 +24,11 @@ let rec pp_s ~st fmt = function
         pp_c fmt cs
     in
     List.iter (fun (cs,s) ->
-      fprintf fmt "@[<v 2>when %a =>@,%a@]@," pp_cs cs (pp_s ~st) s) hs;
+      fprintf fmt "@[<v 2>when %a =>@,%a@]@," pp_cs cs (pp_s externals ~st) s) hs;
     Option.iter (fun s ->
-      fprintf fmt "@[<v 2>when others =>@,%a@]@," (pp_s ~st) s) so;
+      fprintf fmt "@[<v 2>when others =>@,%a@]@," (pp_s externals ~st) s) so;
     fprintf fmt "@]end case;";
-| S_set(x,a) -> fprintf fmt "@[<v>%a := %a;@]" pp_ident x pp_a a
+| S_set(x,a) -> fprintf fmt "@[<v>%a := %a;@]" pp_ident x (pp_a externals) a
 | S_acquire_lock(l) ->
       fprintf fmt
          "@[acquire(%a);@]" 
@@ -45,7 +45,7 @@ let rec pp_s ~st fmt = function
          "%d" n
     | _ ->
        fprintf fmt
-         "to_integer(unsigned(%a))" pp_a idx);
+         "to_integer(unsigned(%a))" (pp_a externals) idx);
    fprintf fmt ";@]"
 | S_read_stop(x,l) ->
         fprintf fmt
@@ -60,42 +60,40 @@ let rec pp_s ~st fmt = function
            "%d" n
       | _ ->
          fprintf fmt
-           "to_integer(unsigned(%a))" pp_a idx);
+           "to_integer(unsigned(%a))" (pp_a externals) idx);
       fprintf fmt ";@]";
       fprintf fmt
         "@[%a <= %a; %a <= '1';@]" 
           pp_ident ("$"^x^"_write")
-          pp_a a
+          (pp_a externals) a
           pp_ident ("$"^x^"_write_request")
     | S_write_stop(x) ->
         fprintf fmt
          "@[%a <= '0';@]" 
               pp_ident ("$"^x^"_write_request")
-| S_seq(S_skip,s) | S_seq(s,S_skip) -> pp_s ~st fmt s
-| S_seq(s1,s2) -> fprintf fmt "@[<v>%a@,%a@]" (pp_s ~st) s1 (pp_s ~st) s2
-| S_letIn(x,a,s) -> fprintf fmt "@[<v>%a := %a;@,%a@]" pp_ident x pp_a a (pp_s ~st) s
-| S_fsm(id,rdy,x,cp,ts,s,b) ->
+| S_seq(S_skip,s) | S_seq(s,S_skip) -> pp_s externals ~st fmt s
+| S_seq(s1,s2) -> fprintf fmt "@[<v>%a@,%a@]" (pp_s externals ~st) s1 (pp_s externals ~st) s2
+| S_letIn(x,a,s) -> fprintf fmt "@[<v>%a := %a;@,%a@]" pp_ident x (pp_a externals) a (pp_s externals ~st) s
+| S_fsm(id,rdy,x,cp,ts,s) ->
      let (st2,_,_) = List.assoc id !List_machines.extra_machines in
-     pp_fsm fmt ~restart:b ~state_var:st2 ~idle:cp ~rdy (id,ts,s)
+     pp_fsm externals fmt ~state_var:st2 ~idle:cp ~rdy (id,ts,s)
 | S_in_fsm(id,s) ->
      let (st2,_,_) = List.assoc id !List_machines.extra_machines in
-     pp_s ~st:st2 fmt s
+     pp_s externals ~st:st2 fmt s
 | S_call(op,a) ->
-   fprintf fmt "%a;@," pp_call (Runtime(op),a)
+   fprintf fmt "%a;@," (pp_call externals) (Runtime(op),a)
+| S_external_run _ -> assert false (* todo *)
 
 (** code generator for FSMs *)
-and pp_fsm fmt ~restart ~state_var:st ~idle ~rdy (id,ts,s) =
-    if restart then (
-      fprintf fmt "@[<v>case %a is@," pp_ident st;
-      List.iter (fun (x,s) -> fprintf fmt "@[<v 2>when %a =>@,%a@]@," pp_state x (pp_s ~st) s) ts;
-      fprintf fmt "@[<v 2>when %a =>@,%a@]" pp_state idle (pp_s ~st) s;
-      fprintf fmt "@]@,end case;")
-    else (
-    fprintf fmt "@[<v>case %a is@," pp_ident st;
-    List.iter (fun (x,s) -> fprintf fmt "@[<v 2>when %a =>@,%a@]@," pp_state x (pp_s ~st) s) ts;
-    fprintf fmt "@[<v 2>when %a =>@,%a@]@," pp_state idle (pp_s ~st) s;
-    fprintf fmt "@]end case;"
-   )
+and pp_fsm externals fmt ~state_var:st ~idle ~rdy (id,ts,s) =
+  fprintf fmt "@[<v>case %a is@," 
+    pp_ident st;
+  List.iter (fun (x,s) -> fprintf fmt "@[<v 2>when %a =>@,%a@]@," 
+                pp_state x 
+                (pp_s externals ~st)
+                s) ts;
+  fprintf fmt "@[<v 2>when %a =>@,%a@]@," pp_state idle (pp_s externals ~st) s;
+  fprintf fmt "@]end case;"
 
 (* default value as bitvector where each bit is at '0' *)
 let default_zero_value nbits =
@@ -230,7 +228,7 @@ let declare_variable ~argument ~statics typing_env fmt =
 
 
 (* code generator for the whole design *)
-let pp_component fmt ~vhdl_comment ~name ~state_var ~argument ~result ~idle ~rdy ~statics typing_env infos (ts,s) =
+let pp_component fmt ~vhdl_comment ~name ~externals ~state_var ~argument ~result ~idle ~rdy ~statics typing_env infos (ts,s) =
 
   let arty = List.fold_left (fun arty (_,g) ->
       match g with
@@ -280,55 +278,6 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
 
   ArrayType.iter (fun n _ ->
       fprintf fmt "type array_value_%d is array (natural range <>) of value(0 to %d);@," n (n-1)) arty;
-
-
-(*
-  List.iter (fun (x,st) -> 
-     match st with
-     | Static_array(c,_)
-     | Static_matrix(c,_) ->
-          
-          (match st with
-          | Static_array(_,n) ->
-              fprintf fmt "signal %a : array_value_%d(0 to %d)" pp_ident x (size_const c) (n-1);
-          | Static_matrix(c,n_list) -> 
-              fprintf fmt "signal %a : array_value_%d" pp_ident x (size_const c);
-              List.iter (fun n -> fprintf fmt "(0 to %d)" n) n_list;
-          );
-
-          if not(!ram_inference) then (
-           fprintf fmt " := (others => %a);@," pp_c c
-          ) else (fprintf fmt ";@,";
-                  if !intel_max10_target then (
-                    (** Intel MAX 10 FPGA device do not support memory initialization.
-                        (source: https://www.intel.com/content/www/us/en/support/programmable/articles/000074796.html
-                     *)
-                    Prelude.Errors.warning (fun fmt ->
-                        Format.fprintf fmt
-                          "Static array %s%a%s (RAM block): Intel MAX 10 FPGA device do not support memory initialization.\n"
-                          Prelude.Errors.bold
-                          pp_ident x
-                          Prelude.Errors.reset)
-                  )
-                  else (
-                    fprintf fmt "attribute %a_init_file : string;@," pp_ident x;
-                    fprintf fmt
-                       "attribute %a_init_file of %a : signal is \"init_file_%a.mif\";@,"
-                       pp_ident x
-                       pp_ident x
-                       pp_ident x));
-          fprintf fmt "signal %a : value(0 to %d);@," pp_ident ("$"^x^"_value") (size_const c - 1);
-          (match st with
-          | Static_array(_,n) ->
-            fprintf fmt "signal %a : natural range 0 to %d;@," pp_ident ("$"^x^"_ptr") (n - 1);
-            fprintf fmt "signal %a : natural range 0 to %d;@," pp_ident ("$"^x^"_ptr_write") (n - 1);
-          | Static_matrix(_,n_list) -> ());
-          fprintf fmt "signal %a : value(0 to %d);@," pp_ident ("$"^x^"_write") (size_const c - 1);
-          fprintf fmt "signal %a : std_logic := '0';@," pp_ident ("$"^x^"_write_request")
-
-        ) statics;
-*)
-
 
 
   List.iter (fun (x,st) ->
@@ -411,7 +360,11 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
   fprintf fmt "@,%a := \"0\";@," pp_ident rdy;
   fprintf fmt "%a <= %a;@," pp_ident state_var pp_state idle;
 
-  List.iter (fun (_,(sv,idle,xs)) -> fprintf fmt "%a <= %a;@," pp_ident sv pp_state idle) !List_machines.extra_machines;
+  List.iter (fun (_,(sv,idle,xs)) -> 
+    fprintf fmt "%a <= %a;@," 
+      pp_ident sv 
+      pp_state idle) 
+      !List_machines.extra_machines;
 
   (* initializing all locks to 0 *)
   List.iter (fun (x,(Static_array_of _ | Static_array _)) ->
@@ -420,7 +373,7 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
 
   fprintf fmt "@]@,else@,";
 
-  pp_fsm ~restart:false fmt ~state_var ~idle ~rdy ("main",ts,s);
+  pp_fsm externals fmt ~state_var ~idle ~rdy ("main",ts,s);
 
   fprintf fmt "@,@,result <= %a;@," pp_ident result;
   fprintf fmt "rdy <= %a;@," pp_ident rdy;

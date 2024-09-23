@@ -273,7 +273,7 @@ package body runtime is
     end;
 
   function eclat_not(arg : value) return value is
-    variable r : signed (0 to arg'length - 1);
+    variable r : unsigned (0 to arg'length - 1);
     begin
       for i in 0 to arg'length-1 loop
         r(i) := not arg(i);

@@ -275,9 +275,12 @@ let pp_exp (fmt:fmt) (e:e) : unit =
         fprintf fmt "@[<v>%a := %a@]"
           (pp_e ~paren:true) e1
           (pp_e ~paren:true) e2) fmt ()
-  | E_local_static_array(e1,_) ->
-     fprintf fmt "array_create %a"
-        (pp_e ~paren:true) e1
+  | E_array_create(sz,_) ->
+     fprintf fmt "create<%a>"
+       pp_size sz
+  | E_array_make(sz,e,_) ->
+     fprintf fmt "make<%a>(%a)" 
+       pp_size sz (pp_e ~paren:false) e
   | E_array_length(x) ->
       fprintf fmt "@[<v>%a.length@]"
         pp_ident x
@@ -317,6 +320,8 @@ let pp_exp (fmt:fmt) (e:e) : unit =
       fprintf fmt "mapi%s" (if is_par then "_par" else "");
       fprintf fmt "%a %a" (pp_e ~paren:true) (E_fun(p,e1))
                           (pp_e ~paren:true) e2
+  | E_run(i,e) ->
+      fprintf fmt "run %s(%a)" i (pp_e ~paren:false) e
   in
   fprintf fmt "@[<v 0>%a@]" (pp_e ~paren:false) e
 

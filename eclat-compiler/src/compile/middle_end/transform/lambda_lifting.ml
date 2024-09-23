@@ -62,62 +62,70 @@ let lifting ~statics (env:env) (e:e) : e =
             E_fun(P_var x,E_app(E_var f,E_tuple[E_var x;pat2exp p])))
             (* E_letIn(P_var g,E_fun(P_var x,E_app(E_var f,E_tuple[E_var x;pat2exp p])), E_var g)) *)
       else e
-    | E_app((E_const (Op(TyConstr _))),_) ->
-        assert false
-    | E_app((E_const _) as e1,e2) ->
-        E_app(e1,lift env e2)
-    | E_app(E_var f,e2) ->
-        let e2' = lift env e2 in
-        (match SMap.find_opt f env with
-         | None | Some (P_unit) -> E_app(E_var f,e2')
-         | Some p -> (* Printf.printf "=====>%d\n" (SMap.cardinal  (vars_of_p p)); *)
-            E_app(E_var f,E_tuple[e2'; pat2exp p]))
+    (*| E_app((E_const (Op(TyConstr _))),_) ->
+        assert false*)
     | E_app(e1,e2) ->
+        let _ty,e1' = Ast_undecorated.remove_tyconstr e1 in
+        (* todo: deal with ty or emit warning *)
+        (match e1' with
+        | E_const _ -> E_app(e1,lift env e2)
+        | E_var f -> 
+            let e2' = lift env e2 in
+            (match SMap.find_opt f env with
+             | None | Some (P_unit) -> E_app(e1,e2')
+             | Some p -> (* Printf.printf "=====>%d\n" (SMap.cardinal  (vars_of_p p)); *)
+                 E_app(e1,E_tuple[e2'; pat2exp p]))
+        | _ ->
          (* assert (evaluated e1);*) lift env @@
          let f = gensym () in
-         E_letIn(P_var f,e1,E_app(E_var f,e2))
-    | E_letIn(P_var f,(E_fun(p,e1) as phi),e2) ->
-        let e1' = lift env e1 in
-        let xs = fv ~statics phi in
-        let vp = (vars_of_p p) in
-        let vp = xs |> SMap.filter (fun x _ ->
-                             not (SMap.mem x vp) && not (SMap.mem x env)) in
-        let p_env' = vp |> SMap.bindings
-                        |> List.map (fun (x,_) -> (* Printf.printf "--->%s\n" x;*) P_var x)
-                        |> group_ps in
-        if not (SMap.is_empty (vars_of_p p_env')) then
-          (has_changed := true;
-           let f,e2 = (* renaming in the case a same name [f]
-                         is in the environment of function [f] *)
-                      if SMap.mem f vp
-                      then let f' = gensym ~prefix:f () in
-                           let e2' = Ast_subst.subst_e f (E_var f') e2
-                           in (f',e2')
-                      else f,e2 in
-           let env2, ef = (SMap.add f p_env' env, E_fun(P_tuple[p;p_env'],e1')) in
-           E_letIn(P_var f,ef,lift env2 e2) )
-        else
-           let env2 = SMap.add f p_env' env in
-           E_letIn(P_var f,(E_fun(p,e1')),lift env2 e2)
-    | E_letIn(P_var f,(E_fix(g,(p,e1)) as phi),e2) ->
-        let xs = fv ~statics phi in
-        let vp = (vars_of_p p) in
-        let p_env' = xs |> SMap.filter (fun x _ ->
-                            not (SMap.mem x vp) && not (SMap.mem x env) && x <> g)
-                        |> SMap.bindings
-                        |> List.map (fun (x,_) -> P_var x)
-                        |> group_ps in
-        let e1' = lift (SMap.add g p_env' env) e1 in
-        let e2' = lift (SMap.add f p_env' env) e2 in
-        if not (SMap.is_empty (vars_of_p p_env')) then (
-          has_changed := true;
-          let ef = E_fix(g,(P_tuple[p;p_env'],e1')) in
-          E_letIn(P_var f,ef,e2'))
-         else
-          (E_letIn(P_var f,(E_fix(g,(p,e1'))),e2') )
-    | E_letIn(p,e1,e2) ->
-        let env' = env_filter env p in  (* todo: idem with E_match to avoid capture *)
-        E_letIn(p,lift env e1,lift env' e2)
+         E_letIn(P_var f,e1,E_app(E_var f,e2)))
+    | E_letIn(px,ex,e2) ->
+        let _ty,ex' = Ast_undecorated.remove_tyconstr ex in
+        (* todo: deal with ty or emit warning *)
+        (match px,ex' with
+        | P_var f,(E_fun(p,e1) as phi) ->
+            let e1' = lift env e1 in
+            let xs = fv ~statics phi in
+            let vp = (vars_of_p p) in
+            let vp = xs |> SMap.filter (fun x _ ->
+                                 not (SMap.mem x vp) && not (SMap.mem x env)) in
+            let p_env' = vp |> SMap.bindings
+                            |> List.map (fun (x,_) -> (* Printf.printf "--->%s\n" x;*) P_var x)
+                            |> group_ps in
+            if not (SMap.is_empty (vars_of_p p_env')) then
+              (has_changed := true;
+               let f,e2 = (* renaming in the case a same name [f]
+                             is in the environment of function [f] *)
+                          if SMap.mem f vp
+                          then let f' = gensym ~prefix:f () in
+                               let e2' = Ast_subst.subst_e f (E_var f') e2
+                               in (f',e2')
+                          else f,e2 in
+               let env2, ef = (SMap.add f p_env' env, E_fun(P_tuple[p;p_env'],e1')) in
+               E_letIn(P_var f,ef,lift env2 e2) )
+            else
+               let env2 = SMap.add f p_env' env in
+               E_letIn(P_var f,(E_fun(p,e1')),lift env2 e2)
+     
+        | P_var f,(E_fix(g,(p,e1)) as phi) ->
+            let xs = fv ~statics phi in
+            let vp = (vars_of_p p) in
+            let p_env' = xs |> SMap.filter (fun x _ ->
+                                not (SMap.mem x vp) && not (SMap.mem x env) && x <> g)
+                            |> SMap.bindings
+                            |> List.map (fun (x,_) -> P_var x)
+                            |> group_ps in
+            let e1' = lift (SMap.add g p_env' env) e1 in
+            let e2' = lift (SMap.add f p_env' env) e2 in
+            if not (SMap.is_empty (vars_of_p p_env')) then (
+              has_changed := true;
+              let ef = E_fix(g,(P_tuple[p;p_env'],e1')) in
+              E_letIn(P_var f,ef,e2'))
+             else
+              (E_letIn(P_var f,(E_fix(g,(p,e1'))),e2') )
+          | _ ->
+              let env' = env_filter env px in  (* todo: idem with E_match to avoid capture *)
+              E_letIn(px,lift env ex,lift env' e2))
     | E_match(e1,hs,eo) ->
         let e1' = lift env e1 in
         let hs' = List.map (fun (inj,(p,ei)) ->
@@ -207,7 +215,7 @@ let globalize_e (e:e) : ((x * e) list * e) =
                                  (dsw,Some ew')
       in
       ds1@List.concat dss@dsw, E_match(e1',hs',eo')
-    (* | E_letIn(P_var x,(E_local_static_array (e3,_) as e1),e2) ->
+    (* | E_letIn(P_var x,(E_array_create (e3,_) as e1),e2) ->
         (match e3 with
         | E_const _ ->
             let ds1,e1' = glob e1 in
@@ -237,9 +245,11 @@ let globalize_e (e:e) : ((x * e) list * e) =
         let ds1,e1' = glob e1 in
         let ds2,e2' = glob e2 in
         ds1@ds2,E_set(e1',e2)
-    | E_local_static_array(e1,loc) ->
+    | E_array_make(sz,e1,loc) ->
         let ds1,e1' = glob e1 in
-        ds1,E_local_static_array(e1',loc)
+        ds1,E_array_make(sz,e1',loc)
+    | E_array_create _ ->
+        [],e
    | E_array_length _ ->
         [],e
     | E_array_get(x,e1) ->
@@ -291,6 +301,9 @@ let globalize_e (e:e) : ((x * e) list * e) =
       let ds1,e1' = glob e1 in
       let ds2,e2' = glob e2 in
       ds2,E_int_mapi(is_par,(p,declare ds1 e1'),e2',ty)
+    | E_run(x,e) ->
+      let ds,e' = glob e in
+      ds,E_run(x,e')
   in glob e
 
 

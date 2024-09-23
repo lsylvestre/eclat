@@ -1,7 +1,7 @@
 open Fsm_syntax
 open Format
 
-let ram_inference = ref false
+let ram_inference = ref true
 let memory_initialization = ref false
 let intel_max10_target = ref false
 let intel_xilinx_target = ref false
@@ -10,8 +10,9 @@ let single_read_write_lock_flag = ref true
 let mealy_flag = ref true
 
 
+
 let size_ty t =
-  (* we must canonising [t] to prevent it from being considered as a type variable *)
+  (* we must canonize [t] to prevent it from being considered as a type variable *)
   Fsm_typing.(size_ty (canon t))
 
 (** [size_const c] returns the number of bits of constant [c] *)
@@ -135,7 +136,7 @@ let rec pp_c fmt c =
       fprintf fmt "%a & %s" pp_c c (const_zero (n - size_const c))
 
 (** code generator for tuples deconstruction *)
-let rec pp_tuple_access fmt (i:int) ty (a:a) : unit =
+let rec pp_tuple_access externals fmt (i:int) ty (a:a) : unit =
 
   let rec tuple_access i ty_a a =
       (* compute bounds of the value to be accessed at index [i_to_find]
@@ -175,36 +176,64 @@ let rec pp_tuple_access fmt (i:int) ty (a:a) : unit =
         (* this case is use to avoid a strange failure (a GHDL bug ?)
            during simulation (overflow detected)
            when using slice x(j to k) of size 1 (i.e., j = k) *)
-        fprintf fmt "\"\"&%a(%d)" pp_a a j
+        fprintf fmt "\"\"&%a(%d)" (pp_a externals) a j
       else
       let pp_slice fmt (j,k) =
         fprintf fmt "%d to %d" j k
       in
-      fprintf fmt "%a(%a)" pp_a a pp_slice (j,k)
-  | `Atom(a) -> pp_a fmt a
+      fprintf fmt "%a(%a)" (pp_a externals) a pp_slice (j,k)
+  | `Atom(a) -> pp_a externals fmt a
 
 
 (** code generator for call of operator *)
-and pp_call fmt (op,a) =
+and pp_call externals fmt (op,a) =
   match op with
-  | GetTuple(i,_,ty) -> pp_tuple_access fmt i ty a
+  | GetTuple(i,_,ty) -> pp_tuple_access externals fmt i ty a
   | Runtime(Size_of_val(ty,size_int)) -> 
      let n = size_ty (Fsm_typing.translate_ty ty) in
      pp_c fmt (Int{value=n;tsize=Fsm_typing.translate_size size_int})
-  | Runtime(Vector_make) ->
-      (match a with
-      | A_tuple[a1; a2] -> fprintf fmt "eclat_vector_make(%a,%a)" pp_a a1 pp_a a2
-      | _ -> assert false)
-  | Runtime(Vector_length (sz,sz_res)) ->
+ | Runtime(Resize_int sz) ->
+      let n = size_ty @@ Fsm_typing.translate_size sz in
+      fprintf fmt "eclat_resize(%a,%d)" (pp_a externals) a n
+ | Runtime(Vector_create sz) ->
+      let n = size_ty @@ Fsm_typing.translate_size sz in
+      fprintf fmt "eclat_vector_make(%d,%a)" n (pp_a externals) a
+ (* | Runtime(Vector_length (sz,sz_res)) ->
       (match Types.canon_size sz with
       | Sz_lit n -> pp_c fmt (Int {value=n;tsize=(Fsm_typing.translate_size sz_res)})
       | _ -> Types.pp_size Format.std_formatter (Types.canon_size sz); assert false)
    | Runtime(Vector_get t) ->
-      fprintf fmt "eclat_vector_get(%a,%d)" pp_a a Fsm_typing.(size_ty (translate_tyB t))
+      fprintf fmt "eclat_vector_get(%a,%d)" (pp_a externals) a (size_ty Fsm_typing.(translate_tyB t))
    | Runtime(Vector_update t) ->
-      fprintf fmt "eclat_vector_update(%a,%d)" pp_a a Fsm_typing.(size_ty (translate_size t))
-  | Runtime p -> Operators.gen_op fmt p pp_a a
-  | _ -> fprintf fmt "@[%a(%a)@]" pp_op op pp_a a
+      fprintf fmt "eclat_vector_update(%a,%d)" (pp_a externals) a (size_ty Fsm_typing.(translate_size t))
+ *)
+  | Runtime(External_fun (x,ty)) ->
+      let annot_with_sizes,arity = match List.assoc_opt x (snd externals) with
+                                   | Some (_,(b,n,_)) -> (b,n)
+                                   | None -> false,1 in
+      (* let rec extract_tyB tyB =
+        match Types.canon_tyB tyB with
+        | TyB_abstract(_,_sz,tyB_list) ->
+            List.map (fun tyB -> Fsm_typing.(size_ty (translate_tyB tyB))) tyB_list
+        | TyB_var{contents=Is v} -> extract_tyB v
+        | _ -> []
+      in*)
+      let extra = match Types.canon_ty ty with
+                  | Ty_fun(Ty_base tyB1,_,tyB2) -> 
+                       [size_ty Fsm_typing.(translate_tyB tyB1)  
+                       ;size_ty Fsm_typing.(translate_tyB tyB2)  ]
+                  | _ -> assert false
+      in
+      fprintf fmt "@[work.%s(" x;
+      if annot_with_sizes then List.iter (fun n -> fprintf fmt "%d, " n) extra;
+      (match a with
+      | A_tuple aa when arity > 1 -> 
+         fprintf fmt "@[%a)@]"
+            (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt ", ") (pp_a externals)) aa
+      | _ -> fprintf fmt "@[%a)@]" (pp_a externals) a);
+      fprintf fmt "@]"
+  | Runtime p -> Operators.gen_op fmt p (pp_a externals) a
+  | _ -> fprintf fmt "@[%a(%a)@]" pp_op op (pp_a externals) a
 
 (** code generator for operator *)
 and pp_op fmt = function
@@ -215,15 +244,15 @@ and pp_op fmt = function
 
 (** code generator for atoms (i.e. combinatorial expression) *)
 (* assumes that the let-bindings of atoms are not nested *)
-and pp_a fmt = function
+and pp_a externals fmt = function
 | A_const c -> pp_c fmt c
 | A_var x -> fprintf fmt "%a" pp_ident x
 | A_call(op,a) ->
-   pp_call fmt (op,a)
+   pp_call externals fmt (op,a)
 | A_letIn(x,a1,a2) ->
-   assert false (* flattening needed before *) (* fprintf fmt "@[%a := %a;@,%a@]" pp_ident x pp_a a1 pp_a a2*)
-| A_tuple aas -> pp_tuple fmt pp_a aas
-| A_vector aas -> pp_vector fmt pp_a aas
+   assert false (* flattening needed before *) (* fprintf fmt "@[%a := %a;@,%a@]" pp_ident x pp_a externals a1 pp_a externals a2*)
+| A_tuple aas -> pp_tuple fmt (pp_a externals) aas
+| A_vector aas -> pp_vector fmt (pp_a externals) aas
 | A_string_get(s,i) ->
     fprintf fmt "@[%a(to_integer(unsigned(%s&\"000\")) to to_integer(unsigned(%s&\"000\"))+7)@]" pp_ident s i i
 | A_buffer_get(xb) ->
@@ -239,3 +268,77 @@ and pp_a fmt = function
 | A_decode(y,ty) ->
    fprintf fmt "%a(0 to %d)" pp_ident y (size_ty ty - 1)
 
+
+let print_external fmt (n,(ty,shared)) =
+  let arg,d,ret = match ty with
+  | Types.Ty_fun(arg,d,ret) -> 
+      size_ty Fsm_typing.(translate_ty arg),d, size_ty Fsm_typing.(translate_tyB ret)
+  | _ -> assert false
+  in
+  let instances = match Hashtbl.find_opt Count_externals.external_count n with
+                  | None -> Count_externals.IMap.empty | Some v -> v in
+  Count_externals.IMap.iter (fun i () ->
+      fprintf fmt "signal %s_argument_%d : std_logic_vector(0 to %d) := (others => '0');\n" n i arg;
+      fprintf fmt "signal %s_result_%d : std_logic_vector(0 to %d) := (others => '0');\n" n i ret
+    ) instances;
+
+  fprintf fmt "@[<v 2>component %s is@, port(@[" n;
+  fprintf fmt "signal clk : in std_logic;@,";
+  fprintf fmt "signal reset : in std_logic;@,";
+  fprintf fmt "signal argument : in std_logic_vector(0 to %d);@," arg;
+  fprintf fmt "signal result : out std_logic_vector(0 to %d)@," ret;
+  fprintf fmt "@]);@,end component;@,@,@]"
+
+
+let instantiate_external fmt (n,(_,shared)) =    
+  let instances = match Hashtbl.find_opt Count_externals.external_count n with
+                  | None -> Count_externals.IMap.empty
+                  | Some v -> v in
+  Count_externals.IMap.iter (fun i () ->
+    fprintf fmt "@[%s_cc_%d : component %s port map (@[" n i n;
+    fprintf fmt "clk => clk,@,";
+    fprintf fmt "reset => reset,@,";
+    fprintf fmt "argument => %s_argument_%d,@," n i;
+    fprintf fmt "result => %s_result_%d@," n i;
+    fprintf fmt ");@]@,@]"
+  ) instances
+
+
+
+let variable_decl_go_external fmt (n,(ty,_)) =    
+  let ty_arg = match ty with
+  | Types.Ty_fun(arg,_,_) -> 
+      Fsm_typing.(translate_ty arg)
+  | _ -> assert false
+  in  
+  let instances = match Hashtbl.find_opt Count_externals.external_count n with
+                  | None ->  Count_externals.IMap.empty
+                  | Some v -> v in
+  Count_externals.IMap.iter (fun i () ->
+    fprintf fmt "variable %s_argument_%d_var : std_logic_vector(0 to %d);@," 
+      n i (size_ty ty_arg);
+  ) instances
+
+let variable_init_go_external fmt (n,_) =    
+  let instances = match Hashtbl.find_opt Count_externals.external_count n with
+                  | None ->  Count_externals.IMap.empty
+                  | Some v -> v in
+  Count_externals.IMap.iter (fun i () ->
+    fprintf fmt "%s_argument_%d_var := (others => '0');@," n i;
+    (* fprintf fmt "restart_%s_%d := \"0\";@," n i; *)
+  ) instances
+
+(* | A_is_rdy(x,id) ->
+    fprintf fmt "%s_result_%d(%s_result_%d'length - 1 to %s_result_%d'length - 1)" x id x id x id
+| A_get_result(x,id) ->
+    fprintf fmt "%s_result_%d(0 to %s_result_%d'length - 2)" x id x id
+ *)
+
+let variable_set_go_external fmt (n,_) =    
+  let instances = match Hashtbl.find_opt Count_externals.external_count n with
+                  | None ->  Count_externals.IMap.empty
+                  | Some v -> v in
+  Count_externals.IMap.iter (fun i () ->
+    (* fprintf fmt "%s_argument_%d(0 to 0) <= restart_%s_%d;@," n i n i; *)
+    fprintf fmt "%s_argument_%d <= %s_argument_%d_var;@," n i n i
+  ) instances

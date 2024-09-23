@@ -83,12 +83,16 @@ let rec prop_s env s =
       let a1' = prop env a1 in
       if propagable a1' then (when_propagate x; prop_s (SMap.add x a1' env) s1)
       else S_letIn(x,a1',prop_s env s1)
-  | S_fsm(id,rdy,result,compute,ts,s,b) ->
-      S_fsm(id,rdy,result,compute,List.map (fun (q,s) -> q, prop_s env s) ts,prop_s env s,b)
+  | S_fsm(id,rdy,result,compute,ts,s) ->
+      S_fsm(id,rdy,result,compute,
+            List.map (fun (q,s) -> q, prop_s env s) ts,
+            prop_s env s)
   | S_in_fsm(id,s) ->
       S_in_fsm(id,prop_s env s)
   | S_call(op,a1) ->
       S_call(op,prop env a1)
+  | S_external_run(f,i,res,rdy,a) ->
+      S_external_run(f,i,res,rdy,prop env a)
 
 let propagation_s s =
   prop_s SMap.empty s

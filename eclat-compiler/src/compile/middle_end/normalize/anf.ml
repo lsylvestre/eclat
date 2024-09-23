@@ -146,10 +146,11 @@ let rec anf (e:e) : e =
       E_set(xc1,xc2)
   | E_array_length _ ->
       [],e
-  | E_local_static_array(e1,loc) ->
+  | E_array_make(sz,e1,loc) ->
       let ds1,e1' = glob e1 in
-      ds1,plug e1' @@ fun xc1 ->
-              E_local_static_array(xc1,loc)
+      ds1,E_array_make(sz,e1',loc)
+  | E_array_create _ ->
+      [],e
   | E_array_get(x,e1) ->
       let ds1,e1' = glob e1 in
       ds1,plug e1' @@ fun xc1 ->
@@ -184,6 +185,9 @@ let rec anf (e:e) : e =
   | E_int_mapi(is_par,(p,e1),e2,ty) ->
       [],plug (anf e2) @@ fun xc ->
       E_int_mapi(is_par,(p,anf e1),xc,ty) 
+  | E_run(i,e) ->
+      [],plug (anf e) @@ fun xc ->
+      E_run(i,xc) 
   in 
   let ds,e' = glob e in 
   Ast_mapper.declare ds e'

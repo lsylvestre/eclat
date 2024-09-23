@@ -18,6 +18,13 @@ let eq_tys t1 t2 =
         compare_tyB tyB1 tyB2
     | TyB_var{contents=Unknown _}, _
     | _,TyB_var{contents=Unknown _} -> raise NotEqual
+    (*| TyB_vector(sz1,tyB1),TyB_vector(sz2,tyB2) ->
+        compare_size sz1 sz2;
+        compare_tyB tyB1 tyB2
+    | TyB_abstract(x1,sz1,tyB_list1),TyB_abstract(x2,sz2,tyB_list2) ->
+        if x1 <> x2 then raise NotEqual;
+        compare_size sz2 sz2;
+        List.iter2 compare_tyB tyB_list1 tyB_list2*)
     | _ -> raise NotEqual
   and compare_size sz1 sz2 =
     (match canon_size sz1,canon_size sz2 with
@@ -79,6 +86,7 @@ let monomorphize_exp e =
         if criterion f then E_letIn(P_var f,v,aux ds e2)
         else aux ((f,v)::ds) e2
     | E_app(E_var f,arg) ->
+        (* Printf.printf "---> %s %b\n " f (criterion f); *)
        if criterion f then e else
        (match List.assoc_opt f ds with
        | Some v ->

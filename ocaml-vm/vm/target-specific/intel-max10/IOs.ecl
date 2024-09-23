@@ -79,6 +79,9 @@ let displayZ : t_7seg = tuple_of_int<8>(0b00100101) ;;
 let all_switches (b:bool) : switches =
   (b,b,b,b,b,b,b,b,b,b) ;;
 
+let all_leds (b:bool) : leds =
+  (b,b,b,b,b,b,b,b,b,b) ;;
+
 (* for displaying "COFFEE" on the six 7-segment displays *)
 let display_coffee : t_7segs =
   (displayC, displayO, displayF, displayF, displayE, displayE) ;;
@@ -88,4 +91,35 @@ let display_coffee : t_7segs =
 let display_zero : t_7segs =
   (display0, display0, display0, display0, display0, display0) ;;
 
+
+
+let map_digit(n: int<4>) =
+    match n with
+    | 0 -> display0
+    | 1 -> display1
+    | 2 -> display2
+    | 3 -> display3
+    | 4 -> display4
+    | 5 -> display5
+    | 6 -> display6
+    | 7 -> display7
+    | 8 -> display8
+    | 9 -> display9
+    | 10 -> displayA
+    | 11 -> displayB
+    | 12 -> displayC
+    | 13 -> displayD
+    | 14 -> displayE
+    | 15 -> displayF
+    | _ -> displayL
+    end ;;
+
+let number_to_alpha(n : int<25>) = (* 25 car signe *)
+    let i1 = int_of_tuple<4>(get_bit(n, 3), get_bit(n, 2), get_bit(n, 1), get_bit(n, 0)) in
+    let i2 = int_of_tuple<4>(get_bit(n, 7), get_bit(n, 6), get_bit(n, 5), get_bit(n, 4)) in
+    let i3 = int_of_tuple<4>(get_bit(n, 11), get_bit(n, 10), get_bit(n, 9), get_bit(n, 8)) in
+    let i4 = int_of_tuple<4>(get_bit(n, 15), get_bit(n, 14), get_bit(n, 13), get_bit(n, 12)) in
+    let i5 = int_of_tuple<4>(get_bit(n, 19), get_bit(n, 18), get_bit(n, 17), get_bit(n, 16)) in
+    let i6 = int_of_tuple<4>(get_bit(n, 23), get_bit(n, 22), get_bit(n, 21), get_bit(n, 20)) in
+    (map_digit(i1), map_digit(i2), map_digit(i3), map_digit(i4), map_digit(i5), map_digit(i6)) ;;
 

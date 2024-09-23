@@ -6,6 +6,11 @@ let counter (rst) =
   in
   reg inc last 0 ;;
 
+let counter_cond (b) =
+  let inc(c) =
+    if b then c + 1 else c
+  in
+  reg inc last 0 ;;
 
 (* blinking a led each n clock cycles *)
 let blink (n) =
@@ -32,8 +37,13 @@ let main (ii : inputs) : outputs =
                  print_int(cy);
                  print_string(")");
                  print_newline ()) else ());
-
+  let x = reg (fun x -> stop or x) init false in 
+  let dur = counter_cond(not(x)) in
+  if x then print_int dur; 
+  let dis = if x then number_to_alpha(resize_int<25>(dur))
+            else display_zero in
   (* blinking a led *)
   let b = blink(10000000) in
   let switches = (stop,busy,b,led,false,false,false,false,false,false) in
-  (switches, display_zero) ;;
+  (switches, dis) ;;
+
