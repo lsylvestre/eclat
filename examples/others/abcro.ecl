@@ -2,7 +2,7 @@
 
    $ cd eclat-compiler
    $ make
-   $ ./eclat ../examples/abcro.ecl \
+   $ ./eclat ../examples/others/abcro.ecl \
              -main=abcro \
              -arg="(((false,false),false),false);(((true,true),true),false);(((true,true),true),false);(((true,true),true),true);(((false,true),false),false);(((true,false),false),false);(((false,false),false),false);(((false,false),true),false)"
 

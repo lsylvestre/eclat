@@ -34,6 +34,18 @@ exception BadFormat
 let parse (s:string) : (((string * int) list) * ((string * int) list) * ((string * int) list)) =
   try
     (match split '|' s with
+    | [inputs;outputs] ->
+        let xs = split ',' inputs
+        and ys = split ',' outputs in
+        let parse_io x =
+          match split ':' x with
+          | [x;size] -> (x,int_of_string size)
+          | _ -> raise BadFormat in
+        let parse_ios xs =
+          if xs = [] then (raise BadFormat) else
+          List.map parse_io xs
+        in
+        (parse_ios xs, parse_ios ys, [])
     | [inputs;outputs;inouts] ->
         let xs = split ',' inputs
         and ys = split ',' outputs
@@ -43,7 +55,7 @@ let parse (s:string) : (((string * int) list) * ((string * int) list) * ((string
           | [x;size] -> (x,int_of_string size)
           | _ -> raise BadFormat in
         let parse_ios xs =
-          if xs = [] then raise BadFormat else
+          if xs = [] then (raise BadFormat) else
           List.map parse_io xs
         in
         (parse_ios xs, parse_ios ys, parse_ios zs)

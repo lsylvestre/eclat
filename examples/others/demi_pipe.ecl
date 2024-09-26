@@ -1,4 +1,4 @@
-(* ./eclat ../examples/demi_pipe.ecl
+(* ./eclat ../examples/others/demi_pipe.ecl
    make simul NS=60000 *)
    
 let static a1 = (10,false)^100 ;;
@@ -16,9 +16,9 @@ let demi_pipe(id,go,f,src,dst) =
   in loop(0) ;;
 
 let pipe4 ((f1,f2,f3,f4),(src,dst)) =
-  let tmp1 = array_create 100 in
-  let tmp2 = array_create 100 in
-  let tmp3 = array_create 100 in
+  let tmp1 = create<100>() in
+  let tmp2 = create<100>() in
+  let tmp3 = create<100>() in
   set(tmp1,0,(0,false));
   set(tmp2,0,(0,false));
   set(tmp3,0,(0,false));

@@ -4,7 +4,7 @@
 
    $ cd eclat-compiler
    $ make
-   $ ./eclat ../examples/collatz.ecl -main=collatz -arg="6" -relax
+   $ ./eclat ../examples/others/collatz.ecl -main=collatz -arg="6" -relax
 
   (option -arg is used for simulation only and ignored for synthesis)
 

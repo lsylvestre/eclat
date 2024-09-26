@@ -8,7 +8,7 @@
 
    $ cd eclat-compiler
    $ make
-   $ ./eclat ../examples/counter.ecl \
+   $ ./eclat ../examples/others/counter.ecl \
                    -main=counter \
                    -arg="false;false;false;true;true;false;false"
 
