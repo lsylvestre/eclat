@@ -1,3 +1,7 @@
+**Note: an updated version will be available soon**
+
+-----
+
 ## Eclat
 
 A functional-imperative (ML-like) language with synchronous semantics
