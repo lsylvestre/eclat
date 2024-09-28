@@ -100,7 +100,7 @@ let specialize ds e =
         if contains_array ty then (has_changed := true; spec (SMap.add x (ty,E_fix(x',(p,(filter ty,tyB),e3'))) funcs) e2) 
         else
         E_letIn(P_var x,ty0,(E_fix(x',(p,(ty,tyB),e3'))),spec funcs e2)
-    | E_letIn(P_var x,ty0,((E_fun(p,(ty,tyB),e3)) as e1),e2) ->
+    | E_letIn(P_var x,ty0,((E_fun(p,(ty,tyB),e3))),e2) ->
         let e3' = spec funcs e3 in
         if contains_array ty then (has_changed := true; spec (SMap.add x (ty,E_fun(p,(filter ty,tyB),e3')) funcs) e2)
         else

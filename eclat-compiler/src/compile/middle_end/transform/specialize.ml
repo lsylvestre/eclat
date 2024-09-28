@@ -60,36 +60,6 @@ open Ast
 
 let has_changed = ref false
 
-(* list function names free in [e] that are applied in [e] *)
-
-let applyed e =
-  let r = ref SMap.empty in
-  let rec applyed_e = function
-  | E_app(E_var x,e1) ->
-      r := SMap.add x () !r;
-      applyed_e e1
-  | e -> Ast_mapper.iter applyed_e e
-  in
-  applyed_e e;
-  let vs = Free_vars.fv e in
-  SMap.filter (fun x _ -> SMap.mem x vs) !r
-  
-(** returns [true] if one of the names[xs] is called in [e] *)
-let applyed_xs xs e =
-  let vs = Free_vars.fv e in
-  let xs_free = SMap.filter (fun x _ -> SMap.mem x vs) xs in
-  let exception Found in
-  let rec find e = 
-    match e with
-    | E_app(E_var x,e1) ->
-       if SMap.mem x xs_free 
-       then raise Found 
-       else ()
-    | e -> Ast_mapper.iter find e
-  in 
-  try (find e; false) 
-  with Found -> true
-  
 
 let rec filter ty = 
   let open Types in
@@ -124,18 +94,6 @@ let contains_fun ty =
       ()
   in try aux ty; false with F -> true
 
-
-(** return true if [x] is called in the body of function [v] *)
-let hof x v =
-  match v with
-  | E_fun(p,_,e) ->
-      let xs = vars_of_p p in
-      applyed_xs xs e
-  | E_fix(g,(p,_,e)) ->
-      let xs = vars_of_p p in
-      assert (not (SMap.mem g xs));
-      applyed_xs xs e
-  | _ -> false
 
 (** in function [f = fun p -> ...],
     transforms the pattern [p] by replacing 
@@ -212,7 +170,7 @@ let specialize ds e =
         if contains_fun ty then (has_changed := true; spec (SMap.add x (ty,E_fix(x',(p,(filter ty,tyB),e3'))) funcs) e2) 
         else
         E_letIn(P_var x,ty0,(E_fix(x',(p,(ty,tyB),e3'))),spec funcs e2)
-    | E_letIn(P_var x,ty0,((E_fun(p,(ty,tyB),e3)) as e1),e2) ->
+    | E_letIn(P_var x,ty0,((E_fun(p,(ty,tyB),e3))),e2) ->
         let e3' = spec funcs e3 in
         if contains_fun ty then (
            has_changed := true; 
