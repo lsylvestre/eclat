@@ -117,7 +117,8 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ _ _ _ _ -> ()))
                            error ~loc (fun fmt ->
                                   Format.fprintf fmt
                                     "@[<v>This global pattern does not match statically the right-hand side.@]")) ds in
-  let main = List.fold_right (fun (x,v) e -> E_letIn(P_var x,v,e)) ds (let y = gensym () in E_fun (P_var y, E_app(entry_point,E_var y))) in
+  let main = List.fold_right (fun (x,v) e -> E_letIn(P_var x,Types.new_ty_unknown(),v,e)) ds (let y = gensym () in 
+      E_fun (P_var y,(Types.new_ty_unknown(),Types.new_tyB_unknown()), E_app(entry_point,E_var y))) in
 
 
   (*

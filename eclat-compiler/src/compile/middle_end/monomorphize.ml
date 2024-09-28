@@ -79,19 +79,19 @@ let criterion f =
 
 let monomorphize_exp e =
   let rec aux ds e =
-    match e with
-    | E_letIn(P_var f,E_fix(_,(p,e1)),e2) -> 
-        let v = E_fix(f,(p,aux ds e1)) in
+    match Ast_undecorated.remove_deco e with
+    | E_letIn(P_var f,ty,E_fix(_,(p,sigty,e1)),e2) -> 
+        let v = E_fix(f,(p,sigty,aux ds e1)) in
         (* Printf.printf "---> %s %b\n " f (criterion f); *)
-        if criterion f then E_letIn(P_var f,v,aux ds e2)
-        else aux ((f,v)::ds) e2
+        if criterion f then E_letIn(P_var f,ty,v,aux ds e2)
+        else aux ((f,(ty,v))::ds) e2
     | E_app(E_var f,arg) ->
         (* Printf.printf "---> %s %b\n " f (criterion f); *)
        if criterion f then e else
        (match List.assoc_opt f ds with
-       | Some v ->
+       | Some (ty,v) ->
            let g = Ast.gensym ~prefix:f () in
-           E_letIn(P_var g,v,E_app(E_var g,arg))
+           E_letIn(P_var g,Types.new_ty_unknown(), Inline.subst_ty ty v,E_app(E_var g,arg))
        | None -> (* tail call *) e)
     | e -> Ast_mapper.map (aux ds) e
   in 

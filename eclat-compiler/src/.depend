@@ -271,38 +271,46 @@ src/compile/middle_end/middle_end.cmx : \
 src/compile/middle_end/monomorphize.cmo : \
     src/typing/typing.cmo \
     src/typing/types.cmo \
+    src/compile/middle_end/transform/inline.cmo \
+    src/syntax/ast_undecorated.cmo \
     src/syntax/ast_mapper.cmo \
     src/syntax/ast.cmo
 src/compile/middle_end/monomorphize.cmx : \
     src/typing/typing.cmx \
     src/typing/types.cmx \
+    src/compile/middle_end/transform/inline.cmx \
+    src/syntax/ast_undecorated.cmx \
     src/syntax/ast_mapper.cmx \
     src/syntax/ast.cmx
 src/compile/middle_end/normalize/anf.cmo : \
+    src/typing/types.cmo \
     src/syntax/pattern.cmo \
     src/syntax/ast_undecorated.cmo \
     src/syntax/ast_subst.cmo \
-    src/syntax/ast_mapper.cmo \
     src/syntax/ast.cmo
 src/compile/middle_end/normalize/anf.cmx : \
+    src/typing/types.cmx \
     src/syntax/pattern.cmx \
     src/syntax/ast_undecorated.cmx \
     src/syntax/ast_subst.cmx \
-    src/syntax/ast_mapper.cmx \
     src/syntax/ast.cmx
 src/compile/middle_end/normalize/fun_assign_name.cmo : \
+    src/typing/types.cmo \
     src/syntax/map_pi.cmo \
     src/syntax/ast_subst.cmo \
     src/syntax/ast_mapper.cmo \
     src/syntax/ast.cmo
 src/compile/middle_end/normalize/fun_assign_name.cmx : \
+    src/typing/types.cmx \
     src/syntax/map_pi.cmx \
     src/syntax/ast_subst.cmx \
     src/syntax/ast_mapper.cmx \
     src/syntax/ast.cmx
 src/compile/middle_end/normalize/fun_shape_entry_point.cmo : \
+    src/typing/types.cmo \
     src/syntax/ast.cmo
 src/compile/middle_end/normalize/fun_shape_entry_point.cmx : \
+    src/typing/types.cmx \
     src/syntax/ast.cmx
 src/compile/middle_end/normalize/instantiate.cmo : \
     src/syntax/ast_subst.cmo \
@@ -315,29 +323,35 @@ src/compile/middle_end/normalize/instantiate.cmx : \
     src/syntax/ast_mapper.cmx \
     src/syntax/ast.cmx
 src/compile/middle_end/normalize/let_floating.cmo : \
+    src/typing/types.cmo \
     src/syntax/pattern.cmo \
     src/syntax/ast_undecorated.cmo \
     src/syntax/ast_subst.cmo \
     src/syntax/ast.cmo
 src/compile/middle_end/normalize/let_floating.cmx : \
+    src/typing/types.cmx \
     src/syntax/pattern.cmx \
     src/syntax/ast_undecorated.cmx \
     src/syntax/ast_subst.cmx \
     src/syntax/ast.cmx
 src/compile/middle_end/normalize/move_down_gfun_under_exec_and_par.cmo : \
+    src/typing/types.cmo \
     src/syntax/ast_subst.cmo \
     src/syntax/ast_mapper.cmo \
     src/syntax/ast.cmo
 src/compile/middle_end/normalize/move_down_gfun_under_exec_and_par.cmx : \
+    src/typing/types.cmx \
     src/syntax/ast_subst.cmx \
     src/syntax/ast_mapper.cmx \
     src/syntax/ast.cmx
 src/compile/middle_end/normalize/propagation.cmo : \
+    src/typing/types.cmo \
     src/compile/instantaneous.cmo \
     src/syntax/ast_subst.cmo \
     src/syntax/ast_mapper.cmo \
     src/syntax/ast.cmo
 src/compile/middle_end/normalize/propagation.cmx : \
+    src/typing/types.cmx \
     src/compile/instantaneous.cmx \
     src/syntax/ast_subst.cmx \
     src/syntax/ast_mapper.cmx \
@@ -381,6 +395,7 @@ src/compile/middle_end/transform/globalize_arrays.cmx : \
 src/compile/middle_end/transform/inline.cmo : \
     src/typing/types.cmo \
     src/prelude.cmo \
+    src/operators.cmo \
     src/syntax/ast_subst.cmo \
     src/syntax/ast_pprint.cmo \
     src/syntax/ast_mapper.cmo \
@@ -388,6 +403,7 @@ src/compile/middle_end/transform/inline.cmo : \
 src/compile/middle_end/transform/inline.cmx : \
     src/typing/types.cmx \
     src/prelude.cmx \
+    src/operators.cmx \
     src/syntax/ast_subst.cmx \
     src/syntax/ast_pprint.cmx \
     src/syntax/ast_mapper.cmx \
@@ -405,6 +421,7 @@ src/compile/middle_end/transform/insert_bound_checking.cmx : \
     src/syntax/ast_mapper.cmx \
     src/syntax/ast.cmx
 src/compile/middle_end/transform/lambda_lifting.cmo : \
+    src/typing/types.cmo \
     src/syntax/pattern.cmo \
     src/syntax/free_vars.cmo \
     src/syntax/ast_undecorated.cmo \
@@ -412,6 +429,7 @@ src/compile/middle_end/transform/lambda_lifting.cmo : \
     src/syntax/ast_mapper.cmo \
     src/syntax/ast.cmo
 src/compile/middle_end/transform/lambda_lifting.cmx : \
+    src/typing/types.cmx \
     src/syntax/pattern.cmx \
     src/syntax/free_vars.cmx \
     src/syntax/ast_undecorated.cmx \
@@ -419,54 +437,56 @@ src/compile/middle_end/transform/lambda_lifting.cmx : \
     src/syntax/ast_mapper.cmx \
     src/syntax/ast.cmx
 src/compile/middle_end/transform/matching.cmo : \
+    src/typing/types.cmo \
     src/syntax/map_pi.cmo \
     src/syntax/ast_subst.cmo \
     src/syntax/ast_mapper.cmo \
     src/syntax/ast.cmo
 src/compile/middle_end/transform/matching.cmx : \
+    src/typing/types.cmx \
     src/syntax/map_pi.cmx \
     src/syntax/ast_subst.cmx \
     src/syntax/ast_mapper.cmx \
     src/syntax/ast.cmx
 src/compile/middle_end/transform/specialize.cmo : \
-    src/typing/typing.cmo \
     src/typing/types.cmo \
     src/compile/middle_end/normalize/propagation.cmo \
     src/syntax/pattern.cmo \
     src/compile/middle_end/normalize/let_floating.cmo \
     src/syntax/free_vars.cmo \
-    src/syntax/ast_subst.cmo \
     src/syntax/ast_rename.cmo \
     src/syntax/ast_mapper.cmo \
     src/syntax/ast.cmo
 src/compile/middle_end/transform/specialize.cmx : \
-    src/typing/typing.cmx \
     src/typing/types.cmx \
     src/compile/middle_end/normalize/propagation.cmx \
     src/syntax/pattern.cmx \
     src/compile/middle_end/normalize/let_floating.cmx \
     src/syntax/free_vars.cmx \
-    src/syntax/ast_subst.cmx \
     src/syntax/ast_rename.cmx \
     src/syntax/ast_mapper.cmx \
     src/syntax/ast.cmx
 src/compile/middle_end/transform/specialize_ref.cmo : \
-    src/typing/typing.cmo \
     src/typing/types.cmo \
     src/compile/middle_end/normalize/propagation.cmo \
+    src/syntax/pattern.cmo \
+    src/compile/middle_end/normalize/let_floating.cmo \
+    src/syntax/ast_subst.cmo \
+    src/syntax/ast_rename.cmo \
     src/syntax/ast_mapper.cmo \
     src/syntax/ast.cmo
 src/compile/middle_end/transform/specialize_ref.cmx : \
-    src/typing/typing.cmx \
     src/typing/types.cmx \
     src/compile/middle_end/normalize/propagation.cmx \
+    src/syntax/pattern.cmx \
+    src/compile/middle_end/normalize/let_floating.cmx \
+    src/syntax/ast_subst.cmx \
+    src/syntax/ast_rename.cmx \
     src/syntax/ast_mapper.cmx \
     src/syntax/ast.cmx
 src/compile/middle_end/transform/unroll.cmo : \
-    src/syntax/ast_mapper.cmo \
     src/syntax/ast.cmo
 src/compile/middle_end/transform/unroll.cmx : \
-    src/syntax/ast_mapper.cmx \
     src/syntax/ast.cmx
 src/frontend/clean_simul.cmo : \
     src/syntax/map_pi.cmo \
@@ -483,12 +503,14 @@ src/frontend/current_filename.cmx :
 src/frontend/fix_int_lit_size.cmo :
 src/frontend/fix_int_lit_size.cmx :
 src/frontend/frontend.cmo : \
+    src/typing/types.cmo \
     src/prelude.cmo \
     src/syntax/pattern.cmo \
     src/frontend/parser.cmi \
     src/frontend/current_filename.cmo \
     src/syntax/ast.cmo
 src/frontend/frontend.cmx : \
+    src/typing/types.cmx \
     src/prelude.cmx \
     src/syntax/pattern.cmx \
     src/frontend/parser.cmx \
@@ -519,18 +541,22 @@ src/frontend/parser.cmi : \
     src/prelude.cmo \
     src/syntax/ast.cmo
 src/interp/interp.cmo : \
+    src/typing/typing.cmo \
     src/typing/types.cmo \
     src/interp/special_subst.cmo \
     src/prelude.cmo \
-    src/syntax/pattern.cmo \
+    src/operators.cmo \
     src/syntax/ast_pprint.cmo \
+    src/syntax/ast_mapper.cmo \
     src/syntax/ast.cmo
 src/interp/interp.cmx : \
+    src/typing/typing.cmx \
     src/typing/types.cmx \
     src/interp/special_subst.cmx \
     src/prelude.cmx \
-    src/syntax/pattern.cmx \
+    src/operators.cmx \
     src/syntax/ast_pprint.cmx \
+    src/syntax/ast_mapper.cmx \
     src/syntax/ast.cmx
 src/interp/special_subst.cmo : \
     src/prelude.cmo \

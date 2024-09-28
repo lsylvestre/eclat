@@ -20,110 +20,6 @@ type 'a pp = fmt -> 'a -> unit
 let parenthesize ~(paren:bool) (pp:'a pp) (fmt:fmt) (a:'a) : unit =
  if paren then fprintf fmt "(%a)" pp a else pp fmt a
 
-(*
-(** pretty printer for types *)
-let pp_ty (fmt:fmt) (ty:ty) : unit =
-  let h_assoc_tvars = Hashtbl.create 10 in
-  let tvars_cur = ref 0 in
-  let assoc_tvars n =
-    match Hashtbl.find_opt h_assoc_tvars n with
-    | Some v -> v
-    | None -> let v = !tvars_cur in incr tvars_cur; Hashtbl.add h_assoc_tvars n v; v in
-  let rec pp_type ~paren fmt ty =
-  let open Format in
-  match ty with
-  | T_const tc ->
-      (match tc with
-       | TInt tz -> fprintf fmt "int<%a>" (pp_type ~paren:false) tz
-       | TBool -> fprintf fmt "%s" "bool"
-       | TUnit -> fprintf fmt "%s" "unit")
-  | T_var{contents=Unknown n} ->
-     (match (assoc_tvars n) with
-      | 0 -> fprintf fmt "'a"
-      | 1 -> fprintf fmt "'b"
-      | 2 -> fprintf fmt "'c"
-      | 3 -> fprintf fmt "'d"
-      | v -> fprintf fmt "'a%d" v)
-  | T_var{contents=Ty t} ->
-      fprintf fmt "%a" (pp_type ~paren) t
-  | T_tuple ts ->
-      (* Parentheses are needed to avoid confusion between tuples and pair nesting *)
-      fprintf fmt "(";
-      pp_print_list
-            ~pp_sep:(fun fmt () -> fprintf fmt " * ")
-            (pp_type ~paren:true) fmt ts;
-      fprintf fmt ")"
-  | T_fun{arg;dur;ret} ->
-      parenthesize ~paren (fun fmt () ->
-      match dur with
-      | T_size 0 ->
-          fprintf fmt "%a => %a"
-            (pp_type ~paren:true) arg
-            (pp_type ~paren:true) ret
-      | t -> if size_is_not_zero t then (
-                fprintf fmt "%a -> %a"
-                   (pp_type ~paren:true) arg
-                   (pp_type ~paren:true) ret
-              ) else (
-                fprintf fmt "%a -[%a]-> %a"
-                  (pp_type ~paren:true) arg
-                  (pp_type ~paren:false) dur
-                  (pp_type ~paren:true) ret)
-        ) fmt ()
-  | T_sum(cs) ->
-      fprintf fmt "(";
-      pp_print_list
-        ~pp_sep:(fun fmt () -> fprintf fmt " | ")
-      (fun fmt (x,t) ->
-         fprintf fmt "%s of %a" x (pp_type ~paren:false) t) fmt cs;
-      fprintf fmt ")"
-  | T_string tz ->
-      fprintf fmt "string<%a>"
-        (pp_type ~paren:false) tz
-  | T_static tz ->
-      fprintf fmt "static<%a>"
-        (pp_type ~paren:false) tz
-  | T_ref telem ->
-      fprintf fmt "ref<%a>"
-        (pp_type ~paren:false) telem
-  | T_array{elem=t;size=tz} ->
-      fprintf fmt "%a array<%a>"
-        (pp_type ~paren:true) t
-        (pp_type ~paren:false) tz
-  | T_matrix{elem=t;size=tz} ->
-      fprintf fmt "%a matrix<%a>"
-        (pp_type ~paren:true) t
-        (pp_type ~paren:false) tz
-  | T_vector{elem=t;size=tz} ->
-      fprintf fmt "%a vector<%a>"
-        (pp_type ~paren:true) t
-        (pp_type ~paren:false) tz
-  | T_size n ->
-      fprintf fmt "%d" n
-  | T_response_time n ->
-      fprintf fmt "%d" n
-  | T_infinity ->
-      fprintf fmt "+∞"
-  | T_add (tz1,tz2) ->
-      parenthesize ~paren (fun fmt () ->
-        fprintf fmt "%a + %a"
-          (pp_type ~paren:true) tz1
-          (pp_type ~paren:true) tz2
-        ) fmt ()
-  | T_max (tz1,tz2) ->
-      fprintf fmt "max(%a,%a)"
-      (pp_type ~paren:false) tz1
-      (pp_type ~paren:false) tz2
-  | T_le (tz1,tz2) ->
-      parenthesize ~paren (fun fmt () ->
-        fprintf fmt "t where t = %a & t <= %a"
-          (pp_type ~paren:true) tz1
-          (pp_type ~paren:true) tz2
-      )fmt ()
-  in
-  pp_type ~paren:false fmt ty
-*)
-
 (** pretty printer for identifiers *)
 let pp_ident (fmt:fmt) (x:x) : unit =
   fprintf fmt "%s" x
@@ -207,14 +103,18 @@ let pp_exp (fmt:fmt) (e:e) : unit =
       pp_const fmt c
   | E_var x ->
       pp_ident fmt x
-  | E_fun (p,e) ->
-       fprintf fmt "(fun %a ->@,%a)"
+  | E_fun (p,(ty,tyB),e) ->
+       fprintf fmt "(fun (%a:%a) : %a ->@,%a)"
           pp_pat p
+          Types.pp_ty ty
+          Types.pp_tyB tyB
           (pp_e ~paren:false) e
-  | E_fix (f,(p,e)) ->
-       fprintf fmt "(fix %a (fun %a ->@,%a))"
+  | E_fix (f,(p,(ty,tyB),e)) ->
+       fprintf fmt "(fix %a (fun (%a:%a) : %a ->@,%a))"
           pp_ident f
           pp_pat p
+          Types.pp_ty ty
+          Types.pp_tyB tyB
           (pp_e ~paren:false) e
   | E_if(e,e1,e2) ->
       parenthesize ~paren (fun fmt () ->
@@ -244,10 +144,11 @@ let pp_exp (fmt:fmt) (e:e) : unit =
             match eo with
             | None -> ()
             | Some e -> fprintf fmt "@,| _ -> %a" (pp_e ~paren:false) e) eo
-  | E_letIn(p,e1,e2) ->
+  | E_letIn(p,ty,e1,e2) ->
       parenthesize ~paren (fun fmt () ->
-        fprintf fmt "@[<v>@[<v 2>let %a =@,%a in@]@,%a@]"
+        fprintf fmt "@[<v>@[<v 2>let %a : %a =@,%a in@]@,%a@]"
           pp_pat p
+          Types.pp_ty ty
           (pp_e ~paren:false) e1
           (pp_e ~paren:false) e2) fmt ()
   | E_app(e1,e2) ->
@@ -257,10 +158,11 @@ let pp_exp (fmt:fmt) (e:e) : unit =
           (pp_e ~paren:true) e2) fmt ()
   | E_tuple es ->
         pp_tuple fmt (pp_e ~paren:false) es
-  | E_reg((p,e1), e0,l) ->
+  | E_reg((p,tyB,e1), e0,l) ->
       parenthesize ~paren (fun fmt () ->
-        fprintf fmt "@[<v>reg[%s] (fun %a -> %a) last %a@]" l
+        fprintf fmt "@[<v>reg[%s] (fun %a : %a -> %a) last %a@]" l
           pp_pat p
+          Types.pp_tyB tyB
           (pp_e ~paren:false) e1 (pp_e ~paren:false) e0) fmt ()
   | E_exec(e1,e2,e3,x) ->
       fprintf fmt "(@[<v>exec[%s] %a default %a@])"
@@ -305,20 +207,17 @@ let pp_exp (fmt:fmt) (e:e) : unit =
         (pp_e ~paren:false) e_st1
         (pp_e ~paren:false) e_st2
         (pp_e ~paren:false) e3
-  | E_generate((p,e1),e2,e_st3,_) ->
+  | E_generate((p,ty,e1),e2,e_st3,_) ->
       fprintf fmt "generate %a %a ~depth:%a"
-        (pp_e ~paren:true) (E_fun(p,e1))
+        (pp_e ~paren:true) (E_fun(p,ty,e1))
         (pp_e ~paren:true) e2
         (pp_e ~paren:true) e_st3
   | E_vector(es) ->
       pp_vector fmt (pp_e ~paren:false) es
-  | E_vector_mapi(is_par,(p,e1),e2,_) ->
+  | E_vector_mapi(is_par,(p,(tyB1,tyB2),e1),e2,_) ->
       fprintf fmt "mapi%s" (if is_par then "_par" else "");
-      fprintf fmt "%a %a" (pp_e ~paren:true) (E_fun(p,e1))
-                          (pp_e ~paren:true) e2
-  | E_int_mapi(is_par,(p,e1),e2,_) ->
-      fprintf fmt "mapi%s" (if is_par then "_par" else "");
-      fprintf fmt "%a %a" (pp_e ~paren:true) (E_fun(p,e1))
+      fprintf fmt "%a %a" (pp_e ~paren:true) 
+                            (E_fun(p,(Types.Ty_base tyB1,tyB2),e1))
                           (pp_e ~paren:true) e2
   | E_run(i,e) ->
       fprintf fmt "run %s(%a)" i (pp_e ~paren:false) e

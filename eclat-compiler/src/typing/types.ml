@@ -360,67 +360,67 @@ let free_vars_of_type (bv,t) =
 
 
 let instance (Forall(vs,ty)) =
-let unknowns = Hashtbl.create (Vs.cardinal vs) in
-Vs.iter (fun n -> Hashtbl.add unknowns n (new_unknown_generic())) vs;
-let rec inst_size = function
-| Sz_var {contents=Unknown n} as sz ->
-        (try Sz_var(find_unsafe unknowns n)
-         with Not_found -> sz)
-| Sz_var {contents=Is sz} ->
-    inst_size sz
-| Sz_lit _ as k -> k in
+  let unknowns = Hashtbl.create (Vs.cardinal vs) in
+  Vs.iter (fun n -> Hashtbl.add unknowns n (new_unknown_generic())) vs;
+  let rec inst_size = function
+  | Sz_var {contents=Unknown n} as sz ->
+          (try Sz_var(find_unsafe unknowns n)
+           with Not_found -> sz)
+  | Sz_var {contents=Is sz} ->
+      inst_size sz
+  | Sz_lit _ as k -> k in
 
-let rec inst_dur = function
-| Dur_var {contents=Unknown n} as d ->
-        (try Dur_var(find_unsafe unknowns n)
-         with Not_found -> d)
-| Dur_var {contents=Is d} ->
-    inst_dur d
-| Dur_zero | Dur_one as d -> d
-| Dur_max(d1,d2) ->
-    Dur_max(inst_dur d1,inst_dur d2) in
-let rec inst_tyB = function
-| TyB_var {contents=Unknown n} as tyB ->
-        (try TyB_var(find_unsafe unknowns n)
-         with Not_found -> tyB)
-| TyB_var {contents=Is tyB} ->
-    inst_tyB tyB
-| TyB_bool | TyB_unit as tyB -> tyB
-| TyB_int sz -> TyB_int (inst_size sz)
-| TyB_tuple tyB_list ->
-    TyB_tuple (List.map inst_tyB tyB_list)
-| TyB_size sz ->
-    TyB_size(inst_size sz)
-| TyB_sum ctors ->
-    TyB_sum (List.map (fun (tag,tyB) -> tag,inst_tyB tyB) ctors)
-| TyB_string sz -> TyB_string (inst_size sz)
-| TyB_abstract(x,szs,tyB_list) ->
-    TyB_abstract (x,List.map inst_size szs,List.map inst_tyB tyB_list)
-in
+  let rec inst_dur = function
+  | Dur_var {contents=Unknown n} as d ->
+          (try Dur_var(find_unsafe unknowns n)
+           with Not_found -> d)
+  | Dur_var {contents=Is d} ->
+      inst_dur d
+  | Dur_zero | Dur_one as d -> d
+  | Dur_max(d1,d2) ->
+      Dur_max(inst_dur d1,inst_dur d2) in
+  let rec inst_tyB = function
+  | TyB_var {contents=Unknown n} as tyB ->
+          (try TyB_var(find_unsafe unknowns n)
+           with Not_found -> tyB)
+  | TyB_var {contents=Is tyB} ->
+      inst_tyB tyB
+  | TyB_bool | TyB_unit as tyB -> tyB
+  | TyB_int sz -> TyB_int (inst_size sz)
+  | TyB_tuple tyB_list ->
+      TyB_tuple (List.map inst_tyB tyB_list)
+  | TyB_size sz ->
+      TyB_size(inst_size sz)
+  | TyB_sum ctors ->
+      TyB_sum (List.map (fun (tag,tyB) -> tag,inst_tyB tyB) ctors)
+  | TyB_string sz -> TyB_string (inst_size sz)
+  | TyB_abstract(x,szs,tyB_list) ->
+      TyB_abstract (x,List.map inst_size szs,List.map inst_tyB tyB_list)
+  in
 
-let rec inst_ty = function
-| Ty_var {contents=Unknown n} as ty ->
-        (try Ty_var(Obj.magic @@ Hashtbl.find unknowns n)
-         with Not_found -> ty)
-| Ty_var {contents=Is ty} ->
-    inst_ty ty
-| Ty_base tyB ->
-    Ty_base(inst_tyB tyB)
-| Ty_tuple ty_list ->
-    Ty_tuple(List.map inst_ty ty_list)
-| Ty_fun(ty1,d,tyB2) ->
-    Ty_fun(inst_ty ty1,inst_dur d,inst_tyB tyB2)
-| Ty_ref(tyB) ->
-    Ty_ref(inst_tyB tyB)
-| Ty_array(sz,tyB) ->
-    Ty_array(inst_size sz, inst_tyB tyB)
-in
-inst_ty ty
+  let rec inst_ty = function
+  | Ty_var {contents=Unknown n} as ty ->
+          (try Ty_var(Obj.magic @@ Hashtbl.find unknowns n)
+           with Not_found -> ty)
+  | Ty_var {contents=Is ty} ->
+      inst_ty ty
+  | Ty_base tyB ->
+      Ty_base(inst_tyB tyB)
+  | Ty_tuple ty_list ->
+      Ty_tuple(List.map inst_ty ty_list)
+  | Ty_fun(ty1,d,tyB2) ->
+      Ty_fun(inst_ty ty1,inst_dur d,inst_tyB tyB2)
+  | Ty_ref(tyB) ->
+      Ty_ref(inst_tyB tyB)
+  | Ty_array(sz,tyB) ->
+      Ty_array(inst_size sz, inst_tyB tyB)
+  in
+  inst_ty ty
 
-let free_vars_of_type_env l =
-  List.fold_left (fun vs (x,(Forall (v,t))) ->
-                Vs.union vs (free_vars_of_type (v,t)) )
-   Vs.empty l
+  let free_vars_of_type_env l =
+    List.fold_left (fun vs (x,(Forall (v,t))) ->
+                  Vs.union vs (free_vars_of_type (v,t)) )
+     Vs.empty l
 
 let generalize r ty =
   let ty = canon_ty ty in
@@ -440,11 +440,77 @@ let rec as_tyB ~loc ty =
   match ty with
   | Ty_base tyB -> tyB
   | Ty_tuple(tys) -> TyB_tuple(List.map (as_tyB ~loc) tys)
+  | Ty_var({contents=Unknown n} as r) -> TyB_var(Obj.magic r)
   | _ -> Prelude.Errors.raise_error ~loc ()
                  ~msg:"basic type expected"
 
 
 let rec no_unknown_in_ty t =
   assert false (* todo *)
+
+
+
+
+
+
+
+
+
+
+
+let rec rename_size unknowns = function
+| Sz_var {contents=Unknown n} as sz ->
+        (try Sz_var(find_unsafe unknowns n)
+         with Not_found -> sz)
+| Sz_var {contents=Is sz} ->
+    rename_size unknowns sz
+| Sz_lit _ as k -> k
+
+let rec rename_dur unknowns = function
+| Dur_var {contents=Unknown n} as d ->
+        (try Dur_var(find_unsafe unknowns n)
+         with Not_found -> d)
+| Dur_var {contents=Is d} ->
+    rename_dur unknowns d
+| Dur_zero | Dur_one as d -> d
+| Dur_max(d1,d2) ->
+    Dur_max(rename_dur unknowns d1,
+            rename_dur unknowns d2) 
+
+let rec rename_tyB unknowns = function
+| TyB_var {contents=Unknown n} as tyB ->
+        (try TyB_var(find_unsafe unknowns n)
+         with Not_found -> tyB)
+| TyB_var {contents=Is tyB} ->
+    rename_tyB unknowns tyB
+| TyB_bool | TyB_unit as tyB -> tyB
+| TyB_int sz -> TyB_int (rename_size unknowns sz)
+| TyB_tuple tyB_list ->
+    TyB_tuple (List.map (rename_tyB unknowns) tyB_list)
+| TyB_size sz ->
+    TyB_size(rename_size unknowns sz)
+| TyB_sum ctors ->
+    TyB_sum (List.map (fun (tag,tyB) -> tag,rename_tyB unknowns tyB) ctors)
+| TyB_string sz -> TyB_string (rename_size unknowns sz)
+| TyB_abstract(x,szs,tyB_list) ->
+    TyB_abstract (x,List.map (rename_size unknowns) szs,List.map (rename_tyB unknowns) tyB_list)
+
+
+let rec rename_ty unknowns = function
+| Ty_var {contents=Unknown n} as ty ->
+        (try Ty_var(Obj.magic @@ Hashtbl.find unknowns n)
+         with Not_found -> ty)
+| Ty_var {contents=Is ty} ->
+    rename_ty unknowns ty
+| Ty_base tyB ->
+    Ty_base(rename_tyB unknowns tyB)
+| Ty_tuple ty_list ->
+    Ty_tuple(List.map (rename_ty unknowns) ty_list)
+| Ty_fun(ty1,d,tyB2) ->
+    Ty_fun(rename_ty unknowns ty1,rename_dur unknowns d,rename_tyB unknowns tyB2)
+| Ty_ref(tyB) ->
+    Ty_ref(rename_tyB unknowns tyB)
+| Ty_array(sz,tyB) ->
+    Ty_array(rename_size unknowns sz, rename_tyB unknowns tyB)
 
 

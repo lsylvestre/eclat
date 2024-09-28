@@ -134,7 +134,8 @@ pi:
                         let (x,t) = ec in
                         let f = String.capitalize_ascii x in
                         let arg = gensym ~prefix:"arg" () in
-                        let v = E_fun(P_var arg, E_run(f,E_var arg)) in
+                        let v = E_fun(P_var arg,(Types.new_ty_unknown(),Types.new_tyB_unknown()), 
+                             E_run(f,E_var arg)) in
                         (((f,t)::ecs,efs), gs,    ts,    (((P_var x,v),with_file $loc)::ds)) }
 | ef=ext_fun pi=pi    { let (ecs,efs),gs,ts,ds = pi in ((ecs,ef::efs), gs,    ts,    ds   ) }
 | g=static pi=pi      { let (ecs,efs),gs,ts,ds = pi in ((ecs,    efs), g::gs, ts,    ds   ) }
@@ -206,9 +207,9 @@ decl:
 decl_all:
 | LET b=after_let(SEMI_SEMI)
         { b,(with_file $loc) }
-| NODE b=fun_decl(SEMI_SEMI)
+/*| NODE b=fun_decl(SEMI_SEMI)
         { enforce_node b,(with_file $loc) }
-
+*/
 | e=exp SEMI_SEMI { ((P_var "_", e),(with_file $loc))  }
 /*
 | EOF { E_var (!Ast_mk.main_symbol) }*/
@@ -331,6 +332,7 @@ tyB_next:
 | LPAREN tyB=tyB RPAREN { tyB }
 | x=IDENT szs=size_list
      { match x with
+       | "_" -> (new_tyB_unknown ())
        | "int" -> (match szs with 
                    | sz::[] -> 
                       TyB_int(sz)
@@ -425,7 +427,7 @@ exp:
 exp_desc:
 | e1=lexp SEMI e2=exp
         {
-            E_letIn(P_unit,e1,e2)
+            E_letIn(P_unit,Ty_base TyB_unit, e1,e2)
         }
 | e=lexp COMMA es=separated_nonempty_list(COMMA,lexp)
         {
@@ -462,11 +464,11 @@ lexp_desc:
         { let (e2,e3) = e2_e3 in E_if(e1,e2,e3) }
 | LET b=after_let(IN) e2=exp
         { let (p,e1) = b in
-          E_letIn(p,e1,e2) }
-| NODE b=fun_decl(IN) e2=exp 
+          E_letIn(p,Types.new_ty_unknown(),e1,e2) }
+(*| NODE b=fun_decl(IN) e2=exp 
     /* variant of LET enforcing the defined function to be instantaneous */
         { let (p,e1) = enforce_node b in
-          E_letIn(p,e1,e2) }
+          E_letIn(p,e1,e2) }*)
 | LPAREN e1=lexp PIPE_PIPE 
          es=separated_nonempty_list(PIPE_PIPE,lexp) 
   RPAREN
@@ -570,14 +572,14 @@ app_exp_desc:
         }
 | REGISTER ev=exp INIT e0=aexp
        { match un_annot ev with
-         | E_fun(p,e1) -> E_reg((p,e1),e0,Ast.gensym ())
+         | E_fun(p,(_,tyB),e1) -> E_reg((p,tyB,e1),e0,Ast.gensym ())
          | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
                                ~msg:"This expression should be a function" ()
        }
 | REGISTER f=IDENT INIT e0=aexp
        {
         let y = gensym () in
-         E_reg((P_var y,E_app(E_var f,E_var y)),e0,Ast.gensym ())
+         E_reg((P_var y,Types.new_tyB_unknown(),E_app(E_var f,E_var y)),e0,Ast.gensym ())
        }
 | EXEC e1=exp DEFAULT e2=lexp
        { E_exec(e1,e2,None,"") }
@@ -585,7 +587,7 @@ app_exp_desc:
        { E_exec(e1,e2,Some e3,"") }
 | MACRO_GENERATE ef1=aexp e_init2=aexp e_st3=aexp
   { let z = Ast.gensym () in
-    E_generate((P_var z,E_app(ef1,E_var z)),e_init2,e_st3,with_file $loc) }
+    E_generate((P_var z,(Types.new_ty_unknown(),Types.new_tyB_unknown()),  E_app(ef1,E_var z)),e_init2,e_st3,with_file $loc) }
 
 | EXEC e1=exp 
     {
@@ -641,15 +643,10 @@ aexp_desc:
                 match Ast_undecorated.remove_deco e with
                 | E_tuple[v;e] -> assert (is_variable v || evaluated v); (* todo: error *)
                                   let x = Ast.gensym () in
-                                  E_vector_mapi(false,(P_var x,E_app(v,E_var x)), 
+                                  E_vector_mapi(false,(P_var x,(Types.new_tyB_unknown(),Types.new_tyB_unknown()),E_app(v,E_var x)), 
                                      mk_loc loc e, new_size_unknown ())
                 | _ -> assert false (* todo error *) }
-| INT_MAPI e=aexp {
-                match Ast_undecorated.remove_deco e with
-                | E_tuple[v;e] -> assert (is_variable v || evaluated v); (* todo: error *)
-                                  let x = Ast.gensym () in
-                                  E_int_mapi(false,(P_var x,E_app(v,E_var x)), e, new_size_unknown ())
-                | _ -> assert false (* todo error *) }
+
 | x=UNROLL AT k=INT_LIT { E_const (Op(Runtime(Unroll k))) }
 | VECT_CREATE LT l=size GT { E_const (Op(Runtime(Vector_create l))) } 
 | x=IDENT { match x with
@@ -665,7 +662,8 @@ aexp_desc:
             | "update_bit" -> E_const (Op(Runtime(UpdateBit)))
            (*  | "size_of_val" -> E_const (Op(Runtime(Size_of_val (unknown(),unknown())))) *)
             | "get" -> let x = gensym () in let y = gensym () in
-                       E_fun(P_tuple[P_var x;P_var y], E_array_get(x,E_var y))
+                       E_fun(P_tuple[P_var x;P_var y], (Types.new_ty_unknown(),Types.new_tyB_unknown()), 
+                          E_array_get(x,E_var y))
             | "bvect_of_int" -> E_const (Op(Runtime(Bvect_of_int)))
             | "int_of_bvect" -> E_const (Op(Runtime(Int_of_bvect)))
             | "_" -> Prelude.Errors.raise_error ~loc:(with_file $loc)
@@ -687,18 +685,19 @@ aexp_desc:
       { let loop = gensym ~prefix:"loop" () in
         let n0 = gensym ~prefix:"n0" () in
         let n = gensym ~prefix:"n" () in
-        E_letIn(P_var n0, e1,
-        E_letIn(P_var n, e2,
-        E_letIn(P_var loop,E_fix(loop,(P_var i,
+        E_letIn(P_var n0,Types.new_ty_unknown(), e1,
+        E_letIn(P_var n, Types.new_ty_unknown(), e2,
+        E_letIn(P_var loop,Types.new_ty_unknown(),
+                          E_fix(loop,(P_var i,(Types.new_ty_unknown(),Types.new_tyB_unknown()),
                               E_if(E_app(E_const(Op(Runtime(External_fun("Int.gt",new_ty_unknown ())))),E_tuple[E_var i;E_var n]),
                                    E_const(Unit),
-                                   E_letIn(P_unit,e,E_app(E_var loop,
+                                   E_letIn(P_unit,Types.new_ty_unknown(), e,E_app(E_var loop,
                                     E_app(E_const(Op(Runtime(External_fun("Int.add",new_ty_unknown ())))),
                                         E_tuple[E_var i;E_const (Int (1,new_size_unknown()))])))))), 
                  E_app(E_var loop,E_var n0))))
                 }
 
-| MACRO_FOR x=IDENT EQ e_st1=exp TO e_st2=exp DO e=exp DONE 
+| PARFOR x=IDENT EQ e_st1=exp TO e_st2=exp DO e=exp DONE 
       { E_for(x,e_st1,e_st2,e,with_file $loc) }
 
 

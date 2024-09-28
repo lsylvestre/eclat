@@ -181,7 +181,7 @@ let rec to_a ~externals ~sums (e:Ast.e) : a =
       A_call(to_op op,to_a ~externals ~sums e)
   | Ast.E_if(e1,e2,e3) -> A_call(If,A_tuple [to_a ~externals ~sums e1;to_a ~externals ~sums e2;to_a ~externals ~sums e3])
   | Ast.E_tuple(es) -> A_tuple (List.map (to_a ~externals ~sums) es)
-  | Ast.E_letIn(P_var x,e1,e2) -> A_letIn(x,to_a ~externals ~sums e1,to_a ~externals ~sums e2)
+  | Ast.E_letIn(P_var x,_,e1,e2) -> A_letIn(x,to_a ~externals ~sums e1,to_a ~externals ~sums e2)
   | Ast.E_array_length x -> A_buffer_length(x,new_tvar())
   | E_app(E_const(Inj y),e) ->
       let_plug_a (to_a ~externals ~sums e) @@ (fun z ->
@@ -206,7 +206,7 @@ let rec conjonction_atoms alist =
 
 let replace_arg e =
   match e with
-  | Ast.E_fix(f,(P_var x,e1)) -> Ast_subst.subst_e x (E_var (NameC.formal_param_of_fun f)) e1
+  | Ast.E_fix(f,(P_var x,_,e1)) -> Ast_subst.subst_e x (E_var (NameC.formal_param_of_fun f)) e1
   | e -> e
 
 (* Debug/Display *)
@@ -314,20 +314,20 @@ let rec to_s ~statics ~externals ~sums gs e x k =
             S_letIn(z2,A_call((to_op @@ (GetTuple{pos=1;arity=2}),A_var z)),
 
             S_case(z1,hs',so))))
-  | E_letIn(P_var f,(E_fix(h,(p,e1)) as phi),e2) ->
+  | E_letIn(P_var f,_,(E_fix(h,(p,_,e1)) as phi),e2) ->
      assert (f = h);
      let e1 = replace_arg phi in
      let f' = NameC.mark_return f in
      let w1,ts1,s1 = to_s ~statics ~externals ~sums (f::gs) e1 (NameC.result_of_fun f) (S_continue f') in
      let w2,ts2,s2 = to_s ~statics ~externals ~sums gs e2 x k in
      (w1++>w2),(SMap.add f s1 ts1)++ts2,s2
-  | E_letIn(P_unit,e1,e2) ->
+  | E_letIn(P_unit,_,e1,e2) ->
       (* [SEQ] *)
       let w2,ts2,s2 = to_s ~statics ~externals ~sums gs e2 x k in
       if Instantaneous.combinational ~externals e1 then (* todo: emit a warning ? *) (w2,ts2,s2) else
       let w1,ts1,s1 = to_s ~statics ~externals ~sums gs e1 (Ast.gensym ()) s2 in
       w1++>w2,ts2++ts1,s1
-  | E_letIn(P_var y,e1,e2) ->
+  | E_letIn(P_var y,_,e1,e2) ->
       (* [LET] *)
       let w2,ts2,s2 = to_s ~statics ~externals ~sums gs e2 x k in
       if Instantaneous.combinational ~externals e1 then
@@ -446,7 +446,7 @@ let rec to_s ~statics ~externals ~sums gs e x k =
                                      (S_continue q1))) in
           (SMap.empty, SMap.add q_wait s' ts, s')
       )
-  | E_reg((p,e1),e0,l) ->
+  | E_reg((p,_,e1),e0,l) ->
       let y = match p with
               | P_var y -> y 
               | _ -> assert false 

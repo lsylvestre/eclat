@@ -24,47 +24,44 @@ let subst_e x ex e =
     match e with
     | E_var y ->
         if y = x then ex else e
-    | E_letIn(p,e1,e2) ->
-        if pat_mem x p then E_letIn(p, ss e1, e2)
-        else E_letIn(p, ss e1, ss e2)
-    | E_fun(p,e1) ->
-        if pat_mem x p then e else E_fun(p,ss e1)
-    | E_fix(f,(p,e1)) ->
-        if x = f || pat_mem x p then e else E_fix(f,(p,ss e1))
-    | E_match(e1,hs,eo) ->
-        let hs' = List.map (fun (inj,(p,ei)) ->
+    | E_letIn(p, ty, e1, e2) ->
+        if pat_mem x p then E_letIn(p, ty, ss e1, e2)
+        else E_letIn(p, ty, ss e1, ss e2)
+    | E_fun(p, ty, e1) ->
+        if pat_mem x p then e else E_fun(p, ty, ss e1)
+    | E_fix(f, (p, ty, e1)) ->
+        if x = f || pat_mem x p then e else E_fix(f, (p, ty, ss e1))
+    | E_match(e1, hs, eo) ->
+        let hs' = List.map (fun (inj, (p, ei)) ->
                               let ei' = if pat_mem x p then ei else ss ei in
                               (inj,(p,ei'))) hs in
         E_match(ss e1, hs', Option.map ss eo)
-    | E_reg((p,e1),e0,l) ->
+    | E_reg((p, tyB, e1), e0, l) ->
         let e1' = if pat_mem x p then e1 else ss e1 in
-        E_reg((p,e1'),ss e0,l)
+        E_reg((p, tyB, e1'), ss e0, l)
     | E_array_length(y) ->
         let z = if x <> y then y else as_ident ex in
         E_array_length(z)
-    | E_array_make(sz,e1,deco) ->
+    | E_array_make(sz, e1, deco) ->
         let e1' = ss e1 in
-        E_array_make(sz,e1',deco)
-    | E_array_create(sz,deco) ->
-        E_array_create(sz,deco)
-    | E_array_get(y,e1) ->
+        E_array_make(sz, e1', deco)
+    | E_array_create(sz, deco) ->
+        E_array_create(sz, deco)
+    | E_array_get(y, e1) ->
         let z = if x <> y then y else as_ident ex in
         E_array_get(z, ss e1)
-    | E_array_set(y,e1,e2) ->
+    | E_array_set(y, e1, e2) ->
         let z = if x <> y then y else as_ident ex in
         E_array_set(z, ss e1, ss e2)
-    | E_for(y,e_st1,e_st2,e3,loc) ->
+    | E_for(y, e_st1, e_st2, e3, loc) ->
        E_for(y,ss e_st1,ss e_st2,
              (if x = y then e3 else ss e3),loc)
-    | E_generate((p,e1),e2,e_st3,loc) ->
+    | E_generate((p, ty, e1), e2, e_st3, loc) ->
         let e1' = if pat_mem x p then e1 else ss e1 in
-        E_generate((p,e1'),ss e2,ss e_st3,loc)
-    | E_vector_mapi(is_par,(p,e1),e2,ty) ->
+        E_generate((p, ty, e1'), ss e2, ss e_st3, loc)
+    | E_vector_mapi(is_par, (p, typ, e1), e2, ty) ->
         let e1' = if pat_mem x p then e1 else ss e1 in
-        E_vector_mapi(is_par,(p,e1'),ss e2,ty)
-    | E_int_mapi(is_par,(p,e1),e2,ty) ->
-        let e1' = if pat_mem x p then e1 else ss e1 in
-        E_int_mapi(is_par,(p,e1'),ss e2,ty)
+        E_vector_mapi(is_par, (p, typ, e1'), ss e2, ty)
     | e -> Ast_mapper.map ss e
   in
   ss e

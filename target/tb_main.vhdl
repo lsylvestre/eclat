@@ -70,13 +70,13 @@ end component;
       end process;
 
   process
-  variable \$v7465\ : value(0 to 11) := (others => '0');
+  variable \$v5925\ : value(0 to 11) := (others => '0');
 begin
 
       -- Start computation
     wait for 5 ns;
-      \$v7465\ := eclat_true & eclat_true & eclat_true & eclat_true & eclat_true & eclat_true & eclat_true & eclat_true & eclat_true & eclat_true & eclat_true & eclat_false;
-      tb_argument <= \$v7465\;
+      \$v5925\ := eclat_true & eclat_true & eclat_true & eclat_true & eclat_true & eclat_true & eclat_true & eclat_true & eclat_true & eclat_true & eclat_true & eclat_false;
+      tb_argument <= \$v5925\;
 wait for 10 ns;
 
     wait;

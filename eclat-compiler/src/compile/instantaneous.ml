@@ -37,7 +37,7 @@ let rec combinational ~externals (e:e) : bool =
          (* as we can't know locally whether [e1] is combinational,
 	       we return false *)
 	       false)
-	| E_letIn(_,e1,e2) ->
+	| E_letIn(_,_,e1,e2) ->
 	    combinational ~externals e1 && combinational ~externals e2
 	| E_tuple es ->
 	    List.for_all (combinational ~externals) es
@@ -57,12 +57,10 @@ let rec combinational ~externals (e:e) : bool =
 	    false (* side effect *)
 	| E_for(_,e_st1,e_st2,e3,_) ->
 	   combinational ~externals e_st1 && combinational ~externals e_st2 && combinational ~externals e3
-	| E_generate((_,e1),e2,e_st3,_) ->
+	| E_generate((_,_,e1),e2,e_st3,_) ->
 	    combinational ~externals e1 && combinational ~externals e2 && combinational ~externals e_st3
 	| E_vector es -> List.for_all (combinational ~externals) es
-	| E_vector_mapi(is_par,(_,e1),e2,_) ->
-	    not(is_par) && combinational ~externals e1 && combinational ~externals e2
-	| E_int_mapi(is_par,(_,e1),e2,_) ->
+	| E_vector_mapi(is_par,(_,_,e1),e2,_) ->
 	    not(is_par) && combinational ~externals e1 && combinational ~externals e2
   | E_run _ -> false (* sometimes true, sometimes false, depending on the type *)
 
@@ -93,7 +91,7 @@ let rec instantaneous ~externals (e:e) : bool =
          (* as we can't know locally whether [e1] is instantaneous,
 	       we return false *)
 	       false)
-	| E_letIn(_,e1,e2) ->
+	| E_letIn(_,_,e1,e2) ->
 	    instantaneous ~externals e1 && instantaneous ~externals e2
 	| E_tuple es ->
 	    List.for_all (instantaneous ~externals) es
@@ -113,12 +111,10 @@ let rec instantaneous ~externals (e:e) : bool =
 	    false (* side effect *)
 	| E_for(_,e_st1,e_st2,e3,_) ->
 	   instantaneous ~externals e_st1 && instantaneous ~externals e_st2 && instantaneous ~externals e3
-	| E_generate((_,e1),e2,e_st3,_) ->
+	| E_generate((_,_,e1),e2,e_st3,_) ->
 	    instantaneous ~externals e1 && instantaneous ~externals e2 && instantaneous ~externals e_st3
 	| E_vector es -> List.for_all (instantaneous ~externals)es
-	| E_vector_mapi(is_par,(_,e1),e2,_) ->
-	    not(is_par) && instantaneous ~externals e1 && instantaneous ~externals e2
-	| E_int_mapi(is_par,(_,e1),e2,_) ->
+	| E_vector_mapi(is_par,(_,_,e1),e2,_) ->
 	    not(is_par) && instantaneous ~externals e1 && instantaneous ~externals e2
   | E_run _ -> false (* sometimes true, sometimes false, depending on the type *)
 

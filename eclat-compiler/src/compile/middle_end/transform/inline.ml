@@ -35,6 +35,37 @@ let eval_static_exp_int ~loc ~statics e =
                Ast_pprint.pp_exp e)
 
 
+
+let subst_ty ty e =
+  let open Types in
+  let vs = free_vars_of_type (Vs.empty,ty) in
+  let unknowns = Hashtbl.create (Vs.cardinal vs) in
+  Vs.iter (fun n -> Hashtbl.add unknowns n (new_unknown_generic())) vs;
+  let rec ss e =
+    let open Operators in
+    match e with
+    | E_letIn(p, ty, e1, e2) ->
+        E_letIn(p, rename_ty unknowns ty, ss e1, ss e2)
+    | E_fun(p, (ty,tyB), e1) ->
+       E_fun(p, (rename_ty unknowns ty,rename_tyB unknowns tyB), ss e1)
+    | E_fix(f, (p, (ty, tyB), e1)) ->
+        E_fix(f, (p, (rename_ty unknowns ty, rename_tyB unknowns tyB), ss e1))
+    | E_app(E_const(Op(TyConstr ty)),e) ->
+        E_app(E_const(Op(TyConstr (rename_ty unknowns ty))),ss e)
+    | E_app(E_const(Op(Runtime (op))),e) ->
+        let op' = (match op with 
+                  | Resize_int sz -> Resize_int (rename_size unknowns sz)
+                  | Vector_create sz -> Vector_create (rename_size unknowns sz)
+                 | op -> op) in
+        E_app(E_const(Op(Runtime (op'))),ss e)
+    | E_array_create(sz,deco) -> E_array_create(rename_size unknowns  sz,deco)
+    | E_array_make(sz,c,deco) -> E_array_make(rename_size unknowns  sz,c,deco)
+    | e -> Ast_mapper.map ss e
+  in
+  ss e
+
+
+
 (* inline a program given in ANF, lambda-lifted form. The resulting program is
    in lambda-lifted-form but not necessarily in ANF-form. *)
 
@@ -43,18 +74,18 @@ let eval_static_exp_int ~loc ~statics e =
 let inline_with_statics ~statics e =
   let rec inline e =
     match e with
-    | E_letIn(p,e1,e2) ->
+    | E_letIn(p,ty,e1,e2) ->
         (match p,e1 with
         | P_var x,E_fun _ -> 
             has_changed := true;
             inline @@ subst_e x e1 e2
-        | _ -> E_letIn(p,inline e1,inline e2))
+        | _ -> E_letIn(p,ty,inline e1,inline e2))
 
-    | E_app(E_fun(p,e1),e2) ->
+    | E_app(E_fun(p,(ty,tyB),e1),e2) ->
         has_changed := true;
         (* substitution is needed (rather than a let-binding)
            since e2 could be a function (fun x -> e3)       (* no, first order now *) (* ah ? *) *)
-        inline @@ E_letIn(p,e2,e1)
+        inline @@ subst_ty ty @@ E_letIn(p,ty,e2,e1)
 
 (*     | E_generate((p,e1),init,e_st3,loc) ->
         has_changed := true;

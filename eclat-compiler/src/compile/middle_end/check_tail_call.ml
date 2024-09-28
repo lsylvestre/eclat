@@ -5,11 +5,11 @@ let check e =
   let rec find ~tailcall xs e =
     match e with
     | E_deco(e,_) -> find ~tailcall xs e
-    | E_fun(_,e) ->
+    | E_fun(_,_,e) ->
         find ~tailcall xs e
-    | E_fix(f,(_,e)) ->
+    | E_fix(f,(_,_,e)) ->
         find ~tailcall (SMap.add f (loc_of e) xs) e
-    | E_letIn(p,e1,e2) ->
+    | E_letIn(p,_,e1,e2) ->
         find ~tailcall:(evaluated e1) xs e1;
         find ~tailcall xs e2
     | E_if(e1,e2,e3) ->

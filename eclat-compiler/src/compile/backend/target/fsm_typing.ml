@@ -97,7 +97,7 @@ let rec unify t1 t2 =
   | TVar ({contents=V _} as r),t | t,TVar ({contents=V _} as r) ->
     r := T t
   | TString tz,TString tz' ->
-      unify tz tz'
+      (* unify tz tz'*) ()
   | TStatic{elem=te;size=tz},TStatic{elem=te';size=tz'} ->
       unify te te';
       unify tz tz'

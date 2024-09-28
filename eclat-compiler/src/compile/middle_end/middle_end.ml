@@ -10,10 +10,12 @@ let normalize (pi:pi) : pi =
   (** ensure each function called within an [exec], or [( || )] construct
       is defined locally in this construct *)
   let pi = Move_down_gfun_under_exec_and_par.move_down_gfun_under_exec_and_par_pi pi in
+
   (* assign a fresh label to each [reg] and [exec] construct *)
   let pi = Instantiate.instantiate_pi pi in
-  
+  display_pi Lambda_lifting pi;
   let pi = Monomorphize.monomorphize pi in
+
   (** renaming all bindings in the source program *)
   let pi = Ast_rename.rename_pi pi in
   (** enforce each recursive function [fix f (fun p -> e)] is bound to the name [f]
@@ -45,18 +47,23 @@ let compile ?globalize
   let pi = Unroll.unroll_pi pi in
   let pi = Anf.anf_pi pi in
   display_pi Anf pi;
+  let _ = Typing.typing_with_argument pi arg_list in
   let pi = Specialize.specialize_pi pi in
   display_pi Specialize pi;
 
   (** make explicit all lexical environments *)
   (* let pi = Ast_rename.rename_pi pi in *)
   let pi = Lambda_lifting.lambda_lifting_pi ?globalize pi in
-   display_pi Lambda_lifting pi;
-  let (ty1,_) = Typing.typing_with_argument pi arg_list in
-  Typing.unify_ty ~loc:Prelude.dloc ty0 ty1;
+  display_pi Lambda_lifting pi;
+  let _ = Typing.typing_with_argument pi arg_list in
 
+  let pi = Inline.inl_pi pi in
+  display_pi Inline pi;
+  let _ = Typing.typing_with_argument pi arg_list in
+    
   let pi = Specialize.specialize_pi pi in
   display_pi Specialize pi;
+   let _ = Typing.typing_with_argument pi arg_list in
 
   (** inline non-recursive functions *)
   let rec loop pi =
@@ -66,10 +73,11 @@ let compile ?globalize
     let pi = Anf.anf_pi pi in
     if !Inline.has_changed || !Specialize.has_changed then loop pi 
     else pi
-  in 
+  in
   let pi = loop pi in
   display_pi Inline pi;
 
+ let _ = Typing.typing_with_argument pi arg_list in
   let pi = Specialize_ref.specialize_ref pi in
   display_pi Specialize_ref pi;
   (** compile pattern matching *)
@@ -79,12 +87,13 @@ let compile ?globalize
   let pi = Insert_bound_checking.insert_pi pi in
 
   let pi = Matching.matching_pi pi in
-
   display_pi Matching pi;
 
+  let _ = Typing.typing_with_argument pi [] in
   (** normalization *)
   let pi = normalize pi in
   (** optimization *)
+
   let pi = if propagation then Propagation.propagation_pi pi else pi in
 
   let pi = Globalize_arrays.globalize_arrays pi in
@@ -95,4 +104,6 @@ let compile ?globalize
   Typing.unify_ty ~loc:Prelude.dloc ty0 ty2;
   let pi = Expand.expand_pi pi in
   
+  let pi = Ast_rename.rename_pi pi in
+    let pi = Rename_fix.rename_pi pi in
   pi

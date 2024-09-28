@@ -41,15 +41,15 @@ type e =                      (** expression     [e]                       *)
   | E_var of x                (** variable       [x,y,f,g ...]             *)
   | E_app of e * e            (** application    [e1 e2]                   *)
   | E_tuple of e list         (** tuple          [e1, ... en]              *)
-  | E_letIn of p * e * e      (** let-bindings   [let p = e1 in e2]        *)
+  | E_letIn of p * ty * e * e (** let-bindings   [let p = e1 in e2]        *)
   | E_if of e * e * e         (** conditional    [if e1 then e2 else e3]   *)
   | E_case of e * (c list * e) list * e (** switch/case    [match e with | c -> e | ... | _ -> e] *)
   | E_match of e * (x * (p * e)) list * e option (* sum type projection [match e with inj1 p1 -> e1 | ... ] *)
-  | E_fun of p * e            (** function       [fun p -> e]              *)
-  | E_fix of x * (p * e)      (** recursive function [fix (fun p -> e)]    *)
-  | E_par of e list           (** parallel tuple             [(e1 || e2 ... en)] *)
+  | E_fun of p * (ty * tyB) * e       (** function       [fun p -> e]              *)
+  | E_fix of x * (p * (ty * tyB) * e) (** recursive function [fix (fun p -> e)]    *)
+  | E_par of e list                   (** parallel tuple             [(e1 || e2 ... en)] *)
 
-  | E_reg of (p * e) * e * l  (** register       [reg^l (fun p -> e) last e] *)
+  | E_reg of (p * tyB * e) * e * l  (** register       [reg^l (fun p -> e) last e] *)
   | E_exec of e * e * e option * l   (** exec           [(exec^l e default e [reset when e])]    *)
 
   | E_array_create of size * deco   (** [create<sz>] *)
@@ -63,10 +63,9 @@ type e =                      (** expression     [e]                       *)
   | E_set of e * e
 
   | E_vector of e list
-  | E_vector_mapi of bool * (p * e) * e * size
-  | E_int_mapi of bool * (p * e) * e * size
+  | E_vector_mapi of bool * (p * (tyB * tyB) * e) * e * size
 
-  | E_generate of (p * e) * e * e_static * deco
+  | E_generate of (p * (ty * tyB) * e) * e * e_static * deco
   | E_for of x * e_static * e_static * e * deco
 
   | E_run of x * e (* call external code *)

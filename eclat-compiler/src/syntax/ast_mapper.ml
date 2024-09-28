@@ -8,11 +8,11 @@ let rec map f e =
       let e' = f e in
       E_deco(e', ty)
   | E_const _ | E_var _ -> e
-  | E_fun(p, e) ->
-      E_fun(p, f e)
-  | E_fix(x, (p, e)) ->
+  | E_fun(p, ty, e) ->
+      E_fun(p, ty, f e)
+  | E_fix(x, (p, ty, e)) ->
       let e' = f e in
-      E_fix(x, (p, e'))
+      E_fix(x, (p, ty, e'))
   | E_tuple es ->
       let es' = List.map f es in
       E_tuple es'
@@ -35,10 +35,10 @@ let rec map f e =
       let hs' = List.map (fun (c, (p, e)) -> c, (p, f e)) hs in
       let eo' = Option.map f eo in
       E_match(e1', hs', eo')
-  | E_letIn(p, e1, e2) ->
+  | E_letIn(p, ty, e1, e2) ->
       let e1' = f e1 in
       let e2' = f e2 in
-      E_letIn(p, e1', e2')
+      E_letIn(p, ty, e1', e2')
   | E_ref(e1) ->
       let e1' = f e1 in
       E_ref(e1')
@@ -66,10 +66,10 @@ let rec map f e =
   | E_par(es) ->
       let es' = List.map f es in
       E_par es'
-  | E_reg((p,e1),e0,l) ->
+  | E_reg((p,tyB,e1),e0,l) ->
       let e0' = f e0 in
       let e1' = f e1 in
-      E_reg((p, e1'), e0', l)
+      E_reg((p, tyB, e1'), e0', l)
   | E_exec(e1,e2,e3,l) ->
       let e1' = f e1 in
       let e2' = f e2 in
@@ -78,20 +78,16 @@ let rec map f e =
   | E_vector es ->
       let es' = List.map f es in
       E_vector es'
-  | E_vector_mapi (is_par, (p, e1), e2, ty) ->
+  | E_vector_mapi (is_par, (p, typ, e1), e2, ty) ->
       let e1' = f e1 in
       let e2' = f e2 in
-      E_vector_mapi (is_par, (p,e1'), e2', ty)
-  | E_int_mapi (is_par,(p,e1),e2,ty) ->
-      let e1' = f e1 in
-      let e2' = f e2 in
-      E_int_mapi (is_par, (p, e1'), e2',ty)
+      E_vector_mapi (is_par, (p, typ, e1'), e2', ty)
   | E_run(i,e) ->
       E_run(i, f e)
   | E_for(x,e_st1,e_st2,e,loc) ->
       E_for(x,f e_st1,f e_st2,f e,loc)
-  | E_generate((p,e1),e2,e_st1,loc) ->
-      E_generate((p,f e1),f e2,f e_st1,loc)
+  | E_generate((p, ty, e1), e2, e_st1, loc) ->
+      E_generate((p, ty, f e1), f e2, f e_st1, loc)
 (** traversal order of sub-expressions is unspecified *)
 
 let rec iter f (e:e) : unit =
@@ -110,11 +106,11 @@ let rec iter f (e:e) : unit =
       f e1; List.iter (fun (_,(_,ei)) -> f ei) hs; Option.iter f eo
   | E_app(e1,e2) ->
       f e1; f e2
-  | E_letIn(_,e1,e2) ->
+  | E_letIn(_,_,e1,e2) ->
       f e1; f e2
   | E_tuple es ->
       List.iter f es
-  | E_fun(_,e) | E_fix(_,(_,e)) ->
+  | E_fun(_,_,e) | E_fix(_,(_,_,e)) ->
       f e
   | E_ref(e1) ->
       f e1
@@ -123,7 +119,7 @@ let rec iter f (e:e) : unit =
       f e1; f e2
   | E_par(es) ->
       List.iter f es
-   | E_reg((_,e1),e0,_) ->
+   | E_reg((_,_,e1),e0,_) ->
       f e1; f e0
   | E_exec(e1,e2,e3,_) ->
       f e1; f e2; Option.iter f e3
@@ -139,21 +135,19 @@ let rec iter f (e:e) : unit =
       f e1; f e2
   | E_for(_,_,_,e,_) ->
       f e
-  | E_generate((_,e1),e2,e_st3,_) ->
+  | E_generate((_,_,e1),e2,e_st3,_) ->
       f e1; f e2; f e_st3
   | E_vector es ->
       List.iter f es
-  | E_vector_mapi(_,(_,e1),e2,_) ->
-      f e1; f e2
-  | E_int_mapi(_,(_,e1),e2,_) ->
+  | E_vector_mapi(_,(_,_,e1),e2,_) ->
       f e1; f e2
   | E_run(_,e1) ->
       f e1
 
-let declare ds e =
-  List.fold_right (fun (x,v) e -> E_letIn(P_var x,v,e)) ds e
+let declare ds ts e =
+  List.fold_right2 (fun (x,v) t e -> E_letIn(P_var x,t,v,e)) ds ts e
 
-let accum f (e:e) : ((x * e) list * e) =
+let accum f (e:e) =   (* : ((x * ty * e) list * e)*)
   let rec aux e =
     let open Ast in
       let aux_list es =
@@ -180,17 +174,17 @@ let accum f (e:e) : ((x * e) list * e) =
             let ds1,e1' = aux e1 in
             let ds2,e2' = aux e2 in
             ds1@ds2,E_app(e1',e2')
-        | E_letIn(p,e1,e2) ->
+        | E_letIn(p,ty,e1,e2) ->
             let ds1,e1' = aux e1 in
             let ds2,e2' = aux e2 in
-            ds1@ds2,E_letIn(p,e1',e2')
-        | E_fix(f,(p,e1)) ->
+            ds1@ds2,E_letIn(p,ty,e1',e2')
+        | E_fix(f,(p,ty,e1)) ->
             let ds1,e1' = aux e1 in
-            let v = E_fix(f,(p,e1')) in
+            let v = E_fix(f,(p,ty,e1')) in
             ds1,v
-        | E_fun(p,e1) ->
+        | E_fun(p,ty,e1) ->
             let ds1,e1' = aux e1 in
-            ds1,E_fun(p,e1')
+            ds1,E_fun(p,ty,e1')
         | E_if(e1,e2,e3) ->
             let ds1,e1' = aux e1 in
             let ds2,e2' = aux e2 in
@@ -236,10 +230,10 @@ let accum f (e:e) : ((x * e) list * e) =
         | E_par(es) ->
             let ds,es' = aux_list es in
             ds,E_par(es')
-        | E_reg((p,e1),e0,l) ->
+        | E_reg((p,tyB,e1),e0,l) ->
             let ds1,e1' = aux e1 in
             let ds0,e0' = aux e0 in
-            ds1@ds0,E_reg((p,e1'),e0',l)
+            ds1@ds0,E_reg((p,tyB,e1'),e0',l)
         | E_exec(e1,e2,eo,l) ->
             let ds1,e1' = aux e1 in
             let ds2,e2' = aux e2 in
@@ -255,23 +249,20 @@ let accum f (e:e) : ((x * e) list * e) =
             ds1@ds2@ds3,E_for(x,e_st1',e_st2',e3,loc)
              (* NB: definitions in [e_st1] and [e_st2] and [e3]
                 are *not* globalized *)
-        | E_generate((p,e1),e2,e_st3,loc) ->
+        | E_generate((p,ty,e1),e2,e_st3,loc) ->
           let ds1,e1' = aux e1 in
           let ds2,e2' = aux e2 in
           let ds3,e_st3' = aux e_st3 in
-          ds1@ds2@ds3,E_generate((p,e1'),e2',e_st3',loc)
+          ds1@ds2@ds3,E_generate((p,ty,e1'),e2',e_st3',loc)
           (* NB: definitions in [e_st1] are *not* globalized *)
         | E_vector es ->
             let ds,es' = aux_list es in
             ds,E_vector(es')
-        | E_vector_mapi(is_par,(p,e1),e2,ty) ->
+        | E_vector_mapi(is_par,(p,typ,e1),e2,ty) ->
             let ds1,e1' = aux e1 in
             let ds2,e2' = aux e2 in
-            ds1@ds2,E_vector_mapi(is_par,(p,e1'),e2',ty)
-        | E_int_mapi(is_par,(p,e1),e2,ty) ->
-            let ds1,e1' = aux e1 in
-            let ds2,e2' = aux e2 in
-            ds1@ds2,E_int_mapi(is_par,(p,e1'),e2',ty)
+            ds1@ds2,E_vector_mapi(is_par,(p,typ,e1'),e2',ty)
+
         | E_run(x,e1) ->
             let ds1,e1' = aux e1 in
             ds1,E_run(x,e1')

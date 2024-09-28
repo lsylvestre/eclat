@@ -7,7 +7,7 @@ let stop = "fatal_error$"
 
 let check_bound e x eidx len =
   let x = gensym () in
-  E_letIn(P_var x,eidx,
+  E_letIn(P_var x,Types.new_ty_unknown(),eidx,
   E_if(E_app(E_const(Op(Runtime(External_fun("Bool.land",Types.new_ty_unknown())))),
             E_tuple[E_app(E_const(Op(Runtime(External_fun("Int.ge",Types.new_ty_unknown())))),E_tuple[E_var x;E_const(Int(0,Types.new_size_unknown()))]);
                     E_app(E_const(Op(Runtime(External_fun("Int.lt",Types.new_ty_unknown())))),E_tuple[E_var x;len])]),
@@ -33,11 +33,12 @@ let rec insert e =
  *) | e -> Ast_mapper.map insert e
 
 let declare_toplevel_error e =
-  E_letIn(P_var stop,E_fix(stop,(P_unit, 
-                        E_letIn(P_unit, 
-                          (if !Operators.flag_no_print then E_const Unit 
-                           else E_app(E_const(Op(Runtime(Print_string))),E_const(String("index out of bounds")))),
-                          E_app(E_var stop,E_const Unit)))),e) 
+  E_letIn(P_var stop, Types.new_ty_unknown(), 
+    E_fix(stop,(P_unit, (Ty_base TyB_unit, TyB_unit),
+      E_letIn(P_unit, Ty_base TyB_unit,
+        (if !Operators.flag_no_print then E_const Unit 
+         else E_app(E_const(Op(Runtime(Print_string))),E_const(String("index out of bounds")))),
+        E_app(E_var stop,E_const Unit)))),e) 
 
 let insert_pi pi =
   if !insert_bound_checking_flag then pi else

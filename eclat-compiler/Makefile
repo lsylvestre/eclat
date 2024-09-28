@@ -58,10 +58,10 @@ OBJS= $(SRC_DIR)/prelude.cmx \
       $(SRC_DIR)/compile/middle_end/normalize/let_floating.cmx \
       $(SRC_DIR)/compile/middle_end/transform/insert_bound_checking.cmx \
       $(SRC_DIR)/compile/middle_end/transform/globalize_arrays.cmx \
+      $(SRC_DIR)/compile/middle_end/transform/inline.cmx \
       $(SRC_DIR)/compile/middle_end/transform/specialize_ref.cmx \
       $(SRC_DIR)/compile/middle_end/transform/specialize.cmx \
       $(SRC_DIR)/compile/middle_end/transform/lambda_lifting.cmx \
-      $(SRC_DIR)/compile/middle_end/transform/inline.cmx \
       $(SRC_DIR)/compile/middle_end/transform/unroll.cmx \
       $(SRC_DIR)/compile/middle_end/transform/matching.cmx \
       $(SRC_DIR)/compile/middle_end/transform/expand.cmx \

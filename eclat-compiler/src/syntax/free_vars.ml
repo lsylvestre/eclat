@@ -30,23 +30,23 @@ let fv ?(get_arrays=true) ?(xs=SMap.empty) e =
       (match eo with
       | None -> s
       | Some ew -> s ++ aux xs ew)
-  | E_letIn(p,e1,e2) ->
+  | E_letIn(p,_,e1,e2) ->
       let ys = vars_of_p p in
       let xs' = xs ++ ys in
       aux xs e1 ++ aux xs' e2
   | E_app(e1,e2) ->
       aux xs e1 ++ aux xs e2
-  | E_fun(p,e1) ->
+  | E_fun(p,_,e1) ->
       let ys = vars_of_p p in
       let xs' = xs++ys in
       aux xs' e1
-  | E_fix(f,(p,e)) ->
+  | E_fix(f,(p,_,e)) ->
       let ys = vars_of_p p in
       let xs' = SMap.add f () @@ (xs++ys) in
       aux xs' e
   | E_tuple(es) ->
       fv_list xs es
-  | E_reg((p,e1), e0, _) ->
+  | E_reg((p,_,e1), e0, _) ->
       let ys = vars_of_p p in
       let xs' = xs++ys in
       aux xs' e1 ++ aux xs e0
@@ -86,17 +86,13 @@ let fv ?(get_arrays=true) ?(xs=SMap.empty) e =
       aux xs e_st1 ++ aux xs e_st2 ++
         (let xs' = SMap.add i () @@ xs in
         aux xs' e)
-  | E_generate((p,e1),e2,e_st3,_) ->
+  | E_generate((p,_,e1),e2,e_st3,_) ->
       let ys = vars_of_p p in
       let xs' = xs++ys in
       aux xs' e1 ++ aux xs e2 ++ aux xs e_st3
   | E_vector(es) ->
       fv_list xs es
-  | E_vector_mapi(_,(p,e1),e2,_) ->
-      let ys = vars_of_p p in
-      let xs' = xs++ys in
-      aux xs' e1 ++ aux xs e2
-  | E_int_mapi(_,(p,e1),e2,_) ->
+  | E_vector_mapi(_,(p,_,e1),e2,_) ->
       let ys = vars_of_p p in
       let xs' = xs++ys in
       aux xs' e1 ++ aux xs e2
@@ -132,23 +128,23 @@ let fv_arrays ?(xs=SMap.empty) e =
       (match eo with
       | None -> s
       | Some ew -> s ++ aux xs ew)
-  | E_letIn(p,e1,e2) ->
+  | E_letIn(p,_,e1,e2) ->
       let ys = vars_of_p p in
       let xs' = xs ++ ys in
       aux xs e1 ++ aux xs' e2
   | E_app(e1,e2) ->
       aux xs e1 ++ aux xs e2
-  | E_fun(p,e1) ->
+  | E_fun(p,_,e1) ->
       let ys = vars_of_p p in
       let xs' = xs++ys in
       aux xs' e1
-  | E_fix(f,(p,e)) ->
+  | E_fix(f,(p,_,e)) ->
       let ys = vars_of_p p in
       let xs' = SMap.add f () @@ (xs++ys) in
       aux xs' e
   | E_tuple(es) ->
       fv_list xs es
-  | E_reg((p,e1), e0, _) ->
+  | E_reg((p,_,e1), e0, _) ->
       let ys = vars_of_p p in
       let xs' = xs++ys in
       aux xs' e1 ++ aux xs e0
@@ -182,17 +178,13 @@ let fv_arrays ?(xs=SMap.empty) e =
       aux xs e_st1 ++ aux xs e_st2 ++
         (let xs' = SMap.add i () @@ xs in
         aux xs' e)
-  | E_generate((p,e1),e2,e_st3,_) ->
+  | E_generate((p,_,e1),e2,e_st3,_) ->
       let ys = vars_of_p p in
       let xs' = xs++ys in
       aux xs' e1 ++ aux xs e2 ++ aux xs e_st3
   | E_vector(es) ->
       fv_list xs es
-  | E_vector_mapi(_,(p,e1),e2,_) ->
-      let ys = vars_of_p p in
-      let xs' = xs++ys in
-      aux xs' e1 ++ aux xs e2
-  | E_int_mapi(_,(p,e1),e2,_) ->
+  | E_vector_mapi(_,(p,_,e1),e2,_) ->
       let ys = vars_of_p p in
       let xs' = xs++ys in
       aux xs' e1 ++ aux xs e2

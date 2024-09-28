@@ -63,15 +63,19 @@ let propagation ~externals e =
   in
   let rec prop e =
     match e with
-    | E_letIn(P_tuple ps,E_tuple es,e2) ->
-        prop @@ List.fold_right2 (fun pi ei e -> E_letIn(pi,ei,e)) ps es e2
-    | E_letIn(P_var x as p,e1,e2) ->
+    | E_letIn(P_tuple ps,ty,E_tuple es,e2) ->
+        let ts = match Types.canon_ty ty with 
+                 | Ty_tuple ts -> ts 
+                 | _ -> List.map (fun _ -> Types.new_ty_unknown()) ps  in
+        prop @@ List.fold_right2 (fun (pi,ti) ei e -> E_letIn(pi,ti,ei,e)) 
+                  (List.combine ps ts) es e2
+    | E_letIn(P_var x as p,ty,e1,e2) ->
         let e1' = prop e1 in
         if propagable2 x e1'
         then prop (subst_p_e p e1' e2)
-        else E_letIn(p,e1',prop e2)
-    | E_letIn(p,e1,e2) ->
-        E_letIn(p,prop e1,prop e2)
+        else E_letIn(p,ty,e1',prop e2)
+    | E_letIn(p,ty,e1,e2) ->
+        E_letIn(p,ty,prop e1,prop e2)
     | E_app(E_const(Op(GetTuple{pos;arity})),E_tuple vs) ->
         prop (List.nth vs pos)
     | E_app(e1,e2) ->

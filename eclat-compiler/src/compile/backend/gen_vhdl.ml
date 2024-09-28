@@ -268,9 +268,9 @@ let pp_component fmt ~vhdl_comment ~name ~externals ~state_var ~argument ~result
   let arty = List.fold_left (fun arty (_,g) ->
       match g with
       | Static_array_of ty -> 
-          (match ty with
+          (match Fsm_typing.canon ty with
           | TStatic{elem} ->  ArrayType.add (size_ty elem) () arty
-          | _ -> assert false)
+          | _ -> Debug.pp_ty Format.std_formatter ty;  assert false)
       | Static_array(c,_) -> ArrayType.add (size_const c) () arty
     ) ArrayType.empty statics
   in
@@ -322,7 +322,7 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
           let ty_elem,sz = match Fsm_typing.canon ty with
                           | TStatic {elem;size=sz} -> elem,sz
                           | _ -> assert false (* error *) in
-          let n = match Fsm_typing.canon ty with
+          let n = match Fsm_typing.canon sz with
                   | TSize n -> n
                   | _ ->  Prelude.Errors.error (fun fmt -> 
                             Format.fprintf fmt "unspecified size for array %s" x) in

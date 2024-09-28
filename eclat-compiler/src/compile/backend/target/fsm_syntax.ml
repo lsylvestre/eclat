@@ -110,7 +110,7 @@ module Debug = struct
       pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt ", ") pp_ty fmt ts;
       fprintf fmt "]@]"
   | TSize n -> fprintf fmt "size<%d>" n
-  | TStatic {elem ; size} -> fprintf fmt "%a buffer<%a>" pp_ty elem pp_ty size
+  | TStatic {elem ; size} -> fprintf fmt "%a static<%a>" pp_ty elem pp_ty size
 
 let pp_tuple = Ast_pprint.pp_tuple
 let pp_vector = Ast_pprint.pp_vector

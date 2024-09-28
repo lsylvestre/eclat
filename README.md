@@ -1,6 +1,3 @@
-**Note: an updated version will be available soon**
-
------
 
 ## Eclat
 

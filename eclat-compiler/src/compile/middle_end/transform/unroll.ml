@@ -1,5 +1,6 @@
 open Ast
 
+(*
 let rec unroll env e =
   match e with
   | E_letIn(P_var f,(E_fix(g,(p,e1)) as v1),e2) ->
@@ -17,8 +18,10 @@ let rec unroll env e =
          since e2 could be a function (fun x -> e3)       (* no, first order now *) (* ah ? *) *)
 
   | e -> Ast_mapper.map (unroll env) e
+*)
 
-
-let unroll_pi pi =
+let unroll_pi pi = pi ;;
+(*
   let main = unroll [] pi.main in
   { pi with main }
+*)

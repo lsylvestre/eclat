@@ -45,44 +45,40 @@ let rec rename_pat ~statics p =
 
 let rename_e ~statics e =
   let rec ren_e = function
-  | E_fix(f,(p,e1)) ->
+  | E_fix(f, (p, ty, e1)) ->
       let g = rename_ident ~statics f in
       let pz = rename_pat ~statics p in
       let e1_ren = subst_e f (E_var g) @@
                    subst_p_e p (pat2exp pz) e1 in
-      E_fix (g,(pz, ren_e e1_ren))
-  | E_fun(p,e1) ->
+      E_fix (g,(pz, ty, ren_e e1_ren))
+  | E_fun(p, ty, e1) ->
       let pz = rename_pat ~statics p in
-      E_fun (pz,ren_e (subst_p_e p (pat2exp pz) e1))
-  | E_letIn(p,e1,e2) ->
+      E_fun (pz, ty, ren_e (subst_p_e p (pat2exp pz) e1))
+  | E_letIn(p,ty, e1,e2) ->
       let pz = rename_pat ~statics p in
       let ez = pat2exp pz in
-      E_letIn(pz, ren_e e1, ren_e @@ subst_p_e p ez e2)
+      E_letIn(pz, ty, ren_e e1, ren_e @@ subst_p_e p ez e2)
   | E_match(e1,hs,eo) ->
       let hs' = List.map (fun (inj,(p,ei)) ->
                             let pz = rename_pat ~statics p in
                             let ei' = ren_e (subst_p_e p (pat2exp pz) ei) in
                             (inj,(pz,ei'))) hs in
       E_match(ren_e e1, hs',Option.map ren_e eo)
-  | E_reg((p,e1),e0,l) ->
+  | E_reg((p, tyB, e1),e0,l) ->
       let pz = rename_pat ~statics p in
       let e1' = ren_e (subst_p_e p (pat2exp pz) e1) in
-     E_reg((pz,e1'),ren_e e0,l)
-  | E_generate((p,e1),e2,e3,l) ->
+     E_reg((pz, tyB, e1'), ren_e e0, l)
+  | E_generate((p, ty, e1), e2, e3, l) ->
       let pz = rename_pat ~statics p in
       let e1' = ren_e (subst_p_e p (pat2exp pz) e1) in
-     E_generate((pz,e1'),ren_e e2,ren_e e3,l)
+     E_generate((pz, ty, e1'), ren_e e2, ren_e e3,l)
   | E_for(x,lc,lc',e,loc) ->
       let x' = rename_ident ~statics x in
       E_for(x',lc,lc',ren_e @@ subst_e x (E_var x') e,loc) (* rename lc & lc' ? *)
-  | E_vector_mapi(is_par,(p,e1),e2,ty) ->
+  | E_vector_mapi(is_par,(p, typ, e1),e2,ty) ->
       let pz = rename_pat ~statics p in
       let e1' = ren_e (subst_p_e p (pat2exp pz) e1) in
-     E_vector_mapi(is_par,(pz,e1'),ren_e e2,ty)
-  | E_int_mapi(is_par,(p,e1),e2,ty) ->
-      let pz = rename_pat ~statics p in
-      let e1' = ren_e (subst_p_e p (pat2exp pz) e1) in
-     E_int_mapi(is_par,(pz,e1'),ren_e e2,ty)
+     E_vector_mapi(is_par,(pz, typ, e1'),ren_e e2,ty)
   | e -> Ast_mapper.map ren_e e
   in
   ren_e e
