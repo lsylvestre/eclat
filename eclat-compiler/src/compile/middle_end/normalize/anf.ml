@@ -94,7 +94,12 @@ let rec anf (e:e) : e =
       assert (not (pat_mem f p) && not (pat_mem g p));
       anf @@ E_letIn(P_var f,E_fix(f,(p,subst_e g (E_var f) e1)),e2)*)
   | E_letIn(P_tuple ps,ty,E_tuple es,e2) ->
-      let ts = match Types.canon_ty ty with Ty_tuple ts -> ts | _ -> assert false in
+      let ts = match Types.canon_ty ty with 
+               | Ty_tuple ts -> ts 
+               | _ -> let ts = List.map (fun _ -> Types.new_ty_unknown()) ps in
+                      Typing.unify_ty ~loc:Prelude.dloc ty (Ty_tuple ts);
+                      ts
+      in
       glob (List.fold_right2 (fun (p,t) e acc -> E_letIn(p,t,e,acc)) (List.combine ps ts) es e2)
   | E_letIn(p,ty,e1,e2) ->
       let e1' = glob e1 in

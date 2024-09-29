@@ -400,8 +400,20 @@ let rec typ_exp ?(collect_sig=false) ~statics ~externals ~sums ?(toplevel=false)
                  (fun fmt (x,_) -> fprintf fmt " %s" x) fmt (SMap.bindings xs);
                fprintf fmt " should be values or variables."
              ) end; *)
-         fprintf std_formatter "val %a : %a | %a\n"
-           Ast_pprint.pp_pat p pp_ty (canon_ty ty1) pp_dur (canon_dur d1);
+        begin
+           let open Prelude.Errors in
+           let open Format in
+           fprintf std_formatter "val %a : " Ast_pprint.pp_pat p;
+           if not(!monomorphic) then
+           (match p with P_var x -> (let (Forall(xs,_)) = SMap.find x g' in
+               if Vs.cardinal xs > 0 then (
+                 fprintf std_formatter "forall ";
+                 Vs.iter (fun x -> fprintf std_formatter "'%d " x) xs;
+                 fprintf std_formatter " . "))
+           | _ -> ());
+           fprintf std_formatter "%a | %a\n"
+             pp_ty (canon_ty ty1) pp_dur (canon_dur d1)
+         end
        end);
 
     let ty2,d2 = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:true ~loc:(loc_of e2) g' e2 in
@@ -747,9 +759,23 @@ let when_repl externals statics sums : bool -> ((p * e) * Prelude.loc) -> unit =
         
         r := env;
 
-        let (ty,_) = typing ~env ~statics ~externals ~sums e in
+        let (ty,d) = typing ~env ~statics ~externals ~sums e in
         r := typing_handler (fun () -> (env_extend ~loc ~gen:(evaluated e) !r p ty)) ();
-        if show_val then Format.fprintf Format.std_formatter "val %a : %a@."  Ast_pprint.pp_pat p pp_ty ty
+        if show_val then
+          begin
+           let open Prelude.Errors in
+           let open Format in
+           fprintf std_formatter "val %a : " Ast_pprint.pp_pat p;
+           if not(!monomorphic) then
+           (match p with P_var x -> (let (Forall(xs,_)) = SMap.find x !r in
+               if Vs.cardinal xs > 0 then (
+                 fprintf std_formatter "forall ";
+                 Vs.iter (fun x -> fprintf std_formatter "'%d " x) xs;
+                 fprintf std_formatter " . "))
+           | _ -> ());
+           fprintf std_formatter "%a | %a@."
+             pp_ty (canon_ty ty) pp_dur (canon_dur d)
+         end
       ) ()
 
 let get_vector_size_ref = ref true ;;

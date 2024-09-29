@@ -283,13 +283,17 @@ src/compile/middle_end/monomorphize.cmx : \
     src/syntax/ast_mapper.cmx \
     src/syntax/ast.cmx
 src/compile/middle_end/normalize/anf.cmo : \
+    src/typing/typing.cmo \
     src/typing/types.cmo \
+    src/prelude.cmo \
     src/syntax/pattern.cmo \
     src/syntax/ast_undecorated.cmo \
     src/syntax/ast_subst.cmo \
     src/syntax/ast.cmo
 src/compile/middle_end/normalize/anf.cmx : \
+    src/typing/typing.cmx \
     src/typing/types.cmx \
+    src/prelude.cmx \
     src/syntax/pattern.cmx \
     src/syntax/ast_undecorated.cmx \
     src/syntax/ast_subst.cmx \
@@ -487,11 +491,13 @@ src/compile/middle_end/transform/unroll.cmo : \
 src/compile/middle_end/transform/unroll.cmx : \
     src/syntax/ast.cmx
 src/frontend/clean_simul.cmo : \
+    src/typing/types.cmo \
     src/syntax/map_pi.cmo \
     src/syntax/ast_subst.cmo \
     src/syntax/ast_mapper.cmo \
     src/syntax/ast.cmo
 src/frontend/clean_simul.cmx : \
+    src/typing/types.cmx \
     src/syntax/map_pi.cmx \
     src/syntax/ast_subst.cmx \
     src/syntax/ast_mapper.cmx \

@@ -19,13 +19,16 @@ let string_of_print_mode s =
   | _ -> failwith "unknown print mode"
 
 let print_mode = ref Any
+let print_mode_str = ref ""
 
 let set_print_mode s =
   let pm = string_of_print_mode s in
-  print_mode := pm
+  print_mode := pm;
+  print_mode_str := s
 
 let display_pi a pi =
   if a <> !print_mode then () else
   let open Format in
-  fprintf std_formatter "@[<v>{debug mode}===========@,@.%a@]" Ast_pprint.pp_pi pi
+  fprintf std_formatter "@[<v>======= INTERNAL REPRESENTATION (%s) =======@,%a@,=================================%s=========@,@]" 
+     !print_mode_str Ast_pprint.pp_pi pi (String.make (String.length !print_mode_str) '=')
 

@@ -104,13 +104,13 @@ let pp_exp (fmt:fmt) (e:e) : unit =
   | E_var x ->
       pp_ident fmt x
   | E_fun (p,(ty,tyB),e) ->
-       fprintf fmt "(fun (%a:%a) : %a ->@,%a)"
+       fprintf fmt "(fun (%a:%a) : %a ->@,  @[%a@])"
           pp_pat p
           Types.pp_ty ty
           Types.pp_tyB tyB
           (pp_e ~paren:false) e
   | E_fix (f,(p,(ty,tyB),e)) ->
-       fprintf fmt "(fix %a (fun (%a:%a) : %a ->@,%a))"
+       fprintf fmt "(fix %a (fun (%a:%a) : %a ->@,  @[%a@]))"
           pp_ident f
           pp_pat p
           Types.pp_ty ty
@@ -184,15 +184,17 @@ let pp_exp (fmt:fmt) (e:e) : unit =
      fprintf fmt "make<%a>(%a)" 
        pp_size sz (pp_e ~paren:false) e
   | E_array_length(x) ->
-      fprintf fmt "@[<v>%a.length@]"
-        pp_ident x
+      parenthesize ~paren (fun fmt () ->
+        fprintf fmt "@[<v>length %a@]"
+          pp_ident x) fmt ()
   | E_array_get(x,e1) ->
-      fprintf fmt "@[<v>%a.(%a)@]"
+      parenthesize ~paren (fun fmt () ->
+      fprintf fmt "@[<v>get(%a,%a)@]"
         pp_ident x
-        (pp_e ~paren:false) e1
+        (pp_e ~paren:false) e1) fmt ()
   | E_array_set(x,e1,e2) ->
       parenthesize ~paren (fun fmt () ->
-        fprintf fmt "@[<v>%a.(%a) <- %a@]"
+        fprintf fmt "@[<v>set(%a,%a,%a)@]"
           pp_ident x
           (pp_e ~paren:false) e1
           (pp_e ~paren:false) e2) fmt ()
@@ -228,7 +230,7 @@ let pp_exp (fmt:fmt) (e:e) : unit =
 let pp_static (fmt:fmt) (g:static) : unit =
   match g with
   | Static_array_of (t,_) ->
-      fprintf fmt "array of %a" pp_ty t
+      fprintf fmt "static_array : %a" pp_ty t
   | Static_array(c,n) ->
       fprintf fmt "(%a)^%d" pp_const c n
   | Static_const(c) ->
