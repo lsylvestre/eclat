@@ -457,6 +457,7 @@ src/compile/middle_end/transform/specialize.cmo : \
     src/compile/middle_end/normalize/propagation.cmo \
     src/syntax/pattern.cmo \
     src/compile/middle_end/normalize/let_floating.cmo \
+    src/compile/middle_end/transform/inline.cmo \
     src/syntax/ast_rename.cmo \
     src/syntax/ast_mapper.cmo \
     src/syntax/ast.cmo
@@ -465,6 +466,7 @@ src/compile/middle_end/transform/specialize.cmx : \
     src/compile/middle_end/normalize/propagation.cmx \
     src/syntax/pattern.cmx \
     src/compile/middle_end/normalize/let_floating.cmx \
+    src/compile/middle_end/transform/inline.cmx \
     src/syntax/ast_rename.cmx \
     src/syntax/ast_mapper.cmx \
     src/syntax/ast.cmx
@@ -473,7 +475,7 @@ src/compile/middle_end/transform/specialize_ref.cmo : \
     src/compile/middle_end/normalize/propagation.cmo \
     src/syntax/pattern.cmo \
     src/compile/middle_end/normalize/let_floating.cmo \
-    src/syntax/ast_subst.cmo \
+    src/compile/middle_end/transform/inline.cmo \
     src/syntax/ast_rename.cmo \
     src/syntax/ast_mapper.cmo \
     src/syntax/ast.cmo
@@ -482,7 +484,7 @@ src/compile/middle_end/transform/specialize_ref.cmx : \
     src/compile/middle_end/normalize/propagation.cmx \
     src/syntax/pattern.cmx \
     src/compile/middle_end/normalize/let_floating.cmx \
-    src/syntax/ast_subst.cmx \
+    src/compile/middle_end/transform/inline.cmx \
     src/syntax/ast_rename.cmx \
     src/syntax/ast_mapper.cmx \
     src/syntax/ast.cmx

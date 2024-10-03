@@ -61,7 +61,7 @@
   let infix_operators : (x, x) Hashtbl.t = Hashtbl.create 10
 
   let get_arity ty = 
-    match ty with
+    match Types.canon_ty ty with
     | Ty_fun(Ty_base(TyB_tuple ts),_,_) -> List.length ts
     | Ty_fun(Ty_base _,_,_) -> 1
     | _ -> assert false (* todo *)
@@ -327,6 +327,7 @@ tyB:
 | tyB=tyB_next {tyB}
 
 tyB_next:
+| x=TVAR_IDENT
 | x=TYB_VAR_IDENT { decl_tyB_var x }
 | tyB=tyB_ident { tyB }
 | LPAREN tyB=tyB RPAREN { tyB }
@@ -370,15 +371,11 @@ ty:
 
 ty_next:
 | x=TVAR_IDENT { decl_ty_var x }
-| ty_tyB=ty_next  ARRAY LT sz=size GT 
-    { let tyB = as_tyB ~loc:(with_file $loc) ty_tyB in
-      Ty_array(sz,tyB) }
-/*| ty=ty_ident { ty }
-| ty_tyB=ty_next x=IDENT LT sz=size GT 
+| tyB=tyB_next ARRAY LT sz=size GT { Ty_array(sz,tyB) }
+| ty=ty_ident { ty }
+/*| ty_tyB=ty_next x=IDENT LT sz=size GT 
      { let tyB = as_tyB ~loc:(with_file $loc) ty_tyB in
        match x with
-       | "array" -> Ty_array(sz,tyB)
-       | "vect" -> Ty_base(TyB_vector(sz,tyB))
        | x -> Ty_base (TyB_abstract(x,[sz],[tyB]))
        (* | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc) ()
                  ~msg:("unknown type constructor "^x)  *) }*/

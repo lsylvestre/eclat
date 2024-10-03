@@ -137,9 +137,10 @@ let specialize ds e =
         | Some (ty_orig,E_fun(p,(ty,tyB),e1)) -> 
            (* Format.fprintf Format.std_formatter "==> %a | %s %a %a \n" Types.pp_ty ty f Ast_pprint.pp_pat p Ast_pprint.pp_exp e1; *)
            (*Format.fprintf Format.std_formatter "==> %a %a \n" Types.pp_ty ty Ast_pprint.pp_exp xc2; *)
-           (* Inline.subst_ty ty_orig @@
+           (* 
            E_letIn(p,ty_orig,xc2, ty_annot ~ty:(Ty_base tyB) e1)*)
            let p' = p_without_fun f p ty in
+           Inline.subst_ty ty_orig @@
            E_letIn(p,ty_orig,xc2,
            E_app(E_fun(p',(ty,tyB),e1),Pattern.pat2exp p'))
         | Some (ty_orig,E_fix(x,(p,(ty,tyB),e1))) ->
@@ -151,6 +152,7 @@ let specialize ds e =
                 let e1' = (* Ast_subst.subst_p_e p (Pattern.pat2exp p')*) e1 in
                 E_letIn(P_var z,Types.new_ty_unknown(), E_fix(x,(p',(ty,tyB),e1')), E_app(E_var z,Pattern.pat2exp p')))
 *)
+           Inline.subst_ty ty_orig @@
            E_letIn(p,ty_orig,xc2,
            E_app(E_fix(x,(p',(ty,tyB),e1)),Pattern.pat2exp p'))
         | Some _ ->

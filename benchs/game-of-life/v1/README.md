@@ -9,17 +9,19 @@ $ ./eclat -relax ../benchs/game-of-life/v1/v1.ecl  -main=chrono_main
 vhdl code generated in ../target/main.vhdl 
 testbench generated in ../target/tb_main.vhdl for software RTL simulation using GHDL.
 
-$ make simul NS=4000000
+$ make simul NAME=chrono_main NS=4000000
 cd ../target; make NS=4000000
-ghdl -a  runtime.vhdl
-ghdl -a  main.vhdl
-ghdl -a  tb_main.vhdl
-ghdl -e  tb_main
-ghdl -r  tb_main --vcd=tb.vcd --stop-time=4000000ns
-execution time = 21506 cycles 
-execution time = 43012 cycles      // <-- once finished, the program restarts
-execution time = 64518 cycles 
-execution time = 86024 cycles 
+ghdl -a  runtime.vhdl stdlib.vhdl 
+ghdl -a  chrono_main.vhdl
+ghdl -a  tb_chrono_main.vhdl
+ghdl -e  tb_chrono_main
+ghdl -r  tb_chrono_main --vcd=tb.vcd --stop-time=4000000ns
+execution time = 14402 cycles 
+execution time = 28805 cycles 
+execution time = 43208 cycles 
+execution time = 57611 cycles 
+execution time = 72014 cycles 
+^C
 ```
 
 ### Display successive generations of the world

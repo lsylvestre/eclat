@@ -58,8 +58,8 @@ let subst_ty ty e =
                   | Vector_create sz -> Vector_create (rename_size unknowns sz)
                  | op -> op) in
         E_app(E_const(Op(Runtime (op'))),ss e)
-    | E_array_create(sz,deco) -> E_array_create(rename_size unknowns  sz,deco)
-    | E_array_make(sz,c,deco) -> E_array_make(rename_size unknowns  sz,c,deco)
+    | E_array_create(sz,deco) -> E_array_create(rename_size unknowns sz,deco)
+    | E_array_make(sz,c,deco) -> E_array_make(rename_size unknowns sz,c,deco)
     | e -> Ast_mapper.map ss e
   in
   ss e

@@ -78,23 +78,24 @@ let specialize ds e =
         | Some (ty_orig,E_fun(p,(ty,tyB),e1)) -> 
            (* Format.fprintf Format.std_formatter "==> %a | %s %a %a \n" Types.pp_ty ty f Ast_pprint.pp_pat p Ast_pprint.pp_exp e1; *)
            (*Format.fprintf Format.std_formatter "==> %a %a \n" Types.pp_ty ty Ast_pprint.pp_exp xc2; *)
+           Inline.subst_ty ty_orig @@
            E_letIn(p,ty_orig(*Types.new_ty_unknown()*),xc2, ty_annot ~ty:(Ty_base tyB) e1)
         | Some (ty_orig,E_fix(x,(p,(ty,tyB),e1))) ->
               let p' = p_without_array f p ty in
-              (* Format.fprintf Format.std_formatter "~~~~~~~> %a %a %a\n" Types.pp_ty ty Ast_pprint.pp_pat p' Ast_pprint.pp_pat p; *)
-              E_letIn(p,ty_orig(* Types.new_ty_unknown()*),xc2,
-                let z = gensym ~prefix:x () in
+              (*Format.fprintf Format.std_formatter "~~~~~~~> %a || %a %a %a %a\n" Types.pp_ty ty_orig Types.pp_ty ty Ast_pprint.pp_pat p' Ast_pprint.pp_pat p Ast_pprint.pp_exp (E_fix(x,(p,(ty,tyB),e1)));*)
+              (* Inline.subst_ty ty_orig @@*)
+              E_letIn(p,ty_orig,E_app(E_const(Op(TyConstr ty_orig)),xc2),
                 let e1' = (* Ast_subst.subst_p_e p (Pattern.pat2exp p')*) e1 in
-                E_letIn(P_var z,Types.new_ty_unknown(), E_fix(x,(p',(ty,tyB),e1')), E_app(E_var z,Pattern.pat2exp p')))
-
+                E_app(E_fix(x,(p',(ty,tyB),e1')),Pattern.pat2exp p'))
         | Some _ ->
             assert false (* ill typed *)
       )
     | E_app(e1,xc) ->
         E_app(spec funcs e1,xc)
-    | E_letIn(P_var x,_,((E_var _ | E_tuple _) as xc1),e2) ->
+    | E_letIn(P_var x,ty,((E_var _ | E_tuple _) as xc1),e2) ->
         (* copy propagation to remove aliasing of global functions *)
-        spec funcs (Ast_subst.subst_e x xc1 e2)
+        Inline.subst_ty ty @@
+        (E_letIn(P_var x, ty, xc1, spec funcs  e2))(* (Ast_subst.subst_e x xc1 e2)*)
     | E_letIn(P_var x,ty0,(E_fix(x',(p,(ty,tyB),e3)) as e1),e2) ->
         let e3' = spec (SMap.add x'(ty,E_tuple[E_var x;e1]) funcs) e3 in
         if contains_array ty then (has_changed := true; spec (SMap.add x (ty,E_fix(x',(p,(filter ty,tyB),e3'))) funcs) e2) 
@@ -121,7 +122,6 @@ let normalize pi =
   let pi = Ast_rename.rename_pi pi in (* seems needed *)
   Propagation.propagation_pi @@ Let_floating.float_pi pi ;;
 
-let oo = ref 0 ;;
 
 let rec specialize_ref pi =
   has_changed := false;
@@ -130,7 +130,6 @@ let rec specialize_ref pi =
   let pi_res = { pi_norm with main } in 
   (* Format.fprintf Format.std_formatter "==> %a \n" Ast_pprint.pp_exp pi_res.main; *)
   flush stdout;
-  if !oo > 10 then   assert false else incr oo; 
   if !has_changed then specialize_ref pi_res else normalize pi_res
 
 

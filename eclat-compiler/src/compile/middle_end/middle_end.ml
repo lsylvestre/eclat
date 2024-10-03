@@ -59,8 +59,9 @@ let compile ?globalize
 
   let pi = Inline.inl_pi pi in
   display_pi Inline pi;
+  
   let _ = Typing.typing_with_argument pi arg_list in
-    
+ 
   let pi = Specialize.specialize_pi pi in
   display_pi Specialize pi;
    let _ = Typing.typing_with_argument pi arg_list in
@@ -78,6 +79,7 @@ let compile ?globalize
   display_pi Inline pi;
 
  let _ = Typing.typing_with_argument pi arg_list in
+
   let pi = Specialize_ref.specialize_ref pi in
   display_pi Specialize_ref pi;
   (** compile pattern matching *)
@@ -95,9 +97,10 @@ let compile ?globalize
   (** optimization *)
 
   let pi = if propagation then Propagation.propagation_pi pi else pi in
-
-  let pi = Globalize_arrays.globalize_arrays pi in
+  let _ = Typing.typing_with_argument pi [] in
   display_pi Propagation pi;
+  let pi = Globalize_arrays.globalize_arrays pi in
+  display_pi GlobalizeArrays pi;
   (** ensure that transformations preserve typing *)
 
   let (ty2,_) = Typing.typing_with_argument ~get_vector_size:false pi arg_list in

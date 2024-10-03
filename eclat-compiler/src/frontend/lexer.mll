@@ -47,7 +47,7 @@
        "tuple_of_int",TUPLE_OF_INT;
        "int_of_tuple",INT_OF_TUPLE;
        "type", TYPE;
-       
+       "array", ARRAY;
        "to", TO;
        "do", DO;
        "done", DONE;
@@ -72,7 +72,6 @@
        "operator", OPERATOR;
        "shared", SHARED;
        "run", RUN;
-       "array",ARRAY;
        "impure",IMPURE;
        "vect_create",VECT_CREATE;
        "make", ARRAY_MAKE

@@ -38,15 +38,17 @@ let eval_static_exp_int ~loc ~statics e =
 let rec expand ~statics e =
   match e with
     | E_generate((p,tyB,e1),init,e_st3,loc) ->
+        expand ~statics @@ (
         has_changed := true;
         let (n,w) = eval_static_exp_int ~loc ~statics e_st3 in
         let rec loop i =
           if i < n then
             E_letIn(p,Types.new_ty_unknown(),E_tuple[E_const (Int(i,w)); loop(i+1)],e1)
           else init
-         in loop 0
+         in loop 0)
 
     | E_for(x,e_st1,e_st2,e3,loc) ->
+        expand ~statics @@ (
         has_changed := true;
         let (n,w) = eval_static_exp_int ~loc ~statics e_st1 in
         let (m,w') = eval_static_exp_int ~loc ~statics e_st2 in
@@ -56,7 +58,7 @@ let rec expand ~statics e =
                 (let es = List.init (m-n+1) (fun i -> 
                    E_letIn(P_var x,Types.new_ty_unknown(),E_const (Int(n+i,w)),e3)) in
                 E_par(es)),
-                E_const Unit)
+                E_const Unit))
 
   (*
   | E_generate((p,e1),init,e_st3,loc) ->
@@ -84,6 +86,7 @@ let rec expand ~statics e =
 *)
 
   | E_vector_mapi(_is_par,(p,tyB,e1),e2,sz) ->
+      expand ~statics @@ (
       has_changed := true;
       let e1' = expand ~statics @@ e1 in
       (match Types.canon_size sz with
@@ -103,11 +106,16 @@ let rec expand ~statics e =
             loop (x::xs) (i+1)) in loop [] 0)
             (* Ast_pprint.pp_exp Format.std_formatter e0; *)
       | _ -> assert false (* todo error *)
-      )
+      ))
 
   | e -> Ast_mapper.map (expand ~statics) e
 
-
+(*
+let rec expand_e ~statics e =
+  has_changed := false;
+  let e' = expand_e ~statics e in
+  if !has_changed then expand_e ~statics e' else e' ;;
+*)
 let expand_pi pi =
   let main = expand ~statics:pi.statics pi.main in
   { pi with main }

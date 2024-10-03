@@ -462,8 +462,8 @@ let rec rename_size unknowns = function
 | Sz_var {contents=Unknown n} as sz ->
         (try Sz_var(find_unsafe unknowns n)
          with Not_found -> sz)
-| Sz_var {contents=Is sz} ->
-    rename_size unknowns sz
+| Sz_var ({contents=Is sz} as v) ->
+    v := Is (rename_size unknowns sz); Sz_var v
 | Sz_lit _ as k -> k
 
 let rec rename_dur unknowns = function
