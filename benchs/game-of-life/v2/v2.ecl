@@ -41,7 +41,7 @@ let counter () =
 
 (**
    $ ./eclat ../benchs/game-of-life/v2/v2.ecl  -main=chrono_main
-   $ make simul
+   $ make simul NAME=chrono_main
      ~> execution time = 1 cycles
 *)
 let chrono_main () =
@@ -69,7 +69,7 @@ let print_world (world,nbc,nbl) : unit =
   print_string "==============";
   print_newline () ;;
 
-(*
+
 (** 
     $ ./eclat -relax ../benchs/game-of-life/v2/v2.ecl  -main=test_main
  *)
@@ -113,4 +113,3 @@ let main_xilinx (i:int<8>) : int<4> =
 let main_yosys (i:int<1>) : int<1> =
   let v = test_main() in
   resize_int<1>(v) ;;
-*)

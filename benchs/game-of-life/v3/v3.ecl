@@ -98,7 +98,7 @@ let test_main () =
 
   if vect_nth(get(w,0),0) then 0 else 1 ;;
 
-(*
+
 
 (** ==== synthesis ==== *)
 
@@ -120,4 +120,3 @@ let main_yosys (i:int<1>) : int<1> =
   let v = test_main() in
   resize_int<1>(v) ;;
 
-*)

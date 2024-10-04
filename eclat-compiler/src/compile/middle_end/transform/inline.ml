@@ -56,7 +56,8 @@ let subst_ty ty e =
         let op' = (match op with 
                   | Resize_int sz -> Resize_int (rename_size unknowns sz)
                   | Vector_create sz -> Vector_create (rename_size unknowns sz)
-                 | op -> op) in
+                  | External_fun (op,ty) -> External_fun(op,(rename_ty unknowns ty))
+                  | op -> op) in
         E_app(E_const(Op(Runtime (op'))),ss e)
     | E_array_create(sz,deco) -> E_array_create(rename_size unknowns sz,deco)
     | E_array_make(sz,c,deco) -> E_array_make(rename_size unknowns sz,c,deco)

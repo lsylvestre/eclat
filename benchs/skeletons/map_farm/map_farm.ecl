@@ -9,8 +9,7 @@ let map_worker (f,r,src,dst) =
     else ()
   in loop();;
 
-let map_farm((p,f,src),k) =
-  let _ : 'B array<'N> = src in
+let map_farm ((( p, f, src), k) : (('A * 'B * array<'N>) * 'D)) : 'E = 
   let dst = create<'N> () in
   let r = create<1> () in
   set(r,0,0);

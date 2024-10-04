@@ -58,6 +58,7 @@ let compile ?globalize
   let _ = Typing.typing_with_argument pi arg_list in
 
   let pi = Inline.inl_pi pi in
+  let pi = Ast_rename.rename_pi pi in
   display_pi Inline pi;
   
   let _ = Typing.typing_with_argument pi arg_list in
