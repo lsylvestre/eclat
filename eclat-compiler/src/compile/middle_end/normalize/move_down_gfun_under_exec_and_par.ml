@@ -38,7 +38,7 @@ module Deadcode_elimination = struct
         aux xs' e
     | E_exec(e1,_,eo,_) ->
         (* note: no recursive call on [e2] *)
-        aux xs e1; Option.iter (aux xs) eo
+        Option.iter (aux xs) eo
     | E_par _ ->
         (* note: no recursive call *)
         ()
