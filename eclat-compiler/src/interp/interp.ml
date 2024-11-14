@@ -169,10 +169,25 @@ let app_const e e2 r =
       | ("Int.neq"),  E_tuple [E_const (Int (n,tz)); E_const (Int (m,tz'))] -> let _k = unify_sz tz tz' in  E_const (Bool (n!=m)), r
       | ("Bool.land"),  E_tuple [E_const (Bool a); E_const (Bool b)] -> E_const (Bool (a&&b)), r
       | ("Bool.lor"),  E_tuple  [E_const (Bool a); E_const (Bool b)] -> E_const (Bool (a||b)), r
+      | ("Bool.lxor"),  E_tuple [E_const (Bool a); E_const (Bool b)] -> E_const (Bool (if a then not b else b)), r
       | ("Bool.lnot"),  E_const (Bool b) -> E_const (Bool (not b)), r
       | ("Int.abs"),  E_const (Int (n,tz)) -> E_const (Int (abs n,tz)), r
       | ("Int.neg"),  E_const (Int (n,tz)) -> E_const (Int (- n,tz)), r
-      | ("Vect.infos",E_const(C_vector cs)) -> E_const(C_tuple[Int(List.length cs,Types.new_size_unknown()); List.hd cs]), r
+      | ("Vect.infos", E_const(C_vector cs)) -> E_const(C_tuple[Int(List.length cs,Types.new_size_unknown()); List.hd cs]), r
+      | ("Vect.nth"),  E_tuple [E_const (C_vector cs); E_const (Int (i,tz))] -> 
+          let len = List.length cs in
+          if i < 0 || i > len then check_bounds ~index:i ~size:len;
+          E_const (List.nth cs i), r
+      | ("Vect.copy_with"),  E_tuple [E_const (C_vector cs); E_const (Int (i,tz));E_const ci] -> 
+          let len = List.length cs in
+          if i < 0 || i > len then check_bounds ~index:i ~size:len;
+          let rec update n i cs =
+            match cs with
+            | [] -> assert false
+            | c::cs' -> if n = i then ci::cs' else c::update (n+1) i cs
+          in 
+          let cs' = update 0 i cs in
+          E_const (C_vector cs'), r
       | x,_ -> Printf.printf "===> %s\n" x; assert false (* unknown pritmitive *)
       end
   | Op op -> begin
@@ -202,10 +217,14 @@ let app_const e e2 r =
           let vs = loop [] ls n in
           E_tuple (List.map (fun c -> E_const c) vs), r
       | Runtime(Resize_int sz),  E_const (Int (l,tz)) -> 
+          let return_c k =
+            E_const (Int (l mod (1 lsl (k-1)) ,Sz_lit k))
+          in
           (match Types.canon_size sz with
           | Sz_lit k ->
-              E_const (Int (l mod (1 lsl (k-1)) ,Sz_lit k)), r
-          | _ -> assert false)
+              return_c k
+          | _ -> 
+              return_c 32), r
       | Runtime(Print_string),E_const (String s) ->
          assert (evaluated e);
          Format.fprintf Format.std_formatter "%s" s; flush stdout; E_const Unit, r
@@ -448,18 +467,20 @@ let eval n mu main vs ty =
     | v::vs' ->
        let open Prelude.Errors in
        let open Format in
-       fprintf std_formatter "@[%a : " 
+       fprintf std_formatter "@[<v 0>%a : " 
                   (emph_pp blue (fun fmt () -> fprintf fmt "cycle %d" i)) ();
+       fprintf std_formatter "%a --> " Ast_pprint.pp_exp v ;
        (let e',mu' = eval_prog mu ef v in
         if evaluated e' then (
            let v' = e' in
-           fprintf std_formatter "%a --> %a@]@," 
-                 Ast_pprint.pp_exp v Ast_pprint.pp_exp v';
+           fprintf std_formatter "%a@,"
+                 Ast_pprint.pp_exp v';
            eval_aux (i+1) n mu' main vs'
         ) else (
-          fprintf std_formatter "%a@]@," (emph red) "(running)";
+          fprintf std_formatter "%a@," (emph red) "(running)";
           eval_aux (i+1) n mu' (E_fun(P_var "_",(ty,Types.new_tyB_unknown()),e')) vs'
-        )
+        );
+        fprintf std_formatter "@]" 
     )) in 
     eval_aux 0 n mu (* (Ast_undecorated.remove_deco*) main vs
 
