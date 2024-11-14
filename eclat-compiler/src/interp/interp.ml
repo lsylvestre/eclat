@@ -76,7 +76,10 @@ let instance ty v e =
   let size_match_val sz1 sz2 = match Types.canon_size sz1,Types.canon_size sz2 with 
     Types.Sz_var {contents=Unknown id},Types.Sz_lit n -> (* Printf.printf "===>%d|%d\n" id n; *) [(id,n)]
     | Sz_lit _ , _ -> [] 
-    | _ -> assert false in
+    | _ -> [] (* could never occur if the type-checker assigned
+                 a default size for non-generalized size variables
+                 (to be improved) *)
+  in
   let rec match_ty ty ty0 =
     match Types.canon_ty ty,Types.canon_ty ty0 with
     | Types.Ty_base (TyB_int sz1), Types.Ty_base (TyB_int sz2) -> size_match_val sz1 sz2
@@ -86,21 +89,21 @@ let instance ty v e =
           match_ty ty1 ty1' @ match_ty (Ty_base tyB2) (Ty_base tyB2')
     | _ -> [] in
   let rec type_of v = 
-     let ty2,_ = Typing.typ_exp ~statics:[] ~externals:([],[]) ~sums:[] ~loc:Prelude.dloc SMap.empty v in
-      ty2
-  (* match v with
-  | E_const(Int(_,sz)) -> Types.Ty_base (TyB_int sz)
-  | E_const(Bool _) -> Types.Ty_base (TyB_bool)
-  | E_const(Unit) -> Types.Ty_base (TyB_unit)
-  | E_tuple(es) -> (Ty_tuple (List.map type_of es))
-  | E_fun(_,(ty,tyr),_) -> Types.Ty_fun(ty,Types.new_dur_unknown(), tyr)
+    match v with
+    | E_const(Inj _ | C_appInj _) -> 
+        Prelude.Errors.raise_error 
+           ~msg:"sum type not supported in evaluation mode" ()
+    | E_const(c) -> Types.Ty_base (Typing.typ_const ~loc:Prelude.dloc SMap.empty c)
+    | E_tuple(es) -> (Ty_tuple (List.map type_of es))
+    | E_fun(_,(ty,tyr),_) -> Types.Ty_fun(ty,Types.new_dur_unknown(), tyr)
+    | E_fix(_,(_,(ty,tyr),_)) -> Types.Ty_fun(ty,Types.new_dur_unknown(), tyr)
   (* let rec match_val ty v =
     match Types.canon_ty ty,v with
     | Types.Ty_base (TyB_int sz1),E_const (Int(_,sz2)) -> size_match_val sz1 sz2
     | Ty_tuple(tys),E_tuple vs -> List.concat (List.map2 match_val tys vs)
     | Ty_base (TyB_tuple(tyBs)),E_tuple vs -> List.concat (List.map2 (fun tyB v -> match_val (Ty_base tyB) v) tyBs vs)
     | Ty_fun(ty1,d,tyB2),E_fun(_,ty1',tyB2'),_) ->
-    | _ -> []*)*)
+    | _ -> []*)
   in
   subst_sz_var (match_ty ty (type_of v)) e
 
@@ -141,7 +144,9 @@ let rec eq_const c1 c2 =
 let unify_sz tz tz' = 
   match Types.canon_size tz, Types.canon_size tz' with
   | Types.Sz_lit n,_ | _,Types.Sz_lit n -> n
-  | _ -> assert false (* todo error *)
+  | _ -> 32 (* could never occur if the type-checker assigned
+               a default size for non-generalized size variables
+               (to be improved) *)
 
 let app_const e e2 r =
   let c = match e with
