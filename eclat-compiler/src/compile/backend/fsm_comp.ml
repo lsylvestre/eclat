@@ -482,6 +482,13 @@ let rec to_s ~statics ~externals ~sums gs e x k =
   | E_par(es) ->
       let id_s = List.map (fun _ -> Ast.gensym ~prefix:"id" ()) es in
       let pi_s = List.map (fun e -> compile @@ Ast.{statics;externals;sums;main=e}) es in
+      if List.for_all (function (_,_,_,([],_)) -> true | _ -> false) pi_s then
+        let xs = List.map (fun (_,res_i,_,_) -> A_var res_i) pi_s in
+        let s_list = List.map2 (fun id_i (rdy_i,res_i,idle_i,(ts_i,s_i)) -> 
+                        S_fsm(id_i,rdy_i,res_i,idle_i,ts_i,s_i)) id_s pi_s
+        in
+        SMap.empty,SMap.empty,seq_ (seq_ (seq_list_ s_list) (set_ x (A_tuple xs))) k
+      else
       let q = Ast.gensym ~prefix:"par" () in
       let ts = SMap.singleton q (
         let s_fin =
