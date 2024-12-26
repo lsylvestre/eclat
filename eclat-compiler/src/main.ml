@@ -161,7 +161,8 @@ let () =
 
     ("-keep-ty", Arg.Set Ast_undecorated.keep_ty_flag,
                 "keep type annotation");
-    
+    ("-nonormalization", Arg.Set Compile.nonormalization,
+                         "[experimental] inline only, assume the source program is already normalized") 
     ]
       add_input "Usage:\n  ./eclat file"
 ;;
