@@ -161,6 +161,8 @@ let () =
 
     ("-keep-ty", Arg.Set Ast_undecorated.keep_ty_flag,
                 "keep type annotation");
+    ("-ram-init", Arg.String (fun s -> Gen_vhdl.has_init_file_ram := s::!Gen_vhdl.has_init_file_ram),
+                 "add initialization file for the given static array");
     ("-nonormalization", Arg.Set Compile.nonormalization,
                          "[experimental] inline only, assume the source program is already normalized") 
     ]

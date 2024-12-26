@@ -9,7 +9,7 @@ let intel_max10_target = Gen_vhdl_aux.intel_max10_target
 let intel_xilinx_target = Gen_vhdl_aux.intel_xilinx_target
 let single_read_write_lock_flag = Gen_vhdl_aux.single_read_write_lock_flag
 
-
+let has_init_file_ram = ref [] ;;
 
 
 (** code generator for statements *)
@@ -216,6 +216,8 @@ let array_decl fmt x sz_elem n default_value_pp =
   if !intel_xilinx_target then ( (* attribute for enforcing RAM inference in Xilinx Vivado *)
     fprintf fmt "attribute ram_style of %a : signal is \"block\";@," pp_ident x;
   );
+
+  if List.mem x !has_init_file_ram then fprintf fmt "attribute ram_init_file of %s : signal is \"%s.mif\";@," x x;
 
   fprintf fmt "signal %a : value(0 to %d) := (others => '0');@," pp_ident ("$"^x^"_value") (sz_elem - 1);
   fprintf fmt "signal %a : natural range 0 to %d := 0;@," pp_ident ("$"^x^"_ptr") (n - 1);
