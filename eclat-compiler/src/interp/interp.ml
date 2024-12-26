@@ -442,7 +442,7 @@ let rec red (e,r) =
       E_array_set (x,e1',e2'),r2
   | E_generate _ 
   | E_for _ -> assert false (* todo *)
-
+  | E_pause e -> E_letIn(P_unit,Ty_base(TyB_unit),E_const(Unit),e),r
 
 
 let eval_prog mu main v =

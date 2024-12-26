@@ -223,6 +223,7 @@ let pp_exp (fmt:fmt) (e:e) : unit =
                           (pp_e ~paren:true) e2
   | E_run(i,e) ->
       fprintf fmt "run %s(%a)" i (pp_e ~paren:false) e
+  | E_pause e -> fprintf fmt "pause %a"  (pp_e ~paren:true) e
   in
   fprintf fmt "@[<v 0>%a@]" (pp_e ~paren:false) e
 

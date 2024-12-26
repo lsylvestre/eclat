@@ -666,6 +666,10 @@ let rec typ_exp ?(collect_sig=false) ~statics ~externals ~sums ?(toplevel=false)
         unify_ty ~loc ty ty2;
         Ty_base tyB,Dur_max(Dur_max(d1,d2),d3)
     | None -> Prelude.Errors.raise_error ~msg:("unbound external circuit "^i) ())
+    | E_pause e1 -> 
+        let ty1,_ = typ_exp ~collect_sig ~statics ~externals ~sums
+                        ~toplevel ~loc:(loc_of e1) g e1 in
+        (ty1, Dur_one)
 
 let typing_handler ?(msg="") f () =
   let open Format in

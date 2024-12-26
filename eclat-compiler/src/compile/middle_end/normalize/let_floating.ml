@@ -113,6 +113,9 @@ let rec lfloat (e:e) : e =
   | E_run(i,e) ->
       let ds,e' = glob e in
       ds,E_run(i,e)
+  | E_pause e -> 
+      let ds,e' = glob e in
+      ds,E_pause e'
   in 
   let ds,e' = glob e in 
   declare ds e'

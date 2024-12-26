@@ -189,6 +189,7 @@ let rec anf (e:e) : e =
   | E_run(i,e) ->
       plug (anf e) @@ fun xc ->
       E_run(i,xc) 
+  | E_pause e -> E_pause (anf e)
   in 
   glob e ;;
 

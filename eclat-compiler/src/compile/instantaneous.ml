@@ -63,7 +63,7 @@ let rec combinational ~externals (e:e) : bool =
 	| E_vector_mapi(is_par,(_,_,e1),e2,_) ->
 	    not(is_par) && combinational ~externals e1 && combinational ~externals e2
   | E_run _ -> false (* sometimes true, sometimes false, depending on the type *)
-
+  | E_pause _ -> false
 
 (* same as combinational, but may contain cas/match, registers or even exec blocks *)
 
@@ -117,4 +117,4 @@ let rec instantaneous ~externals (e:e) : bool =
 	| E_vector_mapi(is_par,(_,_,e1),e2,_) ->
 	    not(is_par) && instantaneous ~externals e1 && instantaneous ~externals e2
   | E_run _ -> false (* sometimes true, sometimes false, depending on the type *)
-
+  | E_pause _ -> false

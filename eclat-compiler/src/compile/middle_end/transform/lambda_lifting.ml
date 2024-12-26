@@ -297,6 +297,9 @@ let globalize_e (e:e) : ((x * _ * e) list * e) =
     | E_run(x,e) ->
       let ds,e' = glob e in
       ds,E_run(x,e')
+    | E_pause e ->
+      let ds,e' = glob e in
+      ds,E_pause e'
   in glob e
 
 

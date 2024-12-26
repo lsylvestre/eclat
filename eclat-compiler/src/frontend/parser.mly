@@ -103,6 +103,7 @@
 %token ARRAY_CREATE ARRAY_MAKE
 %token INIT_TUPLE INIT_INT
 %token VECTOR_MAPI INT_MAPI VECT_CREATE
+%token PAUSE
 /* The precedences must be listed from low to high. */
 
 %right    PIPE_PIPE PIPE_COMMA_PIPE /* parallel construct */
@@ -513,6 +514,7 @@ app_exp:
   e=app_exp_desc { mk_loc (with_file $loc) e }
 
 app_exp_desc:
+| PAUSE e=aexp { mk_loc (with_file $loc) @@ E_pause e }
 | ARRAY_MAKE LT sz=size GT e=aexp { E_array_make(sz, e, with_file $loc) }
 | ARRAY_CREATE LT sz=size GT LPAREN RPAREN
 | CREATE LT sz=size GT LPAREN RPAREN { E_array_create(sz, with_file $loc) }
@@ -671,11 +673,11 @@ aexp_desc:
 
 | MATCH e=exp WITH
     PIPE? cases=match_case_const*
-    IDENT RIGHT_ARROW otherwise=exp END
+    IDENT RIGHT_ARROW otherwise=exp END?
       { E_case(e,cases,otherwise) }
 
 | MATCH e=exp WITH
-    PIPE? rev_cases=match_cases END
+    PIPE? rev_cases=match_cases END?
       { let (hs,eo) = rev_cases in
         E_match(e,List.rev hs,eo) }
 | FOR i=IDENT EQ e1=exp TO e2=exp DO e=exp DONE

@@ -74,7 +74,9 @@
        "run", RUN;
        "impure",IMPURE;
        "vect_create",VECT_CREATE;
-       "make", ARRAY_MAKE
+       "make", ARRAY_MAKE;
+       "pause", PAUSE;
+       (* "vect_of_tuple", VECT_OF_TUPLE*)
      ]
 
 

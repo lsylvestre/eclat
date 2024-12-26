@@ -143,6 +143,7 @@ src/compile/compile.cmo : \
     src/compile/middle_end/rename_main_arg.cmo \
     src/compile/middle_end/middle_end.cmo \
     src/compile/backend/list_machines.cmo \
+    src/compile/middle_end/transform/inline.cmo \
     src/compile/backend/gen_vhdl_moore.cmo \
     src/compile/backend/gen_vhdl.cmo \
     src/compile/backend/target/fsm_typing.cmo \
@@ -159,6 +160,7 @@ src/compile/compile.cmx : \
     src/compile/middle_end/rename_main_arg.cmx \
     src/compile/middle_end/middle_end.cmx \
     src/compile/backend/list_machines.cmx \
+    src/compile/middle_end/transform/inline.cmx \
     src/compile/backend/gen_vhdl_moore.cmx \
     src/compile/backend/gen_vhdl.cmx \
     src/compile/backend/target/fsm_typing.cmx \
@@ -212,6 +214,14 @@ src/compile/middle_end/check_exec_mem.cmx : \
     src/prelude.cmx \
     src/syntax/ast_mapper.cmx \
     src/syntax/ast.cmx
+src/compile/middle_end/check_exec_mem_reset.cmo : \
+    src/prelude.cmo \
+    src/syntax/ast_mapper.cmo \
+    src/syntax/ast.cmo
+src/compile/middle_end/check_exec_mem_reset.cmx : \
+    src/prelude.cmx \
+    src/syntax/ast_mapper.cmx \
+    src/syntax/ast.cmx
 src/compile/middle_end/check_tail_call.cmo : \
     src/prelude.cmo \
     src/syntax/ast_undecorated.cmo \
@@ -242,6 +252,7 @@ src/compile/middle_end/middle_end.cmo : \
     src/compile/middle_end/normalize/fun_assign_name.cmo \
     src/compile/middle_end/transform/expand.cmo \
     src/compile/inspect/display_internal_steps.cmo \
+    src/compile/middle_end/check_exec_mem_reset.cmo \
     src/syntax/ast_rename.cmo \
     src/syntax/ast.cmo \
     src/compile/middle_end/normalize/anf.cmo
@@ -265,6 +276,7 @@ src/compile/middle_end/middle_end.cmx : \
     src/compile/middle_end/normalize/fun_assign_name.cmx \
     src/compile/middle_end/transform/expand.cmx \
     src/compile/inspect/display_internal_steps.cmx \
+    src/compile/middle_end/check_exec_mem_reset.cmx \
     src/syntax/ast_rename.cmx \
     src/syntax/ast.cmx \
     src/compile/middle_end/normalize/anf.cmx

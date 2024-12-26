@@ -121,6 +121,9 @@ let subst_e x ex e =
     | E_run(i,e1) ->
         let e1' = ss (0::id) e1 in
         E_run(i, e1')
+    | E_pause e1 -> 
+        let e1' = ss (0::id) e1 in
+        E_pause e1'
   in
   ss [] e
 

@@ -59,7 +59,7 @@ type e =                      (** expression     [e]                       *)
   | E_array_set of x * e * e  (** static array assignment    [x.(e) <- e] *)
 
   | E_ref of e
-  | E_get of e 
+  | E_get of e
   | E_set of e * e
 
   | E_vector of e list
@@ -67,8 +67,8 @@ type e =                      (** expression     [e]                       *)
 
   | E_generate of (p * (ty * tyB) * e) * e * e_static * deco
   | E_for of x * e_static * e_static * e * deco
-
-  | E_run of x * e (* call external code *)
+  | E_run of x * e       (* [f e] call external function [f] with argument [e] *)
+  | E_pause of e         (* [pause e] starts [e] after one cycle *)
 
 and e_static = e
 

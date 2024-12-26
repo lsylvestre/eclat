@@ -97,6 +97,7 @@ let fv ?(get_arrays=true) ?(xs=SMap.empty) e =
       let xs' = xs++ys in
       aux xs' e1 ++ aux xs e2
   | E_run(_x,e) -> aux xs e (* what about _x ? *)
+  | E_pause e -> aux xs e
   in
   aux xs e
 
@@ -190,6 +191,7 @@ let fv_arrays ?(xs=SMap.empty) e =
       aux xs' e1 ++ aux xs e2
   | E_run(_x,e1) -> (* what about _x ? *)
       aux xs e1
+  | E_pause e -> aux xs e
   in
   aux xs e
 

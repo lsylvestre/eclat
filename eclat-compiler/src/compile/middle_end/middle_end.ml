@@ -86,6 +86,7 @@ let compile ?globalize
   (** compile pattern matching *)
 
   (* Check_exec_mem.check_pi pi; *)
+  Check_exec_mem_reset.check_pi pi;
 
   let pi = Insert_bound_checking.insert_pi pi in
 

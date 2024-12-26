@@ -45,6 +45,7 @@ type token =
   | PIPE_PIPE
   | PIPE_COMMA_PIPE
   | PIPE
+  | PAUSE
   | PARFOR
   | OR
   | OPERATOR_IDENT of (string)

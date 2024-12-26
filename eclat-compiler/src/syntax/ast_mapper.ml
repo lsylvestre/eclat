@@ -88,8 +88,9 @@ let rec map f e =
       E_for(x,f e_st1,f e_st2,f e,loc)
   | E_generate((p, ty, e1), e2, e_st1, loc) ->
       E_generate((p, ty, f e1), f e2, f e_st1, loc)
-(** traversal order of sub-expressions is unspecified *)
+  | E_pause e1 -> E_pause (f e1)
 
+(** traversal order of sub-expressions is unspecified *)
 let rec iter f (e:e) : unit =
   match e with
   | E_deco (e,_) ->
@@ -143,9 +144,13 @@ let rec iter f (e:e) : unit =
       f e1; f e2
   | E_run(_,e1) ->
       f e1
+  | E_pause e1 -> f e1
 
 let declare ds ts e =
   List.fold_right2 (fun (x,v) t e -> E_letIn(P_var x,t,v,e)) ds ts e
+
+let declare' ds e =
+  List.fold_right (fun (x,(t,v)) e -> E_letIn(P_var x,t,v,e)) ds e
 
 let accum f (e:e) =   (* : ((x * ty * e) list * e)*)
   let rec aux e =
@@ -262,10 +267,12 @@ let accum f (e:e) =   (* : ((x * ty * e) list * e)*)
             let ds1,e1' = aux e1 in
             let ds2,e2' = aux e2 in
             ds1@ds2,E_vector_mapi(is_par,(p,typ,e1'),e2',ty)
-
         | E_run(x,e1) ->
             let ds1,e1' = aux e1 in
             ds1,E_run(x,e1')
+        | E_pause e1 -> 
+            let ds1,e1' = aux e1 in
+            [],E_pause (declare' ds1 e1')
   ) 
   in 
   aux e

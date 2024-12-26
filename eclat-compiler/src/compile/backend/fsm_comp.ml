@@ -593,7 +593,12 @@ let rec to_s ~statics ~externals ~sums gs e x k =
         | None -> assert false (* ill-typed *)
       end
  
-
+  | E_pause e1 -> 
+      let q = Ast.gensym ~prefix:"pause" () in
+      let w1,ts1,s1 = to_s ~statics ~externals ~sums gs e1 x (S_continue q) in
+      (w1, SMap.add q k ts1, s1)
+  
+ 
 
   | e -> Ast_pprint.pp_exp Format.std_formatter e; assert false (* todo *)
 
