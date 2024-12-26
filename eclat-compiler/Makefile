@@ -50,6 +50,7 @@ OBJS= $(SRC_DIR)/prelude.cmx \
       $(SRC_DIR)/syntax/ast_mk.cmx \
       $(SRC_DIR)/compile/middle_end/check_tail_call.cmx \
       $(SRC_DIR)/compile/middle_end/check_exec_mem.cmx \
+      $(SRC_DIR)/compile/middle_end/check_exec_mem_reset.cmx \
       $(SRC_DIR)/compile/middle_end/normalize/fun_assign_name.cmx \
       \
       $(SRC_DIR)/compile/middle_end/normalize/propagation.cmx \
@@ -91,6 +92,9 @@ OBJS= $(SRC_DIR)/prelude.cmx \
       $(SRC_DIR)/compile/backend/gen_vhdl_aux.cmx \
       $(SRC_DIR)/compile/backend/gen_vhdl.cmx \
       $(SRC_DIR)/compile/backend/gen_vhdl_moore.cmx \
+      \
+      \
+      $(SRC_DIR)/compile/backend/gen_ocaml.cmx \
       \
       $(SRC_DIR)/compile/compile.cmx \
       $(SRC_DIR)/compile/gen_testbench/gen_testbench.cmx\
@@ -156,5 +160,3 @@ TESTS=find $(TEST_PATH) -name *.ecl
 test:
 	@$(foreach t,$(shell $(TESTS)), echo "============================\n== $(t)"; \
               $(shell head -n 2 ${t}  | tail -n 1) ;)
-
-

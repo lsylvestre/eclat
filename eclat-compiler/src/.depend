@@ -48,6 +48,8 @@ src/compile/backend/fsm_comp_ok.cmx : \
     src/syntax/ast_subst.cmx \
     src/syntax/ast_pprint.cmx \
     src/syntax/ast.cmx
+src/compile/backend/gen_ocaml.cmo :
+src/compile/backend/gen_ocaml.cmx :
 src/compile/backend/gen_vhdl.cmo : \
     src/prelude.cmo \
     src/operators.cmo \
