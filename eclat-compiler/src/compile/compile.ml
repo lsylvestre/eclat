@@ -5,6 +5,10 @@ let globalize_flag = ref true
 
 let nonormalization = ref false
 
+let target = ref "../target"
+
+let ocaml_output_flag = ref false
+
 module D = Display_internal_steps
 
 let print_elaborated_code_flag = ref true
@@ -15,7 +19,7 @@ let compile ?(vhdl_comment="") ?(prop_fsm=true) arg_list name ty fmt pi =
   let pi = if !nonormalization then Inline.inl_pi pi 
            else Middle_end.compile ~globalize:!globalize_flag arg_list ty pi 
   in
-  
+
   D.display_pi D.MiddleEnd pi;
 
   let pi = Rename_main_arg.rename_main_arg_pi pi in
@@ -61,4 +65,18 @@ let compile ?(vhdl_comment="") ?(prop_fsm=true) arg_list name ty fmt pi =
                                 ~argument ~result ~idle ~rdy ~statics 
                                 typing_env (let infos = SMap.empty in infos) fsm
   in
+
+  if !ocaml_output_flag then (
+    let oc_c = open_out (!target^"/ml/"^name^"_step.ml") in
+    let fmt_c = Format.formatter_of_out_channel oc_c in
+    let arg_list_comp = List.map (to_a ~externals:pi.externals ~sums:pi.sums) arg_list in
+    Gen_ocaml.pp_component fmt_c ~vhdl_comment ~name ~externals:pi.externals ~state_var
+                                  ~argument ~result ~idle ~rdy ~statics 
+                                  typing_env (let infos = SMap.empty in infos) fsm arg_list_comp;
+    close_out oc_c;
+      Format.fprintf Format.std_formatter
+      "ocaml code generated in %s/ml/%s_step.ml"
+        !target name;
+  );
+
   (argument,result,typing_env)

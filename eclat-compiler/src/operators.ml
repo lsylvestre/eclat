@@ -153,9 +153,9 @@ let gen_op fmt (op:op) pp a : unit =
   | Resize_int _ ->
       assert false (* special case *)  
   | Tuple_of_int _ ->
-      pp fmt a
+      pp fmt a (* should add a primitive call (identity ?) *)
   | Int_of_tuple _ ->
-      pp fmt a
+      pp fmt a (* should add a primitive call (identity ?) *)
   | GetBit -> 
       funcall fmt "eclat_getBit"
   | UpdateBit -> 

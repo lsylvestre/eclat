@@ -48,8 +48,20 @@ src/compile/backend/fsm_comp_ok.cmx : \
     src/syntax/ast_subst.cmx \
     src/syntax/ast_pprint.cmx \
     src/syntax/ast.cmx
-src/compile/backend/gen_ocaml.cmo :
-src/compile/backend/gen_ocaml.cmx :
+src/compile/backend/gen_ocaml.cmo : \
+    src/prelude.cmo \
+    src/operators.cmo \
+    src/compile/backend/list_machines.cmo \
+    src/compile/backend/target/fsm_typing.cmo \
+    src/compile/backend/target/fsm_syntax.cmo \
+    src/syntax/ast.cmo
+src/compile/backend/gen_ocaml.cmx : \
+    src/prelude.cmx \
+    src/operators.cmx \
+    src/compile/backend/list_machines.cmx \
+    src/compile/backend/target/fsm_typing.cmx \
+    src/compile/backend/target/fsm_syntax.cmx \
+    src/syntax/ast.cmx
 src/compile/backend/gen_vhdl.cmo : \
     src/prelude.cmo \
     src/operators.cmo \
@@ -148,6 +160,7 @@ src/compile/compile.cmo : \
     src/compile/middle_end/transform/inline.cmo \
     src/compile/backend/gen_vhdl_moore.cmo \
     src/compile/backend/gen_vhdl.cmo \
+    src/compile/backend/gen_ocaml.cmo \
     src/compile/backend/target/fsm_typing.cmo \
     src/compile/backend/target/fsm_syntax.cmo \
     src/compile/backend/fsm_comp.cmo \
@@ -165,6 +178,7 @@ src/compile/compile.cmx : \
     src/compile/middle_end/transform/inline.cmx \
     src/compile/backend/gen_vhdl_moore.cmx \
     src/compile/backend/gen_vhdl.cmx \
+    src/compile/backend/gen_ocaml.cmx \
     src/compile/backend/target/fsm_typing.cmx \
     src/compile/backend/target/fsm_syntax.cmx \
     src/compile/backend/fsm_comp.cmx \

@@ -6,8 +6,6 @@
 (* input files *)
 let inputs : string list ref = ref ["stdlib.ecl"]
 
-let target = ref "../target"
-
 (* option configuration *)
 
 let show_ty_and_exit_flag = ref false
@@ -44,6 +42,7 @@ let top_wrapper_yosys_ecp5 =
   "i:1|o:1"
 
 let nb_iterations_interp = ref 10 ;;
+
 
 (* main configuration *)
 let () =
@@ -164,7 +163,9 @@ let () =
     ("-ram-init", Arg.String (fun s -> Gen_vhdl.has_init_file_ram := s::!Gen_vhdl.has_init_file_ram),
                  "add initialization file for the given static array");
     ("-nonormalization", Arg.Set Compile.nonormalization,
-                         "[experimental] inline only, assume the source program is already normalized") 
+                         "[experimental] inline only, assume the source program is already normalized");
+    ("-ocaml", Arg.Set Compile.ocaml_output_flag,
+               "Translate the generated circuit into sequential ocaml code for testing");
     ]
       add_input "Usage:\n  ./eclat file"
 ;;
@@ -225,9 +226,9 @@ let main () : unit =
   (** standard compilation mode *)
 
   let name = !Ast_mk.main_symbol in
-  let vhdl_name = !target^"/"^name^".vhdl" in
+  let vhdl_name = !Compile.target^"/"^name^".vhdl" in
   let oc_vhdl = open_out vhdl_name in
-  let oc_tb = open_out (!target^"/tb_"^name^".vhdl") in
+  let oc_tb = open_out (!Compile.target^"/tb_"^name^".vhdl") in
   let fmt_vhdl = Format.formatter_of_out_channel oc_vhdl in
   let fmt_tb = Format.formatter_of_out_channel oc_tb in
   let (argument,result,typing_env) = Compile.compile ~vhdl_comment ~prop_fsm:!prop_fsm_flag arg_list name ty fmt_vhdl pi in
@@ -237,7 +238,9 @@ let main () : unit =
 
   Format.fprintf Format.std_formatter
       "\nvhdl code generated in %s/%s.vhdl\
-      \ \ntestbench generated in %s/tb_%s.vhdl for software RTL simulation using GHDL.\n" !target name !target name;
+      \ \ntestbench generated in %s/tb_%s.vhdl for software RTL simulation using GHDL.\n" 
+        !Compile.target name 
+        !Compile.target name;
 
   close_out oc_vhdl;
   close_out oc_tb ;
@@ -249,7 +252,7 @@ let main () : unit =
                         ~argument
                         ~result
                         ~clock:!clock_top
-                        ~dst:(!target^"/top.vhdl") !top_wrapper
+                        ~dst:(!Compile.target^"/top.vhdl") !top_wrapper
 )
 
 ;;

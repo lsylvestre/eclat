@@ -93,7 +93,6 @@ OBJS= $(SRC_DIR)/prelude.cmx \
       $(SRC_DIR)/compile/backend/gen_vhdl.cmx \
       $(SRC_DIR)/compile/backend/gen_vhdl_moore.cmx \
       \
-      \
       $(SRC_DIR)/compile/backend/gen_ocaml.cmx \
       \
       $(SRC_DIR)/compile/compile.cmx \
