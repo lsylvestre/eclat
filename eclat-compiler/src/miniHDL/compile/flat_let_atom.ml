@@ -1,4 +1,10 @@
-open Fsm_syntax
+open MiniHDL_syntax
+
+(** translate A_letIn to S_letIn,
+    eg., [x := let y = 5 in y + 1] becomes
+         [let y = 5 in
+          x := y + 1] 
+*)
 
 let rec flat = function
 | A_letIn(x,a1,a2) ->
@@ -13,10 +19,9 @@ let rec flat = function
    let bs,a' = flat a in
    bs,A_call(op,a')
 | A_string_get _
-| A_buffer_get _
 | A_ptr_taken _
-| A_ptr_write_taken _
-| A_buffer_length _
+| A_array_get _
+| A_array_length _
 | A_encode _
 | A_decode _ as a ->  (* no sub-atoms*)
     [],a
@@ -53,6 +58,9 @@ let rec flat_s s =
       s_let_bindings bs2 @@
       S_write_start(x,a',a_upd')
   | S_write_stop _ -> s
+  | S_array_set(x,y,a) ->
+      let bs,a' = flat a in
+      s_let_bindings bs @@ S_array_set(x,y,a')
   | S_seq(s1,s2) -> S_seq(flat_s s1,flat_s s2)
   | S_letIn(x,a,s) ->
       let bs,a' = flat a in

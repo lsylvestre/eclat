@@ -1,4 +1,4 @@
-open Fsm_syntax
+open MiniHDL_syntax
 
 let clean_fsm ~rdy ~result (ts,s) typing_env =
   let vs_read = Hashtbl.create 200 in
@@ -8,23 +8,25 @@ let clean_fsm ~rdy ~result (ts,s) typing_env =
   | A_var x -> Hashtbl.add vs_read x ()
   | A_tuple aa -> List.iter collect_read_a aa
   | A_letIn(x,a1,a2) ->
-    Hashtbl.add vs_read x ();
-    collect_read_a a1;
-    collect_read_a a2
+      Hashtbl.add vs_read x ();
+      collect_read_a a1;
+      collect_read_a a2
   | (A_const _) -> ()
   | A_call(_,a) ->
      collect_read_a a
   | A_string_get(x,y) ->
      Hashtbl.add vs_read x ();
      Hashtbl.add vs_read y ()
-  | A_buffer_get(x)
+  | A_array_get(x,y) ->
+     Hashtbl.add vs_read x ();
+     Hashtbl.add vs_read y ()
   | A_ptr_taken(x)
-  | A_ptr_write_taken(x)
-  | A_buffer_length(x,_)
+  | A_array_length(x,_)
   | A_encode(x,_,_)
   | A_decode(x,_) ->
       Hashtbl.add vs_read x ()
-  | A_vector aa -> List.iter collect_read_a aa
+  | A_vector aa ->
+      List.iter collect_read_a aa
   in
 
   let rec collect_s = function
@@ -50,6 +52,10 @@ let clean_fsm ~rdy ~result (ts,s) typing_env =
       collect_read_a a;
       collect_read_a a_upd
   | S_write_stop _ -> () 
+  | S_array_set(x,y,a) ->
+      Hashtbl.add vs_read x ();
+      Hashtbl.add vs_read y ();
+      collect_read_a a
   | S_seq(s1,s2) -> collect_s s1; collect_s s2
   | S_letIn(x,a,s) ->
       collect_read_a a;
@@ -84,13 +90,16 @@ let clean_fsm ~rdy ~result (ts,s) typing_env =
   | S_case(x,hs,so) ->
       S_case(x, List.map (fun (c,s) -> c, clean s) hs,Option.map clean so)
   | S_set(x,_) -> (* caution with impure VHDL functions for simulation *)
-     if not (Hashtbl.mem vs_read x) then (Hashtbl.add vs_assigned_but_never_read x (); S_skip) else s
+     if not (Hashtbl.mem vs_read x) 
+     then (Hashtbl.add vs_assigned_but_never_read x (); S_skip) 
+     else s
   | S_acquire_lock _ 
   | S_release_lock _
   | S_write_start _
   | S_write_stop _
   | S_read_start _
-  | S_read_stop _ -> s
+  | S_read_stop _ 
+  | S_array_set _ -> s
   | S_seq(s1,s2) -> S_seq(clean s1,clean s2)
   | S_letIn(x,a,s) ->
       S_letIn(x,a,clean s)

@@ -17,4 +17,4 @@ let display a fsm =
   if a <> !print_mode then () else
   let open Format in
   fprintf std_formatter "@[<v>{debug mode}===========@,@.%a@]"
-    Fsm_syntax.Debug.pp_fsm fsm
+    MiniHDL_syntax.Debug.pp_fsm fsm

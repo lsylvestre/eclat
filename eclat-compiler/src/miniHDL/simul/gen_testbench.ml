@@ -11,10 +11,10 @@ let gen_testbench fmt ?(vhdl_comment="") ~externals typing_env name ty ((argumen
   let typing_env_tb = Hashtbl.create 10 in
   let tmp = Ast.gensym () in
   let ss_args = List.map (fun arg_for_simul ->
-      let s_arg = Flat_let_atom.flat_s (Fsm_syntax.set_ tmp arg_for_simul) in
-      Fsm_typing.typing_error_handler @@ (fun () ->
-        Option.iter (fun t -> Fsm_typing.add_typing_env typing_env_tb tmp t) ta;
-        Fsm_typing.typing_s ~externals ~result:tmp typing_env_tb s_arg;
+      let s_arg = Flat_let_atom.flat_s (MiniHDL_syntax.set_ tmp arg_for_simul) in
+      MiniHDL_typing.typing_error_handler @@ (fun () ->
+        Option.iter (fun t -> MiniHDL_typing.add_typing_env typing_env_tb tmp t) ta;
+        MiniHDL_typing.typing_s ~externals ~result:tmp typing_env_tb s_arg;
         s_arg)) args_for_simul in
 
   fprintf fmt "@[<v>%s@]" vhdl_comment;

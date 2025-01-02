@@ -1,4 +1,6 @@
-open Fsm_syntax
+open MiniHDL_syntax
+
+(** collect the names of external functions called within a MiniHDL program *)
 
 module IMap = Map.Make(Int)
 
@@ -23,7 +25,8 @@ let rec count_s s =
   | S_acquire_lock _ | S_release_lock _ 
   | S_read_stop _
   | S_write_start _
-  | S_write_stop _ -> ()
+  | S_write_stop _
+  | S_array_set _ -> ()
   | S_seq(s1,s2) -> count_s s1; count_s s2
   | S_letIn(_,_,s) ->
       count_s s

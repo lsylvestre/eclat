@@ -1,7 +1,7 @@
 (** generate a top module for synthesis
-    of the program as a whole architecture
+    of a given MiniHDL/Eclat program as a whole architecture
 
-    I/Os of this module top have to be given as a string
+    I/Os of this top module have to be passed as a string
     with the following format :
 
     ios := "<inputs>|<outputs>"
@@ -9,7 +9,7 @@
     io := <name>:<size>
 
     For instance, string "a:1,b:2|o:8,c:1"
-    corresonds to the VHDL interface :
+    corresonds to the following VHDL interface :
 
       entity top is
         port (signal clk : in  std_logic;
@@ -21,7 +21,7 @@
       end entity;
 
     The name of the global clock ([clk] in the example above)
-    can be customized.
+    can also be customized.
 
 *)
 
@@ -67,12 +67,15 @@ let parse (s:string) : (((string * int) list) * ((string * int) list) * ((string
 
 
 
-
 let pp_type name fmt size =
-  if size = 1 then fprintf fmt "std_logic" (* by convention, I/Os of size one are std_logic *)
+  if size = 1 then 
+    (** by convention, I/Os of size one are std_logic 
+       (rather than std_logic_vector(1 to 1)) *)
+    fprintf fmt "std_logic" 
   else if name = "GSENSOR_INT" then fprintf fmt "std_logic_vector(2 downto 1)"  (* TODO: avoid this case (platform dependent) *)
   else fprintf fmt "std_logic_vector(0 to %d)" (size - 1)
 
+(** [list_take_n l n] keeps the n first elements of list l *)
 let list_take_n l n =
   let rec loop l n acc =
     match l, n with
@@ -80,8 +83,12 @@ let list_take_n l n =
     | v :: ll, n -> loop ll (n-1) (v::acc)
   in loop l n []
 
+(** generate a module named [?top], starting with a comment [~vhdl_comment],
+    with logical input [~argument] and logical output [~result] connected to
+    physical [input/output/inout] and clock name [?clock] *)
 let pp_top ?(top="top") ~vhdl_comment ~argument:(_,ta) ~result:(_,tr) ?(clock="clk") fmt (inputs,outputs,inouts) =
 
+  (* each [input/output/inout] is a pair [(name,size)] where size is a number of bit *)
   let size_list xs =
     List.fold_left (+) 0 @@ List.map snd xs in
 
@@ -91,14 +98,14 @@ let pp_top ?(top="top") ~vhdl_comment ~argument:(_,ta) ~result:(_,tr) ?(clock="c
 
   if match ta with
      | None -> false
-     | Some t -> argument_size <> Fsm_typing.size_ty t
+     | Some t -> argument_size <> MiniHDL_typing.size_ty t
   then
     Prelude.Errors.error (fun fmt ->
         fprintf fmt "bad format for top module I/Os -- expect an argument of size %d" argument_size);
 
   if match tr with
      | None -> false
-     | Some t -> result_size <> Fsm_typing.size_ty t
+     | Some t -> result_size <> MiniHDL_typing.size_ty t
   then
     Prelude.Errors.error (fun fmt ->
         fprintf fmt "bad format for top module I/Os -- expect a result of size %d" result_size);
@@ -127,9 +134,7 @@ architecture rtl of %s is
 
     component main is
         port (signal clk : in std_logic;
-             -- signal run : in std_logic;
               signal reset : in std_logic;
-             -- signal rdy : out value(0 to 0);
               signal argument : in value(0 to %d);
               signal result : out value(0 to %d)
         );

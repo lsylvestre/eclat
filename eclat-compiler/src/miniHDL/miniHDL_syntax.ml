@@ -6,7 +6,7 @@ and ty = TInt of ty | TBool | TUnit
        | TVar of tvar ref
        | TString of ty
        | TStatic of {elem:ty ; size: ty}
-       | TVector of {elem:size ; size: ty}
+       | TVector of {elem:ty ; size: ty}
        | TVect of int
        | TAbstract of x * size list * ty list
        | TSize of int
@@ -45,9 +45,8 @@ type a = A_letIn of x * a * a
   | A_call of op * a
   | A_string_get of x * x
   | A_ptr_taken of x
-  | A_ptr_write_taken of x
-  | A_buffer_get of x
-  | A_buffer_length of x * ty (* [ty] is the size of the resulting integer *)
+  | A_array_get of x * x
+  | A_array_length of x * ty (* [ty] is the size of the resulting integer *)
   | A_decode of x * ty
   | A_encode of x * ty * int
 
@@ -68,6 +67,7 @@ type s = (* all instructions terminates in one clock cycle *)
   | S_read_stop of x * l
   | S_write_start of x * a * a
   | S_write_stop of x
+  | S_array_set of x * x * a
   | S_seq of s * s
   | S_letIn of x * a * s
   | S_fsm of id * x * x * q * t list * s (* id * rdy * result * compute * transition * start instruction *)
@@ -150,9 +150,8 @@ let pp_vector = Ast_pprint.pp_vector
       pp_vector fmt pp_a aas
   | A_string_get(sx,ix) -> fprintf fmt "%s[%s]" sx ix
   | A_ptr_taken(x) -> fprintf fmt "ptr_taken<%s>" x
-  | A_ptr_write_taken(x) -> fprintf fmt "ptr_write_taken<%s>" x
-  | A_buffer_get(x) -> fprintf fmt "static_get_value(%s)" x
-  | A_buffer_length(x,_) -> fprintf fmt "%s.length" x
+  | A_array_get(x,y) -> fprintf fmt "array_get(%s,%s)" x y
+  | A_array_length(x,_) -> fprintf fmt "array_length(%s)" x
   | A_decode(x,_) -> fprintf fmt "decode(%s)" x
   | A_encode(x,_,n) -> fprintf fmt "encode(%s,%d)" x n
 
@@ -183,6 +182,8 @@ let pp_vector = Ast_pprint.pp_vector
       fprintf fmt "@[<v>%s <- read_stop<%s>();@]" x l
   | S_write_start(x,idx,a) ->
       fprintf fmt "@[<v>write_start<%s>[%a] <- %a;@]" x pp_a idx pp_a a
+  | S_array_set(x,y,a) ->
+      fprintf fmt "array_set(%s,%s,%a)" x y pp_a a
   | S_write_stop(x) ->
       fprintf fmt "@[<v>write_stop<%s>_end;@]" x
   | S_seq(s1,s2) ->
@@ -194,9 +195,9 @@ let pp_vector = Ast_pprint.pp_vector
   | S_in_fsm(id,s) ->
       fprintf fmt "@[<v>%a in fsm %s@]" pp_s s id
   | S_call(op,a) ->
-     fprintf fmt "@[%a(%a)@]" Operators.pp_op op pp_a a
+      fprintf fmt "@[%a(%a)@]" Operators.pp_op op pp_a a
   | S_external_run(f,i,res,rdy,a) ->
-    fprintf fmt "@[(%s,%s) := run_%d %s %a;@]" res rdy i f pp_a a
+      fprintf fmt "@[(%s,%s) := run_%d %s %a;@]" res rdy i f pp_a a
   and pp_fsm fmt (ts,s) =
     let pp_t fmt (x,s) = fprintf fmt "@[%s = %a@]@," x pp_s s in
     fprintf fmt "@[<v>let rec ";

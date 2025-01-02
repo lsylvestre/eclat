@@ -1,4 +1,4 @@
-open Fsm_syntax
+open MiniHDL_syntax
 
 let verbose_mode = ref false
 
@@ -39,15 +39,14 @@ let rec prop env a =
      A_call(op,prop env a1)
   | A_ptr_taken l -> 
       prop_ident_a env l (fun l' -> A_ptr_taken l')
-  | A_ptr_write_taken l ->
-      prop_ident_a env l (fun l' -> A_ptr_write_taken l')
   | A_string_get(x1,x2) ->
       prop_ident_a env x1 @@ fun x1' ->
       prop_ident_a env x2 @@ fun x2' -> A_string_get(x1',x2')
-  | A_buffer_get x1 ->
-      prop_ident_a env x1 (fun x1' -> A_buffer_get x1')
-  | A_buffer_length(x1,ty) -> 
-      prop_ident_a env x1 (fun x1' -> A_buffer_length(x1',ty))
+  | A_array_get (x1,y1) ->
+      prop_ident_a env x1 @@ fun x1' -> 
+      prop_ident_a env y1 @@ fun y1' -> A_array_get (x1',y1')
+  | A_array_length(x1,ty) -> 
+      prop_ident_a env x1 (fun x1' -> A_array_length(x1',ty))
   | A_encode(x,ty,n) ->
       prop_ident_a env x (fun y -> A_encode(y,ty,n))
   | A_decode(x,ty) -> 
@@ -78,6 +77,10 @@ let rec prop_s env s =
   | S_read_start(l,a1) ->
      let a1' = prop env a1 in
      S_read_start(l,a1')
+  | S_array_set(l,x1,a2) ->
+     prop_ident_s env x1 @@ fun x1' ->
+     let a2' = prop env a2 in
+     S_array_set(l,x1',a2')
   | S_seq(s1,s2) -> S_seq(prop_s env s1,prop_s env s2)
   | S_letIn(x,a1,s1) ->
       let a1' = prop env a1 in

@@ -1,7 +1,6 @@
-(** A type-system, an interpreter and a hardware compiler
-   for a small language mixing general-purpose computation
-   and instantaneous interaction
- *)
+(** A type-system and a hardware compiler for Eclat,
+   a synchronous language mixing general-purpose computation
+   and instantaneous interaction *)
 
 (* input files *)
 let inputs : string list ref = ref ["stdlib.ecl"]
@@ -60,7 +59,7 @@ let () =
                  "force litteral integers to be of the given size");
     ("-mono",    Arg.Set Typing.monomorphic,
                  "monomorphic type system");
-    ("-no-glob",    Arg.Clear Compile.globalize_flag,
+    ("-no-glob", Arg.Clear Compile.globalize_flag,
                  "no globalization during lambda lifting");
     ("-interp",   Arg.Set interp_flag,
                  "interpret and exit (note: experimental, may be buggy).");
@@ -90,7 +89,7 @@ let () =
                  "constant/copy progragation on the generated code");
 
     ("-hexa",    Arg.Set Ast_pprint.hexa_int_pp_flag,
-                 "printer using hexadecimal");
+                 "hexadecimal display when printing (-pp)");
 
     ("-relax",   Arg.Set Typing.relax_flag,
                  "allow the main function to be non-instantaneous (such program is no longer reactive!)");
@@ -155,12 +154,15 @@ let () =
 
     ("-nb-it", Arg.Set_int nb_iterations_interp,
                "Number of reactions for interpretation");
-   ("-moore", Arg.Clear Flag_mealy.mealy_flag,
-               "force the generated circuit to be a Moore Finite State Machine (default: Mealy)");
+    ("-moore", Arg.Clear Flag_mealy.mealy_flag,
+               "[experimental] force the generated circuit to be a Moore Finite State Machine\
+                \ (default: Mealy) -- warning: this cause additionnal latencies for RAM memory accesses\
+                \ and external function calls");
 
     ("-keep-ty", Arg.Set Ast_undecorated.keep_ty_flag,
                 "keep type annotation");
-    ("-ram-init", Arg.String (fun s -> Gen_vhdl.has_init_file_ram := s::!Gen_vhdl.has_init_file_ram),
+    ("-ram-init", Arg.String (fun s -> 
+                     Gen_vhdl_aux.has_init_file_ram := s::!Gen_vhdl_aux.has_init_file_ram),
                  "add initialization file for the given static array");
     ("-nonormalization", Arg.Set Compile.nonormalization,
                          "[experimental] inline only, assume the source program is already normalized");
@@ -232,7 +234,7 @@ let main () : unit =
   let fmt_vhdl = Format.formatter_of_out_channel oc_vhdl in
   let fmt_tb = Format.formatter_of_out_channel oc_tb in
   let (argument,result,typing_env) = Compile.compile ~vhdl_comment ~prop_fsm:!prop_fsm_flag arg_list name ty fmt_vhdl pi in
-  let args = List.map (Fsm_comp.to_a ~externals:pi.externals ~sums:pi.sums) arg_list in
+  let args = List.map (Gen_miniHDL.to_a ~externals:pi.externals ~sums:pi.sums) arg_list in
 
   Gen_testbench.gen_testbench fmt_tb ~vhdl_comment ~externals:pi.externals typing_env name ty (argument,result) args;
 
@@ -245,7 +247,6 @@ let main () : unit =
   close_out oc_vhdl;
   close_out oc_tb ;
 
-
   if !top_wrapper <> "" then (
     Gen_top.gen_wrapper ~name
                         ~vhdl_comment
@@ -253,11 +254,11 @@ let main () : unit =
                         ~result
                         ~clock:!clock_top
                         ~dst:(!Compile.target^"/top.vhdl") !top_wrapper
-)
-
+  )
 ;;
 
-(* enty point of the tool *)
+(* entry point *)
 
 let () =
-  try main () with Prelude.Errors.Caml_error -> exit 1;;
+  try main () with 
+  | Prelude.Errors.Caml_error -> exit 1 ;;

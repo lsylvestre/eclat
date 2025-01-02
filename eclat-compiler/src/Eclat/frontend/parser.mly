@@ -193,9 +193,9 @@ static: /* todo: add loc and type annotation [tyopt] */
 
 static_dim_exp: HAT e=aexp { e }
 
-const_init_static:
+/*const_init_static:
 | ce=aexp { (ce,None) }
-| LPAREN ce=exp COL ty=ty RPAREN { (ce,Some ty) }
+| LPAREN ce=exp COL ty=ty RPAREN { (ce,Some ty) }*/
 
 exp_eof:
 | e=exp EOF {e}

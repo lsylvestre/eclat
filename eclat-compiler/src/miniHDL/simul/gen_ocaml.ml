@@ -8,7 +8,7 @@
   (no modularity, no function definitions). 
 
 *)
-open Fsm_syntax
+open MiniHDL_syntax
 open Format
 
 module SMap = Ast.SMap
@@ -48,7 +48,7 @@ let pp_vector fmt pp vs =
 
 let size_ty t =
   (* we must canonize [t] to prevent it from being considered as a type variable *)
-  Fsm_typing.(size_ty (canon t))
+  MiniHDL_typing.(size_ty (canon t))
 
 
 (** code generator for constants *)
@@ -75,7 +75,7 @@ let rec pp_call externals typing_env res fmt (op,a) =
   (match res with None -> () | Some x -> fprintf fmt "%a := " pp_ident x);
   match op with
   | GetTuple(i,_,ty) ->
-      let ts = match Fsm_typing.canon ty with TTuple ts -> ts | _ -> assert false in
+      let ts = match MiniHDL_typing.canon ty with TTuple ts -> ts | _ -> assert false in
       (match a with
       | A_tuple aa -> (pp_a typing_env externals) fmt (List.nth aa i)
       | _ -> let z = gensym () in
@@ -109,13 +109,13 @@ let rec pp_call externals typing_env res fmt (op,a) =
          fmt ns;
      fprintf fmt "))"
   | Runtime(Size_of_val(ty,size_int)) -> 
-     let n = size_ty (Fsm_typing.translate_ty ty) in
-     pp_c fmt (Int{value=n;tsize=Fsm_typing.translate_size size_int})
+     let n = size_ty (MiniHDL_typing.translate_ty ty) in
+     pp_c fmt (Int{value=n;tsize=MiniHDL_typing.translate_size size_int})
   | Runtime(Resize_int sz) ->
-      let n = size_ty @@ Fsm_typing.translate_size sz in
+      let n = size_ty @@ MiniHDL_typing.translate_size sz in
       fprintf fmt "Int.resize_(%a,%d)" (pp_a typing_env externals) a n
   | Runtime(Vector_create sz) ->
-      let n = size_ty @@ Fsm_typing.translate_size sz in
+      let n = size_ty @@ MiniHDL_typing.translate_size sz in
       fprintf fmt "Vector.make_ (%d,%a)" n (pp_a typing_env externals) a
   | Runtime(External_fun (x,ty)) ->
       (** no normalization of ident [x], 
@@ -162,12 +162,11 @@ and pp_a typing_env externals fmt = function
 | A_vector aas -> pp_vector fmt (pp_a typing_env externals) aas
 | A_string_get(s,i) ->
     fprintf fmt "%a.(%a)" pp_ident s pp_ident i
-| A_buffer_get(xb) ->
-    pp_ident fmt ("$"^xb^"_value") (** A_buffer_get : deacode to be removed *)
-| A_ptr_taken(x)
-| A_ptr_write_taken(x) ->
+| A_array_get(x,y) ->
+    fprintf fmt "%a.(%a)" pp_ident x pp_ident y
+| A_ptr_taken(x) ->
     fprintf fmt "Lock.is_taken(%a)" pp_ident (ptr_taken x)
-| A_buffer_length(x,tz) ->
+| A_array_length(x,_) ->
     fprintf fmt "Int64.of_int (Array.length %a)" pp_ident x
 | A_encode(y,ty,n) ->
    fprintf fmt "Bitvector.encode !%a"
@@ -233,6 +232,11 @@ let rec pp_s typing_env externals ~st fmt = function
         (pp_a typing_env externals) a;
   | S_write_stop _ ->
       fprintf fmt "()"
+  | S_array_set(x,idx,a) ->
+      fprintf fmt "Array.set(%a,%a,%a)"
+        pp_ident x 
+        pp_ident idx 
+        (pp_a typing_env externals) a
 | ( S_seq(S_skip,s) 
   | S_seq(s,S_skip) ) -> 
       pp_s typing_env externals ~st fmt s
@@ -282,7 +286,7 @@ let chop_size = function
 
 (* default value according to the given type. *)
 let rec default_zero t =
-  match Fsm_typing.canon t with
+  match MiniHDL_typing.canon t with
   | TStatic{size;elem} -> 
       Printf.sprintf "(Array.make %d %s)"
         (chop_size size)
@@ -332,7 +336,7 @@ let declare_state_var fmt state_var idle xs =
   fprintf fmt "let %s = ref %a in@," state_var pp_state idle
 
 let pp_ty fmt t =
-  match Fsm_typing.canon t with
+  match MiniHDL_typing.canon t with
   | TStatic{elem;size=TTuple ts} -> 
       fprintf fmt "array_value_%d" (size_ty elem);
       List.iter (fun tsize -> fprintf fmt "(0 to %d)" (size_ty tsize - 1)) ts;
@@ -382,7 +386,7 @@ let pp_component fmt ~vhdl_comment ~name ~externals ~state_var
   (* fprintf fmt "let %s = ref \"0\" ;;@," rdy;*)
   let hash_struct_decl = Hashtbl.create 10 in
   Hashtbl.iter (fun x t ->
-    let t = Fsm_typing.canon t in
+    let t = MiniHDL_typing.canon t in
     match Hashtbl.find_opt hash_struct_decl t with
     | None -> Hashtbl.add hash_struct_decl t (SMap.singleton x (), "t_"^gensym ())
     | Some (xs,name) -> Hashtbl.replace hash_struct_decl t (SMap.add x () xs,name)
@@ -396,10 +400,10 @@ let pp_component fmt ~vhdl_comment ~name ~externals ~state_var
   List.iter (fun (x,st) ->
     match st with
     | Static_array_of ty ->
-          let ty_elem,sz = match Fsm_typing.canon ty with
+          let ty_elem,sz = match MiniHDL_typing.canon ty with
                           | TStatic {elem;size=sz} -> elem,sz
                           | _ -> assert false (* error *) in
-          let n = match Fsm_typing.canon sz with
+          let n = match MiniHDL_typing.canon sz with
                   | TSize n -> n
                   | _ ->  Prelude.Errors.error (fun fmt -> 
                             Format.fprintf fmt "unspecified size for array %s" x) in
@@ -418,7 +422,7 @@ let pp_component fmt ~vhdl_comment ~name ~externals ~state_var
     
        SMap.iter (fun x () -> 
           let ty = (Hashtbl.find typing_env x) in
-          match Fsm_typing.canon ty with
+          match MiniHDL_typing.canon ty with
           | TStatic _ -> ()
           | _ -> 
               if x <> argument 

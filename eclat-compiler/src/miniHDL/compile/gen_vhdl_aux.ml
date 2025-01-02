@@ -1,4 +1,4 @@
-open Fsm_syntax
+open MiniHDL_syntax
 open Format
 
 let ram_inference = ref true
@@ -7,13 +7,11 @@ let intel_max10_target = ref false
 let intel_xilinx_target = ref false
 let single_read_write_lock_flag = ref true
 
-let mealy_flag = ref true
-
-
+let has_init_file_ram = ref [] ;;
 
 let size_ty t =
   (* we must canonize [t] to prevent it from being considered as a type variable *)
-  Fsm_typing.(size_ty (canon t))
+  MiniHDL_typing.(size_ty (canon t))
 
 (** [size_const c] returns the number of bits of constant [c] *)
 let rec size_const c =
@@ -66,6 +64,9 @@ let pp_ident fmt (x:x) : unit =
 
 let pp_state fmt (x:x) : unit =
     pp_ident fmt (String.uppercase_ascii x)
+
+let qualify prefix y =
+  prefix^"_"^y
 
 let const_zero nbits =
   let bits_in_hexa = nbits / 4 in
@@ -147,7 +148,7 @@ let rec pp_tuple_access externals fmt (i:int) ty (a:a) : unit =
       | t::ts' -> if i_to_find = j then acc,t,ts' else aux (j+1) (t::acc) ts' in
       aux 0 [] ts
       in
-      let open Fsm_typing in
+      let open MiniHDL_typing in
       match a,canon ty_a with
       | A_tuple aas,TTuple ts ->
           `Atom(List.nth aas i)
@@ -190,22 +191,22 @@ and pp_call externals fmt (op,a) =
   match op with
   | GetTuple(i,_,ty) -> pp_tuple_access externals fmt i ty a
   | Runtime(Size_of_val(ty,size_int)) -> 
-     let n = size_ty (Fsm_typing.translate_ty ty) in
-     pp_c fmt (Int{value=n;tsize=Fsm_typing.translate_size size_int})
+     let n = size_ty (MiniHDL_typing.translate_ty ty) in
+     pp_c fmt (Int{value=n;tsize=MiniHDL_typing.translate_size size_int})
  | Runtime(Resize_int sz) ->
-      let n = size_ty @@ Fsm_typing.translate_size sz in
+      let n = size_ty @@ MiniHDL_typing.translate_size sz in
       fprintf fmt "eclat_resize(%a,%d)" (pp_a externals) a n
  | Runtime(Vector_create sz) ->
-      let n = size_ty @@ Fsm_typing.translate_size sz in
+      let n = size_ty @@ MiniHDL_typing.translate_size sz in
       fprintf fmt "eclat_vector_make(%d,%a)" n (pp_a externals) a
  (* | Runtime(Vector_length (sz,sz_res)) ->
       (match Types.canon_size sz with
-      | Sz_lit n -> pp_c fmt (Int {value=n;tsize=(Fsm_typing.translate_size sz_res)})
+      | Sz_lit n -> pp_c fmt (Int {value=n;tsize=(MiniHDL_typing.translate_size sz_res)})
       | _ -> Types.pp_size Format.std_formatter (Types.canon_size sz); assert false)
    | Runtime(Vector_get t) ->
-      fprintf fmt "eclat_vector_get(%a,%d)" (pp_a externals) a (size_ty Fsm_typing.(translate_tyB t))
+      fprintf fmt "eclat_vector_get(%a,%d)" (pp_a externals) a (size_ty MiniHDL_typing.(translate_tyB t))
    | Runtime(Vector_update t) ->
-      fprintf fmt "eclat_vector_update(%a,%d)" (pp_a externals) a (size_ty Fsm_typing.(translate_size t))
+      fprintf fmt "eclat_vector_update(%a,%d)" (pp_a externals) a (size_ty MiniHDL_typing.(translate_size t))
  *)
   | Runtime(External_fun (x,ty)) ->
       let annot_with_sizes,arity = match List.assoc_opt x (snd externals) with
@@ -214,14 +215,14 @@ and pp_call externals fmt (op,a) =
       (* let rec extract_tyB tyB =
         match Types.canon_tyB tyB with
         | TyB_abstract(_,_sz,tyB_list) ->
-            List.map (fun tyB -> Fsm_typing.(size_ty (translate_tyB tyB))) tyB_list
+            List.map (fun tyB -> MiniHDL_typing.(size_ty (translate_tyB tyB))) tyB_list
         | TyB_var{contents=Is v} -> extract_tyB v
         | _ -> []
       in*)
       let extra = match Types.canon_ty ty with
                   | Ty_fun(Ty_base tyB1,_,tyB2) -> 
-                       [size_ty Fsm_typing.(translate_tyB tyB1)  
-                       ;size_ty Fsm_typing.(translate_tyB tyB2)  ]
+                       [size_ty MiniHDL_typing.(translate_tyB tyB1)  
+                       ;size_ty MiniHDL_typing.(translate_tyB tyB2)  ]
                   | _ -> assert false
       in
       fprintf fmt "@[work.%s(" x;
@@ -254,14 +255,17 @@ and pp_a externals fmt = function
 | A_tuple aas -> pp_tuple fmt (pp_a externals) aas
 | A_vector aas -> pp_vector fmt (pp_a externals) aas
 | A_string_get(s,i) ->
-    fprintf fmt "@[%a(to_integer(unsigned(%s&\"000\")) to to_integer(unsigned(%s&\"000\"))+7)@]" pp_ident s i i
-| A_buffer_get(xb) ->
-    pp_ident fmt ("$"^xb^"_value")
+    let i_norm = norm_ident i in
+    fprintf fmt "@[%a(to_integer(unsigned(%s&\"000\")) to to_integer(unsigned(%s&\"000\"))+7)@]"
+      pp_ident s
+      i_norm i_norm
+| A_array_get(x,y) ->
+    fprintf fmt "@[%a(to_integer(unsigned(%a&\"000\")))@]"
+      pp_ident x
+      pp_ident y
 | A_ptr_taken(x) ->
     pp_ident fmt (ptr_taken x)
-| A_ptr_write_taken(x) ->
-    pp_ident fmt (ptr_taken x)
-| A_buffer_length(x,tz) ->
+| A_array_length(x,tz) ->
     fprintf fmt  "std_logic_vector(to_unsigned(%a'length,%d))" pp_ident x (size_ty tz)
 | A_encode(y,ty,n) ->
    fprintf fmt "%a%s" pp_ident y (let m = size_ty ty in if n = m then "" else "&"^const_zero (n-m))
@@ -272,7 +276,7 @@ and pp_a externals fmt = function
 let print_external fmt (n,(ty,shared)) =
   let arg,d,ret = match ty with
   | Types.Ty_fun(arg,d,ret) -> 
-      size_ty Fsm_typing.(translate_ty arg),d, size_ty Fsm_typing.(translate_tyB ret)
+      size_ty MiniHDL_typing.(translate_ty arg),d, size_ty MiniHDL_typing.(translate_tyB ret)
   | _ -> assert false
   in
   let instances = match Hashtbl.find_opt Count_externals.external_count n with
@@ -308,7 +312,7 @@ let instantiate_external fmt (n,(_,shared)) =
 let variable_decl_go_external fmt (n,(ty,_)) =    
   let ty_arg = match ty with
   | Types.Ty_fun(arg,_,_) -> 
-      Fsm_typing.(translate_ty arg)
+      MiniHDL_typing.(translate_ty arg)
   | _ -> assert false
   in  
   let instances = match Hashtbl.find_opt Count_externals.external_count n with
@@ -342,3 +346,46 @@ let variable_set_go_external fmt (n,_) =
     (* fprintf fmt "%s_argument_%d(0 to 0) <= restart_%s_%d;@," n i n i; *)
     fprintf fmt "%s_argument_%d <= %s_argument_%d_var;@," n i n i
   ) instances
+
+
+module ArrayType = Map.Make(struct
+    type t = int let compare = Stdlib.compare
+  end)
+
+let array_decl fmt x sz_elem n default_value_pp =
+
+  fprintf fmt "signal %a : array_value_%d(0 to %d)" pp_ident x sz_elem (n-1);
+
+
+  if not(!ram_inference) then (
+   fprintf fmt " := (others => %a);@," default_value_pp ()
+  ) else (fprintf fmt ";@,";
+          if !memory_initialization then (
+            if !intel_max10_target then ( 
+              (** Intel MAX 10 FPGA device do not support memory initialization.
+                (source: https://www.intel.com/content/www/us/en/support/programmable/articles/000074796.html
+              *)
+              Prelude.Errors.warning (fun fmt ->
+                Format.fprintf fmt
+                  "Static array %s%a%s (RAM block): Intel MAX 10 FPGA device do not support memory initialization.\n"
+                  Prelude.Errors.bold
+                  pp_ident x
+                  Prelude.Errors.reset)) else (
+            fprintf fmt "attribute %a_init_file : string;@," pp_ident x;
+            fprintf fmt
+               "attribute %a_init_file of %a : signal is \"init_file_%a.mif\";@,"
+               pp_ident x
+               pp_ident x
+               pp_ident x)));
+
+  if !intel_xilinx_target then ( (* attribute for enforcing RAM inference in Xilinx Vivado *)
+    fprintf fmt "attribute ram_style of %a : signal is \"block\";@," pp_ident x;
+  );
+
+  if List.mem x !has_init_file_ram then fprintf fmt "attribute ram_init_file of %s : signal is \"%s.mif\";@," x x;
+
+  fprintf fmt "signal %a : value(0 to %d) := (others => '0');@," pp_ident ("$"^x^"_value") (sz_elem - 1);
+  fprintf fmt "signal %a : natural range 0 to %d := 0;@," pp_ident ("$"^x^"_ptr") (n - 1);
+  fprintf fmt "signal %a : natural range 0 to %d := 0;@," pp_ident ("$"^x^"_ptr_write") (n - 1);
+  fprintf fmt "signal %a : value(0 to %d) := (others => '0');@," pp_ident ("$"^x^"_write") (sz_elem - 1);
+  fprintf fmt "signal %a : std_logic := '0';@," pp_ident ("$"^x^"_write_request")

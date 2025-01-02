@@ -1,4 +1,4 @@
-open Fsm_syntax
+open MiniHDL_syntax
 open Format
 
 open Gen_vhdl_aux
@@ -8,8 +8,6 @@ let memory_initialization = Gen_vhdl_aux.memory_initialization
 let intel_max10_target = Gen_vhdl_aux.intel_max10_target
 let intel_xilinx_target = Gen_vhdl_aux.intel_xilinx_target
 let single_read_write_lock_flag = Gen_vhdl_aux.single_read_write_lock_flag
-
-let has_init_file_ram = ref [] ;;
 
 
 (** code generator for statements *)
@@ -74,7 +72,8 @@ let rec pp_s externals ~st fmt = function
         fprintf fmt
          "@[%a <= '0';@]" 
               pp_ident ("$"^x^"_write_request")
-| S_seq(S_skip,s) | S_seq(s,S_skip) -> pp_s externals ~st fmt s
+| S_seq(S_skip,s) | S_seq(s,S_skip) ->
+    pp_s externals ~st fmt s
 | S_seq(s1,s2) ->
     fprintf fmt "@[<v>%a@,%a@]" 
       (pp_s externals ~st) s1 
@@ -91,6 +90,11 @@ let rec pp_s externals ~st fmt = function
 | S_in_fsm(id,s) ->
      let (st2,_,_) = List.assoc id !List_machines.extra_machines in
      pp_s externals ~st:st2 fmt s
+| S_array_set(x,y,a) ->
+    fprintf fmt "@[%a(to_integer(unsigned(%a&\"000\"))) := %a@]"
+      pp_ident x
+      pp_ident y
+      (pp_a externals) a
 | S_call(op,a) ->
    fprintf fmt "%a;@," (pp_call externals) (Runtime(op),a)
 | S_external_run(f,id,res,rdy,a) ->
@@ -128,8 +132,10 @@ let default_zero_value nbits =
 
 (* default value according to the given type. *)
 let default_zero t =
-  match Fsm_typing.canon t with
-  | TStatic{size=TTuple ts} ->
+  match MiniHDL_typing.canon t with
+  | TStatic{size=TTuple ts} -> 
+     (* dead code (used for implementing experimental matrices) 
+        to be deleted *)
      let rec aux ts =
        match ts with
        | [] -> "'0'"
@@ -137,9 +143,6 @@ let default_zero t =
       in aux ts
   | TStatic{size=t} -> "(others => (others => '0'))"
   | _ -> "(others => '0')"
-
-let qualify prefix y =
-  prefix^"_"^y
 
 let declare_state_var fmt state_var idle xs =
   let state_var_tname = Naming_convention.state_var_type state_var in
@@ -157,9 +160,9 @@ let declare_machine fmt ~state_var ~idle ~infos (ts,s) =
 
   List.iter (fun (_,(sv,cp,xs)) -> declare_state_var fmt sv cp xs) !List_machines.extra_machines;
 
-  Fsm_comp.SMap.iter (fun x w ->
+  Gen_miniHDL.SMap.iter (fun x w ->
     let inst_tname = Naming_convention.instances_type x in
-    let sq = Fsm_comp.IMap.to_seq w in
+    let sq = Gen_miniHDL.IMap.to_seq w in
     let l = (List.of_seq sq) in
     begin
       fprintf fmt "type %a is (" pp_ident inst_tname ;
@@ -171,60 +174,13 @@ let declare_machine fmt ~state_var ~idle ~infos (ts,s) =
   ) infos
 (* type array_value is array (0 to 20) of value(0 to 31); *)
 let pp_ty fmt t =
-  match Fsm_typing.canon t with
+  match MiniHDL_typing.canon t with
   | TStatic{elem;size=TTuple ts} -> 
       fprintf fmt "array_value_%d" (size_ty elem);
       List.iter (fun tsize -> fprintf fmt "(0 to %d)" (size_ty tsize - 1)) ts;
   | TStatic{elem;size} -> fprintf fmt "array_value_%d(0 to %d)" (size_ty elem) (size_ty size - 1);
   | _ ->
       fprintf fmt "value(0 to %d)" (size_ty t-1)
-
-
-
-
-module ArrayType = Map.Make(struct
-    type t = int let compare = Stdlib.compare
-  end)
-
-
-let array_decl fmt x sz_elem n default_value_pp =
-
-  fprintf fmt "signal %a : array_value_%d(0 to %d)" pp_ident x sz_elem (n-1);
-
-
-  if not(!ram_inference) then (
-   fprintf fmt " := (others => %a);@," default_value_pp ()
-  ) else (fprintf fmt ";@,";
-          if !memory_initialization then (
-            if !intel_max10_target then ( 
-              (** Intel MAX 10 FPGA device do not support memory initialization.
-                (source: https://www.intel.com/content/www/us/en/support/programmable/articles/000074796.html
-              *)
-              Prelude.Errors.warning (fun fmt ->
-                Format.fprintf fmt
-                  "Static array %s%a%s (RAM block): Intel MAX 10 FPGA device do not support memory initialization.\n"
-                  Prelude.Errors.bold
-                  pp_ident x
-                  Prelude.Errors.reset)) else (
-            fprintf fmt "attribute %a_init_file : string;@," pp_ident x;
-            fprintf fmt
-               "attribute %a_init_file of %a : signal is \"init_file_%a.mif\";@,"
-               pp_ident x
-               pp_ident x
-               pp_ident x)));
-
-  if !intel_xilinx_target then ( (* attribute for enforcing RAM inference in Xilinx Vivado *)
-    fprintf fmt "attribute ram_style of %a : signal is \"block\";@," pp_ident x;
-  );
-
-  if List.mem x !has_init_file_ram then fprintf fmt "attribute ram_init_file of %s : signal is \"%s.mif\";@," x x;
-
-  fprintf fmt "signal %a : value(0 to %d) := (others => '0');@," pp_ident ("$"^x^"_value") (sz_elem - 1);
-  fprintf fmt "signal %a : natural range 0 to %d := 0;@," pp_ident ("$"^x^"_ptr") (n - 1);
-  fprintf fmt "signal %a : natural range 0 to %d := 0;@," pp_ident ("$"^x^"_ptr_write") (n - 1);
-  fprintf fmt "signal %a : value(0 to %d) := (others => '0');@," pp_ident ("$"^x^"_write") (sz_elem - 1);
-  fprintf fmt "signal %a : std_logic := '0';@," pp_ident ("$"^x^"_write_request")
-
 
 let declare_signals variables fmt =
   let var_decls = Hashtbl.create 10 in
@@ -270,14 +226,14 @@ let pp_component fmt ~vhdl_comment ~name ~externals ~state_var ~argument ~result
   let arty = List.fold_left (fun arty (_,g) ->
       match g with
       | Static_array_of ty -> 
-          (match Fsm_typing.canon ty with
+          (match MiniHDL_typing.canon ty with
           | TStatic{elem} ->  ArrayType.add (size_ty elem) () arty
           | _ -> Debug.pp_ty Format.std_formatter ty;  assert false)
       | Static_array(c,_) -> ArrayType.add (size_const c) () arty
     ) ArrayType.empty statics
   in
 
-  Fsm_comp.SMap.iter (fun x _ -> Hashtbl.remove typing_env x;
+  Gen_miniHDL.SMap.iter (fun x _ -> Hashtbl.remove typing_env x;
                        Hashtbl.remove typing_env (Naming_convention.instance_id_of_fun x)) infos;
 
   fprintf fmt "@[<v>%s@]" vhdl_comment;
@@ -321,10 +277,10 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
     match st with
    
     | Static_array_of ty ->
-          let ty_elem,sz = match Fsm_typing.canon ty with
+          let ty_elem,sz = match MiniHDL_typing.canon ty with
                           | TStatic {elem;size=sz} -> elem,sz
                           | _ -> assert false (* error *) in
-          let n = match Fsm_typing.canon sz with
+          let n = match MiniHDL_typing.canon sz with
                   | TSize n -> n
                   | _ ->  Prelude.Errors.error (fun fmt -> 
                             Format.fprintf fmt "unspecified size for array %s" x) in

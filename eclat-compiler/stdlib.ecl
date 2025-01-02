@@ -33,7 +33,6 @@ operator Int.ge :     (int<'N> * int<'N>) => bool ;;
 operator Int.land :   (int<'N> * int<'N>) => int<'N> ;;
 operator Int.lor :    (int<'N> * int<'N>) => int<'N> ;;
 operator Int.lnot :   int<'N> => int<'N> ;;
-operator Int.lor :    (int<'N> * int<'N>) => int<'N> ;;
 operator Int.lxor :   (int<'N> * int<'N>) => int<'N> ;;
 operator Int.land :   (int<'N> * int<'N>) => int<'N> ;;
 operator Int.lsl :    (int<'N> * int<'OFFSET>) => int<'N> ;;

@@ -1,4 +1,4 @@
-open Fsm_syntax
+open MiniHDL_syntax
 
 let emit_warning_flag = ref false
 
@@ -257,20 +257,17 @@ let rec typing_a ~externals h a =
       add_typing_env h ix (TInt (TSize 32));
       TInt(TSize 8)
 
-  | A_ptr_taken(x) 
-  | A_ptr_write_taken(x) ->
-      (*let telem = new_tvar () in
-      let tz = new_tvar () in
-       add_typing_env h x (TStatic{elem=telem;size=tz}); *)
+  | A_ptr_taken(x) ->
       TBool
 
-  | A_buffer_get(xb) ->
+  | A_array_get(x,y) ->
       let telem = new_tvar () in
       let tz = new_tvar () in
-      add_typing_env h xb (TStatic{elem=telem;size=tz});
+      add_typing_env h x (TStatic{elem=telem;size=tz});
+      add_typing_env h y (TInt (TSize 32));
       telem
 
-  | A_buffer_length(x,ty) ->
+  | A_array_length(x,ty) ->
       add_typing_env h x (TStatic{elem=new_tvar();size=new_tvar()});
       TInt ty
 
@@ -321,6 +318,12 @@ let rec typing_s ~externals ~result h s =
       add_typing_env h x (TStatic{elem=telem;size=tz});
       let tidx = typing_a ~externals h idx in
       unify tidx (TInt tz2)
+  | S_array_set(x,idx,a) ->
+      let telem = typing_a ~externals h a in
+      let tz = new_tvar () in
+      let tz2 = new_tvar () in
+      add_typing_env h x (TStatic{elem=telem;size=tz});
+      add_typing_env h idx tz2
   | S_write_stop(x) ->
       let t = new_tvar () in
       add_typing_env h x t 

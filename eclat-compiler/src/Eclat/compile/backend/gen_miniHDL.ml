@@ -1,4 +1,4 @@
-open Fsm_syntax
+open MiniHDL_syntax
 
 let ref_set_lock_flag = ref true
 
@@ -66,7 +66,8 @@ let contain_return s =
   | S_write_start _
   | S_write_stop _
   | S_call _
-  | S_set _ -> false
+  | S_set _ 
+  | S_array_set _ -> false
   | S_letIn(_,_,s1) -> aux s1
   | S_seq(s1,s2) -> aux s1 || aux s2
   | S_if(_,s1,so2) -> aux s1 || (match so2 with None -> false | Some s -> aux s)
@@ -79,9 +80,9 @@ let contain_return s =
 
 let find_ctor x sums =
   let (n,sum,t) = Types.find_ctor x sums in
-  let arg_size = List.fold_left (max) 0 @@ List.map (fun (_,t) -> Fsm_typing.(size_ty (translate_tyB t))) sum in
-  let sz = Fsm_typing.compute_tag_size sum in
-   (mk_int n sz,arg_size,Fsm_typing.translate_tyB t)
+  let arg_size = List.fold_left (max) 0 @@ List.map (fun (_,t) -> MiniHDL_typing.(size_ty (translate_tyB t))) sum in
+  let sz = MiniHDL_typing.compute_tag_size sum in
+   (mk_int n sz,arg_size,MiniHDL_typing.translate_tyB t)
 
 let rec insert_kont w ~idle ~x s =
   let rec aux s =
@@ -121,13 +122,14 @@ let rec insert_kont w ~idle ~x s =
     | S_write_stop _
     | S_call _
     | S_set _
-    | S_external_run _ -> s
+    | S_external_run _ 
+    | S_array_set _ -> s
   in
   Some (aux s)
 
 let rec to_c ~sums = function
 | Ast.Unit -> Unit
-| Ast.Int (n,tz) -> Int {value=n;tsize=Fsm_typing.translate_size tz}
+| Ast.Int (n,tz) -> Int {value=n;tsize=MiniHDL_typing.translate_size tz}
 | Ast.Bool b -> Bool b
 | Ast.String s -> String s
 | Ast.C_tuple cs -> CTuple (List.map (to_c ~sums) cs)
@@ -141,7 +143,7 @@ let rec to_c ~sums = function
 
 
 let to_op = function
-| Ast.TyConstr ty -> TyConstr (Fsm_typing.translate_ty ty)
+| Ast.TyConstr ty -> TyConstr (MiniHDL_typing.translate_ty ty)
 | Ast.Runtime (External_fun(x,ty)) -> Runtime (External_fun(x,ty)) (* Types.new_ty_unknown())) *)
 | Ast.Runtime p -> Runtime p
 | Ast.GetTuple {pos=i;arity=n} -> GetTuple (i,n,new_tvar())
@@ -182,7 +184,7 @@ let rec to_a ~externals ~sums (e:Ast.e) : a =
   | Ast.E_if(e1,e2,e3) -> A_call(If,A_tuple [to_a ~externals ~sums e1;to_a ~externals ~sums e2;to_a ~externals ~sums e3])
   | Ast.E_tuple(es) -> A_tuple (List.map (to_a ~externals ~sums) es)
   | Ast.E_letIn(P_var x,_,e1,e2) -> A_letIn(x,to_a ~externals ~sums e1,to_a ~externals ~sums e2)
-  | Ast.E_array_length x -> A_buffer_length(x,new_tvar())
+  | Ast.E_array_length x -> A_array_length(x,new_tvar())
   | E_app(E_const(Inj y),e) ->
       let_plug_a (to_a ~externals ~sums e) @@ (fun z ->
         let n,arg_size,ty_n = find_ctor y sums in
@@ -439,7 +441,7 @@ let rec to_s ~statics ~externals ~sums gs e x k =
                    SMap.add q2 (seq_ (S_release_lock(y)) @@
                                      (return_ @@ (set_ x (A_const Unit)))) SMap.empty  in
           let q_wait = Ast.gensym ~prefix:"q_wait" () in
-          let s' = let_plug_s (A_ptr_write_taken(y)) @@ fun z ->
+          let s' = let_plug_s (A_ptr_taken(y)) @@ fun z ->
                      S_if(z, (S_continue q_wait),
                                Some (seq_ (S_acquire_lock(y)) @@
                                      seq_ (S_write_start(y,a,a_upd)) @@
