@@ -45,7 +45,7 @@ OBJS= $(SRC_DIR)/prelude.cmx \
       $(SRC_DIR)/Eclat/syntax/rename_fix.cmx \
       $(SRC_DIR)/Eclat/syntax/ast_undecorated.cmx \
       \
-      $(SRC_DIR)/eclat/frontend/fix_int_lit_size.cmx \
+      $(SRC_DIR)/Eclat/frontend/fix_int_lit_size.cmx \
       \
       $(SRC_DIR)/Eclat/compile/instantaneous.cmx \
       $(SRC_DIR)/Eclat/typing/typing.cmx \
