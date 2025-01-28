@@ -28,7 +28,7 @@ execution time = 72014 cycles
 
 ```
 $ ./eclat -relax ../benchs/game-of-life/v1/v1.ecl  -main=test_main
-$ make simul NS=4000000
+$ make simul NAME=test_main NS=4000000
 cd ../target; make NS=4000000
 ghdl -a  runtime.vhdl
 ghdl -a  main.vhdl
@@ -63,3 +63,7 @@ $ ./eclat -relax ../benchs/game-of-life/v1/v1.ecl  -xilinx-zybo  -main=main_xili
 ```
 
 #### for Yosys / ECP5
+
+```
+./eclat -relax ../benchs/game-of-life/v1/v1.ecl  -yosys-ecp5  -main=main_yosys
+```

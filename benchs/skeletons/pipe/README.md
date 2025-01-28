@@ -15,11 +15,10 @@ ghdl -a  main.vhdl
 ghdl -a  tb_main.vhdl
 ghdl -e  tb_main
 ghdl -r  tb_main --vcd=tb.vcd --stop-time=10000000ns
- cy=72286 
- cy=144573 
- cy=216860 
- cy=289147 
- cy=361434
+ cy=4249 
+ cy=8499 
+ cy=12749 
+ cy=16999
 ^C
 ```
 

@@ -68,3 +68,7 @@ $ ./eclat -relax ../benchs/game-of-life/v3/v3.ecl  -xilinx-zybo  -main=main_xili
 ```
 
 #### for Yosys / ECP5
+
+```
+$ ./eclat -relax ../benchs/game-of-life/v3/v3.ecl  -yosys-ecp5  -main=main_yosys
+```

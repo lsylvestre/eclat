@@ -55,13 +55,25 @@ ghdl -r  tb_main --vcd=tb.vcd --stop-time=4000000ns
 #### for Intel Max10 FPGA
 
 ```
-$ ./eclat -relax ../benchs/game-of-life/v2/v2.ecl  -intel-max10  -main=main_intel
+$ ./eclat ../benchs/game-of-life/v2/v2.ecl  -intel-max10  -main=main_intel
+$ make simul NS=4000000 NAME=main_intel
 ```
+
+Note: compilation is slow (about 1 minute for a world of size 64*64)
+and the generated code is huge. 
+Option `-moore` implement the resulting circuit as a Moore machine (Mealy machine by default).
+This saves logic elements (LEs) in the MAX 10 FPGA (because within each LE, the combinational 
+part is connected to the input of a register in the same LE).
+
 
 #### for Xilinx Zybo FPGA
 
 ```
-$ ./eclat -relax ../benchs/game-of-life/v2/v2.ecl  -xilinx-zybo  -main=main_xilinx
+$ ./eclat ../benchs/game-of-life/v2/v2.ecl  -xilinx-zybo  -main=main_xilinx
 ```
 
 #### for Yosys / ECP5
+
+```
+$ ./eclat ../benchs/game-of-life/v2/v2.ecl  -yosys-ecp5  -main=main_yosys
+```

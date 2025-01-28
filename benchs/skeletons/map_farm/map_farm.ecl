@@ -9,7 +9,10 @@ let map_worker (f,r,src,dst) =
     else ()
   in loop();;
 
-let map_farm ((( p, f, src), k) : (('A * 'B * array<'N>) * 'D)) : 'E = 
+let map_farm ((p, f, src), k) = 
+  
+  let _ = (src : `A array<'N>) in (* type constraint *)
+  
   let dst = create<'N> () in
   let r = create<1> () in
   set(r,0,0);

@@ -87,7 +87,7 @@ let test_main () =
 
   if get(w_src,0) then 0 else 1 ;;
 
-(*
+
 
 (** ./eclat -relax ../benchs/game-of-life/v1/v1.ecl  -intel-max10  -main=main_intel *)
 
@@ -107,7 +107,7 @@ let main_yosys (i:int<1>) : int<1> =
   let v = test_main() in
   resize_int<1>(v) ;;
 
-*)
+
 
 (** ==== measure execution time ==== *)
 
