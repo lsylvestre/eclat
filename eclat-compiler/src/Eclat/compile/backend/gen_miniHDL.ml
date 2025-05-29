@@ -189,7 +189,7 @@ let rec to_a ~externals ~sums (e:Ast.e) : a =
       let_plug_a (to_a ~externals ~sums e) @@ (fun z ->
         let n,arg_size,ty_n = find_ctor y sums in
         A_tuple[A_const(n);A_encode(z,ty_n,arg_size)])
-  | Ast.E_vector(es) -> A_vector (List.map (to_a ~externals ~sums) es) 
+  | Ast.E_vector(es) -> A_vector (List.map (to_a ~externals ~sums) es)  
   | _ ->
       Format.fprintf Format.std_formatter "--> %a\n"  Ast_pprint.pp_exp  e; assert false
 
@@ -599,8 +599,26 @@ let rec to_s ~statics ~externals ~sums gs e x k =
       let q = Ast.gensym ~prefix:"pause" () in
       let w1,ts1,s1 = to_s ~statics ~externals ~sums gs e1 x (S_continue q) in
       (w1, SMap.add q k ts1, s1)
-  
- 
+  | E_equations(p,eqs) ->
+      let p_tuple = Ast.P_tuple (List.map fst eqs) in
+      let p_tuple_pre = Ast_rename.rename_pat ~statics:(List.map fst statics) p_tuple in
+      let rec aux p1 p2 = 
+        match p1,p2 with
+        | Ast.P_var x1, Ast.P_var x2 -> set_ x1 (A_var x2)
+        | P_tuple ps1, P_tuple ps2 -> seq_list_ @@ List.map2 aux ps1 ps2
+        | P_unit,P_unit -> S_skip
+        | _ -> assert false
+      in
+      let s_init = aux p_tuple_pre p_tuple in
+      let s' = List.fold_right  (fun (pi,ei) s ->
+        match pi with
+        | Ast.P_var z ->
+            let _w,_ts,s' = to_s ~statics ~externals ~sums [] ei (* (Ast_subst.subst_p_e p_tuple (Pattern.pat2exp p_tuple_pre) ei) *) z S_skip in
+            assert (SMap.is_empty _w);
+            assert (SMap.is_empty _ts);
+            seq_ s' s) eqs S_skip in
+      SMap.empty,SMap.empty,seq_ (seq_ S_skip (seq_ s' (set_ x (to_a ~externals ~sums @@ Pattern.pat2exp p))))
+                                 k (* (aux p_tuple p_tuple_pre)*)
 
   | e -> Ast_pprint.pp_exp Format.std_formatter e; assert false (* todo *)
 

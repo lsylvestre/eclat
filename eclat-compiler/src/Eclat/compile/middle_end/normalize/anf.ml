@@ -190,6 +190,8 @@ let rec anf (e:e) : e =
       plug (anf e) @@ fun xc ->
       E_run(i,xc) 
   | E_pause e -> E_pause (anf e)
+  | E_equations(p,eqs) ->
+      E_equations(p,List.map (fun (p,e) -> p,anf e) eqs)
   in 
   glob e ;;
 

@@ -670,6 +670,27 @@ let rec typ_exp ?(collect_sig=false) ~statics ~externals ~sums ?(toplevel=false)
         let ty1,_ = typ_exp ~collect_sig ~statics ~externals ~sums
                         ~toplevel ~loc:(loc_of e1) g e1 in
         (ty1, Dur_one)
+    | E_equations(p,eqs) ->
+        let p_ty_shape p =
+          match p with 
+          | P_tuple ps -> Ty_base (TyB_tuple (List.map (fun _ -> new_tyB_unknown()) ps))
+          | P_unit -> Ty_base TyB_unit
+          | _ -> Ty_base (new_tyB_unknown()) in
+        let g' = env_extend ~loc g p (p_ty_shape p) in
+        let g2 = List.fold_left (fun g (p,_) ->
+                   env_extend ~loc g p (p_ty_shape p)) g' eqs in
+        List.iter (fun (p,e) ->
+            let loc = (loc_of e) in
+            let ty,d = typ_exp ~collect_sig ~statics ~externals ~sums
+                            ~toplevel ~loc g2 e in
+            let tyP,_ = typ_exp ~collect_sig ~statics ~externals ~sums
+                            ~toplevel ~loc g2 (Pattern.pat2exp p) in
+            unify_ty ~loc ty tyP;
+            unify_dur ~loc d Dur_zero) eqs;
+        let tyOut,_ = typ_exp ~collect_sig ~statics ~externals ~sums
+                            ~toplevel ~loc g' (Pattern.pat2exp p) in
+        tyOut,Dur_zero  
+
 
 let typing_handler ?(msg="") f () =
   let open Format in

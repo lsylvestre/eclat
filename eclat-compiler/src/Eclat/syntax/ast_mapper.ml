@@ -89,6 +89,9 @@ let rec map f e =
   | E_generate((p, ty, e1), e2, e_st1, loc) ->
       E_generate((p, ty, f e1), f e2, f e_st1, loc)
   | E_pause e1 -> E_pause (f e1)
+  | E_equations(p,eqs) ->
+      let eqs' = List.map (fun (p,e) -> p, f e) eqs in
+      E_equations(p,eqs')
 
 (** traversal order of sub-expressions is unspecified *)
 let rec iter f (e:e) : unit =
@@ -145,6 +148,8 @@ let rec iter f (e:e) : unit =
   | E_run(_,e1) ->
       f e1
   | E_pause e1 -> f e1
+  | E_equations(_,eqs) ->
+      List.iter (fun (_,e) -> f e) eqs
 
 let declare ds ts e =
   List.fold_right2 (fun (x,v) t e -> E_letIn(P_var x,t,v,e)) ds ts e
@@ -273,6 +278,9 @@ let accum f (e:e) =   (* : ((x * ty * e) list * e)*)
         | E_pause e1 -> 
             let ds1,e1' = aux e1 in
             [],E_pause (declare' ds1 e1')
+        | E_equations(p,eqs) ->
+            let eqs' = List.map (fun (p,e) -> p, let (ds,e') = aux e in declare' ds e') eqs in
+            [], E_equations(p,eqs')
   ) 
   in 
   aux e

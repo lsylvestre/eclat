@@ -70,7 +70,7 @@
 
 %token LPAREN RPAREN LCUR RCUR LBRACKET RBRACKET COMMA PIPE_PIPE PIPE_COMMA_PIPE EQ EQ_EQ COL SEMI HAT STATIC DOT_LENGTH ARRAY_LENGTH
 %token SHARP_PIPE_LBRACKET LBRACKET_PIPE PIPE_RBRACKET
-%token FUN AMP DOT REGISTER EXEC INIT DEFAULT RESET WHEN
+%token FUN AMP DOT REGISTER EXEC INIT DEFAULT RESET WHEN WHERE
 %token NODE IMPLY
 %token MATCH WITH PIPE END
 %token OF
@@ -632,6 +632,7 @@ aexp_desc:
 | BANG ex=aexp { E_get(ex) }
 | LPAREN e=exp RPAREN { e }
 | LPAREN e=exp COL ty=ty RPAREN { ty_annot ~ty e }
+(* | LPAREN RPAREN { E_const Unit } *)
 | c=const { E_const c }
 
 | RESIZE_INT LT k=size GT { E_const (Op(Runtime(Resize_int k))) }
@@ -670,8 +671,8 @@ aexp_desc:
             | _ -> E_var x }
 | SHARP_PIPE_LBRACKET separated_list(COMMA,app_exp) PIPE_RBRACKET
     { (* Buffer n *) assert false (*todo*)  }
-
-| MATCH e=exp WITH
+(*| LAPAREN p=pat WHERE eqs=separated_nonempty_list(AND,separated_pair(pat,EQ,exp)) RPAREN { E_equations(p,eqs) } 
+*)| MATCH e=exp WITH
     PIPE? cases=match_case_const*
     IDENT RIGHT_ARROW otherwise=exp END?
       { E_case(e,cases,otherwise) }

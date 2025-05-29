@@ -116,6 +116,8 @@ let rec lfloat (e:e) : e =
   | E_pause e -> 
       let ds,e' = glob e in
       ds,E_pause e'
+  | E_equations(p,eqs) ->
+      [],E_equations(p,List.map (fun (p,e) -> p,lfloat e) eqs) 
   in 
   let ds,e' = glob e in 
   declare ds e'

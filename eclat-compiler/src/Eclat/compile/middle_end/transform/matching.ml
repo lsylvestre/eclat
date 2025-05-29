@@ -63,7 +63,15 @@ let rec matching e =
   | E_reg((p,tyB,e1),e0,l) ->
      let x = gensym () in
      E_reg((P_var x,tyB,matching @@ E_letIn(p,Ty_base tyB,E_var x,e1)),matching e0,l)
-  | e -> Ast_mapper.map matching e
+  (*| E_equations(p,eqs) ->
+      let x = gensym () in
+let eqs' = List.map (fun (pz,e) ->
+             match pz with 
+             | P_var z -> pz, matching e
+             | _ -> let z = gensym () in
+                    P_var z,matching @@ E_letIn(p,Types.new_ty_unknown(),e,Pattern.pat2exp p)) eqs in
+      E_equations(P_var x,eqs' @ [P_var x,Pattern.pat2exp p])
+*)  | e -> Ast_mapper.map matching e
 
 
 let matching_pi pi =

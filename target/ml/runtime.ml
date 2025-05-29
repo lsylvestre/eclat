@@ -58,7 +58,7 @@ module Vector = struct
   let nth_ (x,n) = Array.get x (Int.to_int_ n)
   let copy_with_ (x,n,v) = 
     let a = Array.copy x in
-    a.(n) <- v;
+    a.(Int.to_int_ n) <- v;
     a
   let infos_ (v : 'a) = 
     let size = Array.length v in
@@ -98,3 +98,7 @@ struct
   let decode s = Marshal.from_string s 0
   let dummy = String.empty
 end
+
+let tuple_get_ (i,v) =
+  Obj.magic (Obj.field (Obj.repr v) i)
+

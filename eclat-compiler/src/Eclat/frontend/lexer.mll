@@ -18,6 +18,7 @@
        "exec",  EXEC;
        "reset", RESET;
        "when",  WHEN;
+       "where", WHERE;
        "and",   AND;
        "in",    IN;
        "if",    IF;

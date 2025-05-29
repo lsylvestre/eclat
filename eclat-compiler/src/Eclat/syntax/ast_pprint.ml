@@ -224,6 +224,12 @@ let pp_exp (fmt:fmt) (e:e) : unit =
   | E_run(i,e) ->
       fprintf fmt "run %s(%a)" i (pp_e ~paren:false) e
   | E_pause e -> fprintf fmt "pause %a"  (pp_e ~paren:true) e
+  | E_equations(p,eqs) ->
+      fprintf fmt "@[<v 2>(%a where@," pp_pat p;
+      pp_print_list
+        ~pp_sep:(fun fmt () -> fprintf fmt "@,and ")
+        (fun fmt (p,e) -> fprintf fmt "%a = %a" pp_pat p (pp_e ~paren:false) e) fmt eqs;
+      fprintf fmt ")@]"
   in
   fprintf fmt "@[<v 0>%a@]" (pp_e ~paren:false) e
 

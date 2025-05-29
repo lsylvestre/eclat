@@ -62,6 +62,11 @@ let subst_e x ex e =
     | E_vector_mapi(is_par, (p, typ, e1), e2, ty) ->
         let e1' = if pat_mem x p then e1 else ss e1 in
         E_vector_mapi(is_par, (p, typ, e1'), ss e2, ty)
+    | E_equations(p,eqs) ->
+        let p_tuple = P_tuple (p :: List.map (fun (p,_) -> p) eqs) in 
+        let eqs' = if pat_mem x p_tuple then eqs else
+                   List.map (fun (p,ei) -> p, ss ei) eqs in
+        E_equations(p,eqs')
     | e -> Ast_mapper.map ss e
   in
   ss e

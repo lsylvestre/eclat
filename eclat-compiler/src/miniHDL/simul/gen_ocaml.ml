@@ -11,6 +11,7 @@
 open MiniHDL_syntax
 open Format
 
+
 module SMap = Ast.SMap
 let gensym =
   let x = ref 0 in
@@ -51,6 +52,23 @@ let size_ty t =
   MiniHDL_typing.(size_ty (canon t))
 
 
+let rec ocaml_type t =
+  let t = MiniHDL_typing.canon t in
+  let gensym () = "v" ^ norm_ident @@ gensym () in
+  match t with
+  | TStatic{size=_;elem} -> "(" ^ ocaml_type elem ^ " array)"
+  | TVector{size=_;elem} -> "(" ^ ocaml_type elem ^ " array)"
+  | TBool -> "bool"
+  | TUnit -> "unit"
+  | TInt _size -> "Int.t"
+  | TTuple ts ->"("^ String.concat "*" (List.map ocaml_type ts) ^")"
+  | TString _ -> "string"
+  | TAbstract _ -> "'" ^ gensym ()
+  | TSize _ -> assert false (* already removed *)
+  | TVect _ -> "Bitvector.t"
+  | _ -> "'" ^ gensym ()
+
+
 (** code generator for constants *)
 let rec pp_c fmt c =
   match c with
@@ -78,12 +96,13 @@ let rec pp_call externals typing_env res fmt (op,a) =
       let ts = match MiniHDL_typing.canon ty with TTuple ts -> ts | _ -> assert false in
       (match a with
       | A_tuple aa -> (pp_a typing_env externals) fmt (List.nth aa i)
-      | _ -> let z = gensym () in
+      | _ -> fprintf fmt "(tuple_get_ (%d,%a) : %s)" i (pp_a typing_env externals) a (ocaml_type (List.nth ts i)))
+          (* let z = gensym () in
              fprintf fmt "(let (";
              let ps = List.mapi (fun j _ -> if i = j then z else "_") ts in
              pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt ",")
                pp_ident fmt ps;
-             fprintf fmt ") = %a in %a)" (pp_a typing_env externals) a pp_ident z)
+             fprintf fmt ") = %a in %a)" (pp_a typing_env externals) a pp_ident z)*)
   | Runtime(Int_of_tuple n) ->
       let xs = List.init n (fun _ -> norm_ident @@ gensym ()) in
       fprintf fmt "(let %a =" (pp_tuple (fun fmt x -> fprintf fmt "%s" x)) xs;
@@ -333,7 +352,7 @@ let type_state_var fmt state_var idle xs =
   fprintf fmt "\n"
 
 let declare_state_var fmt state_var idle xs =
-  fprintf fmt "let %s = ref %a in@," state_var pp_state idle
+  fprintf fmt "let %s = ref %a ;;@," state_var pp_state idle
 
 let pp_ty fmt t =
   match MiniHDL_typing.canon t with
@@ -351,25 +370,19 @@ module ArrayType = Map.Make(struct
     type t = int let compare = Stdlib.compare
   end)
 
-let rec ocaml_type t =
-  let gensym () = "v" ^ norm_ident @@ gensym () in
-  match t with
-  | TStatic{size=_;elem} -> "(" ^ ocaml_type elem ^ " array)"
-  | TVector{size=_;elem} -> "(" ^ ocaml_type elem ^ " array)"
-  | TBool -> "bool"
-  | TUnit -> "unit"
-  | TInt _size -> "Int.t"
-  | TTuple ts ->"("^ String.concat "*" (List.map ocaml_type ts) ^")"
-  | TString _ -> "string"
-  | TAbstract _ -> "'" ^ gensym ()
-  | TSize _ -> assert false (* already removed *)
-  | TVect _ -> "Bitvector.t"
-  | _ -> "'" ^ gensym ()
 
 let array_decl fmt x n default_value_pp =
-  fprintf fmt "let %a = Array.make %d %a in\n" pp_ident x n default_value_pp ();
-  fprintf fmt "let %a_lock : Lock.t = (Lock.init ()) in\n" pp_ident x;
-  fprintf fmt "let %a_value = ref %a in\n" pp_ident x default_value_pp ()
+  
+  begin
+    (* if List.mem x !Gen_vhdl_aux.has_init_file_ram then
+      fprintf fmt "let %a = let ic = input_chan \"%a_init_file.txt\" in 
+    let tmp = Marshal.from_channel ic in 
+    close_in ic; tmp\n" pp_ident x pp_ident x
+    else *)
+      fprintf fmt "let %a = Array.make %d %a ;;\n" pp_ident x n default_value_pp ()
+  end;
+  fprintf fmt "let %a_lock : Lock.t = (Lock.init ()) ;;\n" pp_ident x;
+  fprintf fmt "let %a_value = ref %a ;;\n" pp_ident x default_value_pp ()
 
 let pp_component fmt ~vhdl_comment ~name ~externals ~state_var 
                      ~argument ~result ~idle ~rdy ~statics 
@@ -394,8 +407,6 @@ let pp_component fmt ~vhdl_comment ~name ~externals ~state_var
   
   let argument = fst argument in
   let result = fst result in
-
-  fprintf fmt "@,@[<v 2>let %a =@," pp_prog_name name;
 
   List.iter (fun (x,st) ->
     match st with
@@ -426,12 +437,12 @@ let pp_component fmt ~vhdl_comment ~name ~externals ~state_var
           | TStatic _ -> ()
           | _ -> 
               if x <> argument 
-              then fprintf fmt "@[let %a : %s ref = ref %s in@]@," 
+              then fprintf fmt "@[let %a : %s ref = ref %s ;;@]@," 
                   pp_ident x 
                   (ocaml_type ty)
                  (default_zero ty)) xs
   ) hash_struct_decl;
-
+  fprintf fmt "@,@[<v 2>let %a =@," pp_prog_name name;
   fprintf fmt "@[<v 2>fun arg ->@,let %a = ref arg in@," pp_ident argument;
 
   pp_fsm typing_env externals fmt ~state_var ~idle ~rdy (name,ts,s);

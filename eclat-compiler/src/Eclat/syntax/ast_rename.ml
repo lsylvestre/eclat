@@ -79,6 +79,15 @@ let rename_e ~statics e =
       let pz = rename_pat ~statics p in
       let e1' = ren_e (subst_p_e p (pat2exp pz) e1) in
      E_vector_mapi(is_par,(pz, typ, e1'),ren_e e2,ty)
+  | E_equations(p,eqs) ->
+      let p_tuple = P_tuple (p :: List.map (fun (p,_) -> p) eqs) in 
+      let pz = rename_pat ~statics p_tuple in
+      let eqs' = List.map (fun (pj,ei) -> 
+                  let pj' = exp2pat (subst_p_e p_tuple (pat2exp pz) (pat2exp pj)) in
+                  let ei' = ren_e (subst_p_e p_tuple (pat2exp pz) ei) in
+                  pj', ei') eqs in
+      let p' = exp2pat (subst_p_e p_tuple (pat2exp pz) (pat2exp p)) in
+      E_equations(p',eqs')
   | e -> Ast_mapper.map ren_e e
   in
   ren_e e

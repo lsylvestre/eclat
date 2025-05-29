@@ -64,6 +64,7 @@ let rec combinational ~externals (e:e) : bool =
 	    not(is_par) && combinational ~externals e1 && combinational ~externals e2
   | E_run _ -> false (* sometimes true, sometimes false, depending on the type *)
   | E_pause _ -> false
+  | E_equations(_,_) -> false (* List.for_all (fun (_,e) -> combinational ~externals e) eqs *)
 
 (* same as combinational, but may contain cas/match, registers or even exec blocks *)
 
@@ -118,3 +119,4 @@ let rec instantaneous ~externals (e:e) : bool =
 	    not(is_par) && instantaneous ~externals e1 && instantaneous ~externals e2
   | E_run _ -> false (* sometimes true, sometimes false, depending on the type *)
   | E_pause _ -> false
+  | E_equations _ -> true

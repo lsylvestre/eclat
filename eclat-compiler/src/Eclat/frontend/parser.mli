@@ -5,6 +5,7 @@ type token =
   | XOR
   | WITH_SIZES
   | WITH
+  | WHERE
   | WHEN
   | VECT_CREATE
   | VECTOR_MAPI

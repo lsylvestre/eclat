@@ -11,25 +11,26 @@ module MenhirBasics = struct
     | XOR
     | WITH_SIZES
     | WITH
+    | WHERE
     | WHEN
     | VECT_CREATE
     | VECTOR_MAPI
     | UP_IDENT of (
 # 79 "src/Eclat/frontend/parser.mly"
        (string)
-# 21 "src/Eclat/frontend/parser.ml"
+# 22 "src/Eclat/frontend/parser.ml"
   )
     | UNROLL
     | TYPE
     | TYB_VAR_IDENT of (
 # 79 "src/Eclat/frontend/parser.mly"
        (string)
-# 28 "src/Eclat/frontend/parser.ml"
+# 29 "src/Eclat/frontend/parser.ml"
   )
     | TVAR_IDENT of (
 # 79 "src/Eclat/frontend/parser.mly"
        (string)
-# 33 "src/Eclat/frontend/parser.ml"
+# 34 "src/Eclat/frontend/parser.ml"
   )
     | TUPLE_UPDATE
     | TUPLE_OF_INT
@@ -40,12 +41,12 @@ module MenhirBasics = struct
     | SYM of (
 # 90 "src/Eclat/frontend/parser.mly"
        (string)
-# 44 "src/Eclat/frontend/parser.ml"
+# 45 "src/Eclat/frontend/parser.ml"
   )
     | STRING_LIT of (
 # 97 "src/Eclat/frontend/parser.mly"
        (string)
-# 49 "src/Eclat/frontend/parser.ml"
+# 50 "src/Eclat/frontend/parser.ml"
   )
     | STATIC
     | SIZE_CREATE
@@ -77,7 +78,7 @@ module MenhirBasics = struct
     | OPERATOR_IDENT of (
 # 91 "src/Eclat/frontend/parser.mly"
        (string)
-# 81 "src/Eclat/frontend/parser.ml"
+# 82 "src/Eclat/frontend/parser.ml"
   )
     | OPERATOR
     | OF
@@ -108,7 +109,7 @@ module MenhirBasics = struct
     | INT_LIT of (
 # 81 "src/Eclat/frontend/parser.mly"
        (int)
-# 112 "src/Eclat/frontend/parser.ml"
+# 113 "src/Eclat/frontend/parser.ml"
   )
     | INIT_TUPLE
     | INIT_INT
@@ -121,7 +122,7 @@ module MenhirBasics = struct
     | IDENT of (
 # 79 "src/Eclat/frontend/parser.mly"
        (string)
-# 125 "src/Eclat/frontend/parser.ml"
+# 126 "src/Eclat/frontend/parser.ml"
   )
     | HAT
     | GT
@@ -151,7 +152,7 @@ module MenhirBasics = struct
     | BOOL_LIT of (
 # 80 "src/Eclat/frontend/parser.mly"
        (bool)
-# 155 "src/Eclat/frontend/parser.ml"
+# 156 "src/Eclat/frontend/parser.ml"
   )
     | BANG
     | AT_AT
@@ -239,7 +240,7 @@ include MenhirBasics
     | _ -> assert false (* todo *)
 
 
-# 243 "src/Eclat/frontend/parser.ml"
+# 244 "src/Eclat/frontend/parser.ml"
 
 type ('s, 'r) _menhir_state = 
   | MenhirState000 : ('s, _menhir_box_exp_eof) _menhir_state
@@ -1322,14 +1323,14 @@ and ('s, 'r) _menhir_cell1_IDENT =
   | MenhirCell1_IDENT of 's * ('s, 'r) _menhir_state * (
 # 79 "src/Eclat/frontend/parser.mly"
        (string)
-# 1326 "src/Eclat/frontend/parser.ml"
+# 1327 "src/Eclat/frontend/parser.ml"
 ) * Lexing.position * Lexing.position
 
 and 's _menhir_cell0_IDENT = 
   | MenhirCell0_IDENT of 's * (
 # 79 "src/Eclat/frontend/parser.mly"
        (string)
-# 1333 "src/Eclat/frontend/parser.ml"
+# 1334 "src/Eclat/frontend/parser.ml"
 ) * Lexing.position * Lexing.position
 
 and ('s, 'r) _menhir_cell1_IF = 
@@ -1339,7 +1340,7 @@ and ('s, 'r) _menhir_cell1_INT_LIT =
   | MenhirCell1_INT_LIT of 's * ('s, 'r) _menhir_state * (
 # 81 "src/Eclat/frontend/parser.mly"
        (int)
-# 1343 "src/Eclat/frontend/parser.ml"
+# 1344 "src/Eclat/frontend/parser.ml"
 ) * Lexing.position * Lexing.position
 
 and ('s, 'r) _menhir_cell1_LCUR = 
@@ -1379,7 +1380,7 @@ and 's _menhir_cell0_OPERATOR_IDENT =
   | MenhirCell0_OPERATOR_IDENT of 's * (
 # 91 "src/Eclat/frontend/parser.mly"
        (string)
-# 1383 "src/Eclat/frontend/parser.ml"
+# 1384 "src/Eclat/frontend/parser.ml"
 ) * Lexing.position * Lexing.position
 
 and ('s, 'r) _menhir_cell1_PARFOR = 
@@ -1428,14 +1429,14 @@ and ('s, 'r) _menhir_cell1_UP_IDENT =
   | MenhirCell1_UP_IDENT of 's * ('s, 'r) _menhir_state * (
 # 79 "src/Eclat/frontend/parser.mly"
        (string)
-# 1432 "src/Eclat/frontend/parser.ml"
+# 1433 "src/Eclat/frontend/parser.ml"
 ) * Lexing.position * Lexing.position
 
 and 's _menhir_cell0_UP_IDENT = 
   | MenhirCell0_UP_IDENT of 's * (
 # 79 "src/Eclat/frontend/parser.mly"
        (string)
-# 1439 "src/Eclat/frontend/parser.ml"
+# 1440 "src/Eclat/frontend/parser.ml"
 ) * Lexing.position * Lexing.position
 
 and ('s, 'r) _menhir_cell1_VECTOR_MAPI = 
@@ -1461,7 +1462,7 @@ let _menhir_action_002 =
     (
 # 629 "src/Eclat/frontend/parser.mly"
               ( mk_loc (with_file _loc) e )
-# 1465 "src/Eclat/frontend/parser.ml"
+# 1466 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_003 =
@@ -1469,7 +1470,7 @@ let _menhir_action_003 =
     (
 # 632 "src/Eclat/frontend/parser.mly"
                ( E_get(ex) )
-# 1473 "src/Eclat/frontend/parser.ml"
+# 1474 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_004 =
@@ -1477,7 +1478,7 @@ let _menhir_action_004 =
     (
 # 633 "src/Eclat/frontend/parser.mly"
                       ( e )
-# 1481 "src/Eclat/frontend/parser.ml"
+# 1482 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_005 =
@@ -1485,45 +1486,45 @@ let _menhir_action_005 =
     (
 # 634 "src/Eclat/frontend/parser.mly"
                                 ( ty_annot ~ty e )
-# 1489 "src/Eclat/frontend/parser.ml"
+# 1490 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_006 =
   fun c ->
     (
-# 635 "src/Eclat/frontend/parser.mly"
+# 636 "src/Eclat/frontend/parser.mly"
           ( E_const c )
-# 1497 "src/Eclat/frontend/parser.ml"
+# 1498 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_007 =
   fun k ->
     (
-# 637 "src/Eclat/frontend/parser.mly"
+# 638 "src/Eclat/frontend/parser.mly"
                           ( E_const (Op(Runtime(Resize_int k))) )
-# 1505 "src/Eclat/frontend/parser.ml"
+# 1506 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_008 =
   fun k ->
     (
-# 638 "src/Eclat/frontend/parser.mly"
+# 639 "src/Eclat/frontend/parser.mly"
                                ( E_const (Op(Runtime(Tuple_of_int k))) )
-# 1513 "src/Eclat/frontend/parser.ml"
+# 1514 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_009 =
   fun k ->
     (
-# 639 "src/Eclat/frontend/parser.mly"
+# 640 "src/Eclat/frontend/parser.mly"
                                ( E_const (Op(Runtime(Int_of_tuple k))) )
-# 1521 "src/Eclat/frontend/parser.ml"
+# 1522 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_010 =
   fun e ->
     (
-# 640 "src/Eclat/frontend/parser.mly"
+# 641 "src/Eclat/frontend/parser.mly"
                      (
                 let loc = loc_of e in
                 match Ast_undecorated.remove_deco e with
@@ -1532,23 +1533,23 @@ let _menhir_action_010 =
                                   E_vector_mapi(false,(P_var x,(Types.new_tyB_unknown(),Types.new_tyB_unknown()),E_app(v,E_var x)), 
                                      mk_loc loc e, new_size_unknown ())
                 | _ -> assert false (* todo error *) )
-# 1536 "src/Eclat/frontend/parser.ml"
+# 1537 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_011 =
   fun k x ->
     (
-# 649 "src/Eclat/frontend/parser.mly"
+# 650 "src/Eclat/frontend/parser.mly"
                         ( E_const (Op(Runtime(Unroll k))) )
-# 1544 "src/Eclat/frontend/parser.ml"
+# 1545 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_012 =
   fun l ->
     (
-# 650 "src/Eclat/frontend/parser.mly"
+# 651 "src/Eclat/frontend/parser.mly"
                            ( E_const (Op(Runtime(Vector_create l))) )
-# 1552 "src/Eclat/frontend/parser.ml"
+# 1553 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_013 =
@@ -1557,7 +1558,7 @@ let _menhir_action_013 =
     let _startpos = _startpos_x_ in
     let _loc = (_startpos, _endpos) in
     (
-# 651 "src/Eclat/frontend/parser.mly"
+# 652 "src/Eclat/frontend/parser.mly"
           ( match x with
             | "abs" -> E_const (Op(Runtime(External_fun("Int.absv",new_ty_unknown ()))))
             | "not" -> E_const (Op(Runtime(External_fun("Bool.lnot",new_ty_unknown ()))))
@@ -1578,7 +1579,7 @@ let _menhir_action_013 =
             | "_" -> Prelude.Errors.raise_error ~loc:(with_file _loc)
                          ~msg:"wildcard \"_\" not expected." ()
             | _ -> E_var x )
-# 1582 "src/Eclat/frontend/parser.ml"
+# 1583 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_014 =
@@ -1586,35 +1587,35 @@ let _menhir_action_014 =
     let _2 = 
 # 241 "<standard.mly>"
     ( xs )
-# 1590 "src/Eclat/frontend/parser.ml"
+# 1591 "src/Eclat/frontend/parser.ml"
      in
     (
-# 672 "src/Eclat/frontend/parser.mly"
+# 673 "src/Eclat/frontend/parser.mly"
     ( (* Buffer n *) assert false (*todo*)  )
-# 1595 "src/Eclat/frontend/parser.ml"
+# 1596 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_015 =
   fun cases e otherwise ->
     (
-# 677 "src/Eclat/frontend/parser.mly"
+# 678 "src/Eclat/frontend/parser.mly"
       ( E_case(e,cases,otherwise) )
-# 1603 "src/Eclat/frontend/parser.ml"
+# 1604 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_016 =
   fun e rev_cases ->
     (
-# 681 "src/Eclat/frontend/parser.mly"
+# 682 "src/Eclat/frontend/parser.mly"
       ( let (hs,eo) = rev_cases in
         E_match(e,List.rev hs,eo) )
-# 1612 "src/Eclat/frontend/parser.ml"
+# 1613 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_017 =
   fun e e1 e2 i ->
     (
-# 684 "src/Eclat/frontend/parser.mly"
+# 685 "src/Eclat/frontend/parser.mly"
       ( let loop = gensym ~prefix:"loop" () in
         let n0 = gensym ~prefix:"n0" () in
         let n = gensym ~prefix:"n" () in
@@ -1629,7 +1630,7 @@ let _menhir_action_017 =
                                         E_tuple[E_var i;E_const (Int (1,new_size_unknown()))])))))), 
                  E_app(E_var loop,E_var n0))))
                 )
-# 1633 "src/Eclat/frontend/parser.ml"
+# 1634 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_018 =
@@ -1638,9 +1639,9 @@ let _menhir_action_018 =
     let _startpos = _startpos__1_ in
     let _loc = (_startpos, _endpos) in
     (
-# 700 "src/Eclat/frontend/parser.mly"
+# 701 "src/Eclat/frontend/parser.mly"
       ( E_for(x,e_st1,e_st2,e,with_file _loc) )
-# 1644 "src/Eclat/frontend/parser.ml"
+# 1645 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_019 =
@@ -1648,7 +1649,7 @@ let _menhir_action_019 =
     (
 # 266 "src/Eclat/frontend/parser.mly"
                              ( b )
-# 1652 "src/Eclat/frontend/parser.ml"
+# 1653 "src/Eclat/frontend/parser.ml"
      : (Ast.p * Ast.e_static))
 
 let _menhir_action_020 =
@@ -1656,7 +1657,7 @@ let _menhir_action_020 =
     (
 # 268 "src/Eclat/frontend/parser.mly"
         ( b )
-# 1660 "src/Eclat/frontend/parser.ml"
+# 1661 "src/Eclat/frontend/parser.ml"
      : (Ast.p * Ast.e_static))
 
 let _menhir_action_021 =
@@ -1664,7 +1665,7 @@ let _menhir_action_021 =
     (
 # 270 "src/Eclat/frontend/parser.mly"
         ( e )
-# 1668 "src/Eclat/frontend/parser.ml"
+# 1669 "src/Eclat/frontend/parser.ml"
      : (Ast.p * Ast.e_static))
 
 let _menhir_action_022 =
@@ -1677,7 +1678,7 @@ let _menhir_action_022 =
             let v = mk_fix f (ty_annot_opt ~ty:ty_opt e1) loc_fun in
             P_var f, v
         )
-# 1681 "src/Eclat/frontend/parser.ml"
+# 1682 "src/Eclat/frontend/parser.ml"
      : (Ast.p * Ast.e_static))
 
 let _menhir_action_023 =
@@ -1685,7 +1686,7 @@ let _menhir_action_023 =
     (
 # 266 "src/Eclat/frontend/parser.mly"
                              ( b )
-# 1689 "src/Eclat/frontend/parser.ml"
+# 1690 "src/Eclat/frontend/parser.ml"
      : (Ast.p * Ast.e_static))
 
 let _menhir_action_024 =
@@ -1693,7 +1694,7 @@ let _menhir_action_024 =
     (
 # 268 "src/Eclat/frontend/parser.mly"
         ( b )
-# 1697 "src/Eclat/frontend/parser.ml"
+# 1698 "src/Eclat/frontend/parser.ml"
      : (Ast.p * Ast.e_static))
 
 let _menhir_action_025 =
@@ -1701,7 +1702,7 @@ let _menhir_action_025 =
     (
 # 270 "src/Eclat/frontend/parser.mly"
         ( e )
-# 1705 "src/Eclat/frontend/parser.ml"
+# 1706 "src/Eclat/frontend/parser.ml"
      : (Ast.p * Ast.e_static))
 
 let _menhir_action_026 =
@@ -1714,31 +1715,31 @@ let _menhir_action_026 =
             let v = mk_fix f (ty_annot_opt ~ty:ty_opt e1) loc_fun in
             P_var f, v
         )
-# 1718 "src/Eclat/frontend/parser.ml"
+# 1719 "src/Eclat/frontend/parser.ml"
      : (Ast.p * Ast.e_static))
 
 let _menhir_action_027 =
   fun () ->
     (
-# 728 "src/Eclat/frontend/parser.mly"
+# 729 "src/Eclat/frontend/parser.mly"
                 ( P_unit )
-# 1726 "src/Eclat/frontend/parser.ml"
+# 1727 "src/Eclat/frontend/parser.ml"
      : (Ast.p))
 
 let _menhir_action_028 =
   fun p ->
     (
-# 729 "src/Eclat/frontend/parser.mly"
+# 730 "src/Eclat/frontend/parser.mly"
                       ( p )
-# 1734 "src/Eclat/frontend/parser.ml"
+# 1735 "src/Eclat/frontend/parser.ml"
      : (Ast.p))
 
 let _menhir_action_029 =
   fun x ->
     (
-# 730 "src/Eclat/frontend/parser.mly"
+# 731 "src/Eclat/frontend/parser.mly"
           ( P_var x )
-# 1742 "src/Eclat/frontend/parser.ml"
+# 1743 "src/Eclat/frontend/parser.ml"
      : (Ast.p))
 
 let _menhir_action_030 =
@@ -1749,7 +1750,7 @@ let _menhir_action_030 =
     (
 # 514 "src/Eclat/frontend/parser.mly"
                  ( mk_loc (with_file _loc) e )
-# 1753 "src/Eclat/frontend/parser.ml"
+# 1754 "src/Eclat/frontend/parser.ml"
      : (Ast.e))
 
 let _menhir_action_031 =
@@ -1760,7 +1761,7 @@ let _menhir_action_031 =
     (
 # 517 "src/Eclat/frontend/parser.mly"
                ( mk_loc (with_file _loc) @@ E_pause e )
-# 1764 "src/Eclat/frontend/parser.ml"
+# 1765 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_032 =
@@ -1771,7 +1772,7 @@ let _menhir_action_032 =
     (
 # 518 "src/Eclat/frontend/parser.mly"
                                   ( E_array_make(sz, e, with_file _loc) )
-# 1775 "src/Eclat/frontend/parser.ml"
+# 1776 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_033 =
@@ -1782,7 +1783,7 @@ let _menhir_action_033 =
     (
 # 520 "src/Eclat/frontend/parser.mly"
                                      ( E_array_create(sz, with_file _loc) )
-# 1786 "src/Eclat/frontend/parser.ml"
+# 1787 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_034 =
@@ -1793,7 +1794,7 @@ let _menhir_action_034 =
     (
 # 520 "src/Eclat/frontend/parser.mly"
                                      ( E_array_create(sz, with_file _loc) )
-# 1797 "src/Eclat/frontend/parser.ml"
+# 1798 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_035 =
@@ -1803,7 +1804,7 @@ let _menhir_action_035 =
     ( 
         E_app(e1,E_tuple[e2;v]) 
     )
-# 1807 "src/Eclat/frontend/parser.ml"
+# 1808 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_036 =
@@ -1813,7 +1814,7 @@ let _menhir_action_036 =
     ( 
         E_app(e1,E_tuple[e2;v]) 
     )
-# 1817 "src/Eclat/frontend/parser.ml"
+# 1818 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_037 =
@@ -1821,7 +1822,7 @@ let _menhir_action_037 =
     (
 # 526 "src/Eclat/frontend/parser.mly"
                            ( E_set(ex,e) )
-# 1825 "src/Eclat/frontend/parser.ml"
+# 1826 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_038 =
@@ -1829,7 +1830,7 @@ let _menhir_action_038 =
     (
 # 527 "src/Eclat/frontend/parser.mly"
                         ( E_ref e )
-# 1833 "src/Eclat/frontend/parser.ml"
+# 1834 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_039 =
@@ -1843,7 +1844,7 @@ let _menhir_action_039 =
                | E_tuple[E_var x;e1;e2] -> E_array_set(x,e1,e2) 
                | _ -> Prelude.Errors.raise_error ~loc:(with_file _loc)
                    ~msg:"... array set" () )
-# 1847 "src/Eclat/frontend/parser.ml"
+# 1848 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_040 =
@@ -1851,7 +1852,7 @@ let _menhir_action_040 =
     (
 # 538 "src/Eclat/frontend/parser.mly"
    ( E_array_get(x,e1) )
-# 1855 "src/Eclat/frontend/parser.ml"
+# 1856 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_041 =
@@ -1859,7 +1860,7 @@ let _menhir_action_041 =
     (
 # 538 "src/Eclat/frontend/parser.mly"
    ( E_array_get(x,e1) )
-# 1863 "src/Eclat/frontend/parser.ml"
+# 1864 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_042 =
@@ -1867,7 +1868,7 @@ let _menhir_action_042 =
     (
 # 539 "src/Eclat/frontend/parser.mly"
                      ( E_array_get(x,e1) )
-# 1871 "src/Eclat/frontend/parser.ml"
+# 1872 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_043 =
@@ -1875,7 +1876,7 @@ let _menhir_action_043 =
     (
 # 540 "src/Eclat/frontend/parser.mly"
                      ( E_array_length x )
-# 1879 "src/Eclat/frontend/parser.ml"
+# 1880 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_044 =
@@ -1889,7 +1890,7 @@ let _menhir_action_044 =
                   | E_var x -> E_array_length x 
                   | _ -> Prelude.Errors.raise_error ~loc:(with_file _loc)
                           ~msg:"array length: should be a variable......" () )
-# 1893 "src/Eclat/frontend/parser.ml"
+# 1894 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_045 =
@@ -1903,7 +1904,7 @@ let _menhir_action_045 =
                   | E_var x -> E_array_length x 
                   | _ -> Prelude.Errors.raise_error ~loc:(with_file _loc)
                           ~msg:"array length: should be a variable......" () )
-# 1907 "src/Eclat/frontend/parser.ml"
+# 1908 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_046 =
@@ -1911,7 +1912,7 @@ let _menhir_action_046 =
     (
 # 548 "src/Eclat/frontend/parser.mly"
   ( E_array_set(x,e1,e2) )
-# 1915 "src/Eclat/frontend/parser.ml"
+# 1916 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_047 =
@@ -1919,7 +1920,7 @@ let _menhir_action_047 =
     (
 # 548 "src/Eclat/frontend/parser.mly"
   ( E_array_set(x,e1,e2) )
-# 1923 "src/Eclat/frontend/parser.ml"
+# 1924 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_048 =
@@ -1927,7 +1928,7 @@ let _menhir_action_048 =
     (
 # 549 "src/Eclat/frontend/parser.mly"
                         ( E_const(C_size n) )
-# 1931 "src/Eclat/frontend/parser.ml"
+# 1932 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_049 =
@@ -1945,7 +1946,7 @@ let _menhir_action_049 =
                    ~msg:"expression in functional position should be a variable or a constante" ())
         | _ -> Prelude.Errors.raise_error ~loc:(with_file _loc)
                    ~msg:"All functions and primitives should be unary. Hints: use a tuple as argument" () )
-# 1949 "src/Eclat/frontend/parser.ml"
+# 1950 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_050 =
@@ -1953,15 +1954,15 @@ let _menhir_action_050 =
     (
 # 559 "src/Eclat/frontend/parser.mly"
                                        ( E_app(E_const(Op(Runtime(External_fun("Int.neg",new_ty_unknown ())))),e1) )
-# 1957 "src/Eclat/frontend/parser.ml"
+# 1958 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_051 =
   fun _endpos_e2_ _startpos_e1_ e1 e2 ->
     let op = 
-# 765 "src/Eclat/frontend/parser.mly"
+# 766 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.add",new_ty_unknown ()) )
-# 1965 "src/Eclat/frontend/parser.ml"
+# 1966 "src/Eclat/frontend/parser.ml"
      in
     let _endpos = _endpos_e2_ in
     let _startpos = _startpos_e1_ in
@@ -1971,15 +1972,15 @@ let _menhir_action_051 =
         ( E_app (mk_loc (with_file _loc) @@ E_const (Op (Runtime(op))),
                  mk_loc (with_file _loc) @@ E_tuple [e1;e2])
         )
-# 1975 "src/Eclat/frontend/parser.ml"
+# 1976 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_052 =
   fun _endpos_e2_ _startpos_e1_ e1 e2 ->
     let op = 
-# 766 "src/Eclat/frontend/parser.mly"
+# 767 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.sub",new_ty_unknown ()) )
-# 1983 "src/Eclat/frontend/parser.ml"
+# 1984 "src/Eclat/frontend/parser.ml"
      in
     let _endpos = _endpos_e2_ in
     let _startpos = _startpos_e1_ in
@@ -1989,15 +1990,15 @@ let _menhir_action_052 =
         ( E_app (mk_loc (with_file _loc) @@ E_const (Op (Runtime(op))),
                  mk_loc (with_file _loc) @@ E_tuple [e1;e2])
         )
-# 1993 "src/Eclat/frontend/parser.ml"
+# 1994 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_053 =
   fun _endpos_e2_ _startpos_e1_ e1 e2 ->
     let op = 
-# 767 "src/Eclat/frontend/parser.mly"
+# 768 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.mul",new_ty_unknown ()) )
-# 2001 "src/Eclat/frontend/parser.ml"
+# 2002 "src/Eclat/frontend/parser.ml"
      in
     let _endpos = _endpos_e2_ in
     let _startpos = _startpos_e1_ in
@@ -2007,15 +2008,15 @@ let _menhir_action_053 =
         ( E_app (mk_loc (with_file _loc) @@ E_const (Op (Runtime(op))),
                  mk_loc (with_file _loc) @@ E_tuple [e1;e2])
         )
-# 2011 "src/Eclat/frontend/parser.ml"
+# 2012 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_054 =
   fun _endpos_e2_ _startpos_e1_ e1 e2 ->
     let op = 
-# 768 "src/Eclat/frontend/parser.mly"
+# 769 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.div",new_ty_unknown ()) )
-# 2019 "src/Eclat/frontend/parser.ml"
+# 2020 "src/Eclat/frontend/parser.ml"
      in
     let _endpos = _endpos_e2_ in
     let _startpos = _startpos_e1_ in
@@ -2025,15 +2026,15 @@ let _menhir_action_054 =
         ( E_app (mk_loc (with_file _loc) @@ E_const (Op (Runtime(op))),
                  mk_loc (with_file _loc) @@ E_tuple [e1;e2])
         )
-# 2029 "src/Eclat/frontend/parser.ml"
+# 2030 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_055 =
   fun _endpos_e2_ _startpos_e1_ e1 e2 ->
     let op = 
-# 769 "src/Eclat/frontend/parser.mly"
+# 770 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.modulo",new_ty_unknown ()) )
-# 2037 "src/Eclat/frontend/parser.ml"
+# 2038 "src/Eclat/frontend/parser.ml"
      in
     let _endpos = _endpos_e2_ in
     let _startpos = _startpos_e1_ in
@@ -2043,15 +2044,15 @@ let _menhir_action_055 =
         ( E_app (mk_loc (with_file _loc) @@ E_const (Op (Runtime(op))),
                  mk_loc (with_file _loc) @@ E_tuple [e1;e2])
         )
-# 2047 "src/Eclat/frontend/parser.ml"
+# 2048 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_056 =
   fun _endpos_e2_ _startpos_e1_ e1 e2 ->
     let op = 
-# 770 "src/Eclat/frontend/parser.mly"
+# 771 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.lt",new_ty_unknown ()) )
-# 2055 "src/Eclat/frontend/parser.ml"
+# 2056 "src/Eclat/frontend/parser.ml"
      in
     let _endpos = _endpos_e2_ in
     let _startpos = _startpos_e1_ in
@@ -2061,15 +2062,15 @@ let _menhir_action_056 =
         ( E_app (mk_loc (with_file _loc) @@ E_const (Op (Runtime(op))),
                  mk_loc (with_file _loc) @@ E_tuple [e1;e2])
         )
-# 2065 "src/Eclat/frontend/parser.ml"
+# 2066 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_057 =
   fun _endpos_e2_ _startpos_e1_ e1 e2 ->
     let op = 
-# 771 "src/Eclat/frontend/parser.mly"
+# 772 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.gt",new_ty_unknown ()) )
-# 2073 "src/Eclat/frontend/parser.ml"
+# 2074 "src/Eclat/frontend/parser.ml"
      in
     let _endpos = _endpos_e2_ in
     let _startpos = _startpos_e1_ in
@@ -2079,15 +2080,15 @@ let _menhir_action_057 =
         ( E_app (mk_loc (with_file _loc) @@ E_const (Op (Runtime(op))),
                  mk_loc (with_file _loc) @@ E_tuple [e1;e2])
         )
-# 2083 "src/Eclat/frontend/parser.ml"
+# 2084 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_058 =
   fun _endpos_e2_ _startpos_e1_ e1 e2 ->
     let op = 
-# 772 "src/Eclat/frontend/parser.mly"
+# 773 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.le",new_ty_unknown ()) )
-# 2091 "src/Eclat/frontend/parser.ml"
+# 2092 "src/Eclat/frontend/parser.ml"
      in
     let _endpos = _endpos_e2_ in
     let _startpos = _startpos_e1_ in
@@ -2097,15 +2098,15 @@ let _menhir_action_058 =
         ( E_app (mk_loc (with_file _loc) @@ E_const (Op (Runtime(op))),
                  mk_loc (with_file _loc) @@ E_tuple [e1;e2])
         )
-# 2101 "src/Eclat/frontend/parser.ml"
+# 2102 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_059 =
   fun _endpos_e2_ _startpos_e1_ e1 e2 ->
     let op = 
-# 773 "src/Eclat/frontend/parser.mly"
+# 774 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.ge",new_ty_unknown ()) )
-# 2109 "src/Eclat/frontend/parser.ml"
+# 2110 "src/Eclat/frontend/parser.ml"
      in
     let _endpos = _endpos_e2_ in
     let _startpos = _startpos_e1_ in
@@ -2115,15 +2116,15 @@ let _menhir_action_059 =
         ( E_app (mk_loc (with_file _loc) @@ E_const (Op (Runtime(op))),
                  mk_loc (with_file _loc) @@ E_tuple [e1;e2])
         )
-# 2119 "src/Eclat/frontend/parser.ml"
+# 2120 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_060 =
   fun _endpos_e2_ _startpos_e1_ e1 e2 ->
     let op = 
-# 774 "src/Eclat/frontend/parser.mly"
+# 775 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.eq",new_ty_unknown ()) )
-# 2127 "src/Eclat/frontend/parser.ml"
+# 2128 "src/Eclat/frontend/parser.ml"
      in
     let _endpos = _endpos_e2_ in
     let _startpos = _startpos_e1_ in
@@ -2133,15 +2134,15 @@ let _menhir_action_060 =
         ( E_app (mk_loc (with_file _loc) @@ E_const (Op (Runtime(op))),
                  mk_loc (with_file _loc) @@ E_tuple [e1;e2])
         )
-# 2137 "src/Eclat/frontend/parser.ml"
+# 2138 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_061 =
   fun _endpos_e2_ _startpos_e1_ e1 e2 ->
     let op = 
-# 774 "src/Eclat/frontend/parser.mly"
+# 775 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.eq",new_ty_unknown ()) )
-# 2145 "src/Eclat/frontend/parser.ml"
+# 2146 "src/Eclat/frontend/parser.ml"
      in
     let _endpos = _endpos_e2_ in
     let _startpos = _startpos_e1_ in
@@ -2151,15 +2152,15 @@ let _menhir_action_061 =
         ( E_app (mk_loc (with_file _loc) @@ E_const (Op (Runtime(op))),
                  mk_loc (with_file _loc) @@ E_tuple [e1;e2])
         )
-# 2155 "src/Eclat/frontend/parser.ml"
+# 2156 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_062 =
   fun _endpos_e2_ _startpos_e1_ e1 e2 ->
     let op = 
-# 775 "src/Eclat/frontend/parser.mly"
+# 776 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.neq",new_ty_unknown ()) )
-# 2163 "src/Eclat/frontend/parser.ml"
+# 2164 "src/Eclat/frontend/parser.ml"
      in
     let _endpos = _endpos_e2_ in
     let _startpos = _startpos_e1_ in
@@ -2169,15 +2170,15 @@ let _menhir_action_062 =
         ( E_app (mk_loc (with_file _loc) @@ E_const (Op (Runtime(op))),
                  mk_loc (with_file _loc) @@ E_tuple [e1;e2])
         )
-# 2173 "src/Eclat/frontend/parser.ml"
+# 2174 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_063 =
   fun _endpos_e2_ _startpos_e1_ e1 e2 ->
     let op = 
-# 776 "src/Eclat/frontend/parser.mly"
+# 777 "src/Eclat/frontend/parser.mly"
              ( External_fun("Bool.land",new_ty_unknown ()) )
-# 2181 "src/Eclat/frontend/parser.ml"
+# 2182 "src/Eclat/frontend/parser.ml"
      in
     let _endpos = _endpos_e2_ in
     let _startpos = _startpos_e1_ in
@@ -2187,15 +2188,15 @@ let _menhir_action_063 =
         ( E_app (mk_loc (with_file _loc) @@ E_const (Op (Runtime(op))),
                  mk_loc (with_file _loc) @@ E_tuple [e1;e2])
         )
-# 2191 "src/Eclat/frontend/parser.ml"
+# 2192 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_064 =
   fun _endpos_e2_ _startpos_e1_ e1 e2 ->
     let op = 
-# 777 "src/Eclat/frontend/parser.mly"
+# 778 "src/Eclat/frontend/parser.mly"
              ( External_fun("Bool.lxor",new_ty_unknown ()) )
-# 2199 "src/Eclat/frontend/parser.ml"
+# 2200 "src/Eclat/frontend/parser.ml"
      in
     let _endpos = _endpos_e2_ in
     let _startpos = _startpos_e1_ in
@@ -2205,15 +2206,15 @@ let _menhir_action_064 =
         ( E_app (mk_loc (with_file _loc) @@ E_const (Op (Runtime(op))),
                  mk_loc (with_file _loc) @@ E_tuple [e1;e2])
         )
-# 2209 "src/Eclat/frontend/parser.ml"
+# 2210 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_065 =
   fun _endpos_e2_ _startpos_e1_ e1 e2 ->
     let op = 
-# 778 "src/Eclat/frontend/parser.mly"
+# 779 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.lxor",new_ty_unknown ()) )
-# 2217 "src/Eclat/frontend/parser.ml"
+# 2218 "src/Eclat/frontend/parser.ml"
      in
     let _endpos = _endpos_e2_ in
     let _startpos = _startpos_e1_ in
@@ -2223,15 +2224,15 @@ let _menhir_action_065 =
         ( E_app (mk_loc (with_file _loc) @@ E_const (Op (Runtime(op))),
                  mk_loc (with_file _loc) @@ E_tuple [e1;e2])
         )
-# 2227 "src/Eclat/frontend/parser.ml"
+# 2228 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_066 =
   fun _endpos_e2_ _startpos_e1_ e1 e2 ->
     let op = 
-# 779 "src/Eclat/frontend/parser.mly"
+# 780 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.land",new_ty_unknown ()) )
-# 2235 "src/Eclat/frontend/parser.ml"
+# 2236 "src/Eclat/frontend/parser.ml"
      in
     let _endpos = _endpos_e2_ in
     let _startpos = _startpos_e1_ in
@@ -2241,15 +2242,15 @@ let _menhir_action_066 =
         ( E_app (mk_loc (with_file _loc) @@ E_const (Op (Runtime(op))),
                  mk_loc (with_file _loc) @@ E_tuple [e1;e2])
         )
-# 2245 "src/Eclat/frontend/parser.ml"
+# 2246 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_067 =
   fun _endpos_e2_ _startpos_e1_ e1 e2 ->
     let op = 
-# 780 "src/Eclat/frontend/parser.mly"
+# 781 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.lor",new_ty_unknown ()) )
-# 2253 "src/Eclat/frontend/parser.ml"
+# 2254 "src/Eclat/frontend/parser.ml"
      in
     let _endpos = _endpos_e2_ in
     let _startpos = _startpos_e1_ in
@@ -2259,15 +2260,15 @@ let _menhir_action_067 =
         ( E_app (mk_loc (with_file _loc) @@ E_const (Op (Runtime(op))),
                  mk_loc (with_file _loc) @@ E_tuple [e1;e2])
         )
-# 2263 "src/Eclat/frontend/parser.ml"
+# 2264 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_068 =
   fun _endpos_e2_ _startpos_e1_ e1 e2 ->
     let op = 
-# 781 "src/Eclat/frontend/parser.mly"
+# 782 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.lsl",new_ty_unknown ()) )
-# 2271 "src/Eclat/frontend/parser.ml"
+# 2272 "src/Eclat/frontend/parser.ml"
      in
     let _endpos = _endpos_e2_ in
     let _startpos = _startpos_e1_ in
@@ -2277,15 +2278,15 @@ let _menhir_action_068 =
         ( E_app (mk_loc (with_file _loc) @@ E_const (Op (Runtime(op))),
                  mk_loc (with_file _loc) @@ E_tuple [e1;e2])
         )
-# 2281 "src/Eclat/frontend/parser.ml"
+# 2282 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_069 =
   fun _endpos_e2_ _startpos_e1_ e1 e2 ->
     let op = 
-# 782 "src/Eclat/frontend/parser.mly"
+# 783 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.lsr",new_ty_unknown ()) )
-# 2289 "src/Eclat/frontend/parser.ml"
+# 2290 "src/Eclat/frontend/parser.ml"
      in
     let _endpos = _endpos_e2_ in
     let _startpos = _startpos_e1_ in
@@ -2295,15 +2296,15 @@ let _menhir_action_069 =
         ( E_app (mk_loc (with_file _loc) @@ E_const (Op (Runtime(op))),
                  mk_loc (with_file _loc) @@ E_tuple [e1;e2])
         )
-# 2299 "src/Eclat/frontend/parser.ml"
+# 2300 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_070 =
   fun _endpos_e2_ _startpos_e1_ e1 e2 ->
     let op = 
-# 783 "src/Eclat/frontend/parser.mly"
+# 784 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.asr",new_ty_unknown ()) )
-# 2307 "src/Eclat/frontend/parser.ml"
+# 2308 "src/Eclat/frontend/parser.ml"
      in
     let _endpos = _endpos_e2_ in
     let _startpos = _startpos_e1_ in
@@ -2313,7 +2314,7 @@ let _menhir_action_070 =
         ( E_app (mk_loc (with_file _loc) @@ E_const (Op (Runtime(op))),
                  mk_loc (with_file _loc) @@ E_tuple [e1;e2])
         )
-# 2317 "src/Eclat/frontend/parser.ml"
+# 2318 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_071 =
@@ -2326,7 +2327,7 @@ let _menhir_action_071 =
         ( let e3 = mk_loc (with_file _loc) @@ E_const (Bool false) in
           E_if(e1,e2,e3)
         )
-# 2330 "src/Eclat/frontend/parser.ml"
+# 2331 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_072 =
@@ -2339,7 +2340,7 @@ let _menhir_action_072 =
         ( let e2 = mk_loc (with_file _loc) @@ E_const (Bool true) in
           E_if(e1,e2,e3)
         )
-# 2343 "src/Eclat/frontend/parser.ml"
+# 2344 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_073 =
@@ -2354,7 +2355,7 @@ let _menhir_action_073 =
          | _ -> Prelude.Errors.raise_error ~loc:(with_file _loc)
                                ~msg:"This expression should be a function" ()
        )
-# 2358 "src/Eclat/frontend/parser.ml"
+# 2359 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_074 =
@@ -2365,7 +2366,7 @@ let _menhir_action_074 =
         let y = gensym () in
          E_reg((P_var y,Types.new_tyB_unknown(),E_app(E_var f,E_var y)),e0,Ast.gensym ())
        )
-# 2369 "src/Eclat/frontend/parser.ml"
+# 2370 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_075 =
@@ -2373,7 +2374,7 @@ let _menhir_action_075 =
     (
 # 584 "src/Eclat/frontend/parser.mly"
        ( E_exec(e1,e2,None,"") )
-# 2377 "src/Eclat/frontend/parser.ml"
+# 2378 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_076 =
@@ -2381,7 +2382,7 @@ let _menhir_action_076 =
     (
 # 586 "src/Eclat/frontend/parser.mly"
        ( E_exec(e1,e2,Some e3,"") )
-# 2385 "src/Eclat/frontend/parser.ml"
+# 2386 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_077 =
@@ -2393,7 +2394,7 @@ let _menhir_action_077 =
 # 588 "src/Eclat/frontend/parser.mly"
   ( let z = Ast.gensym () in
     E_generate((P_var z,(Types.new_ty_unknown(),Types.new_tyB_unknown()),  E_app(ef1,E_var z)),e_init2,e_st3,with_file _loc) )
-# 2397 "src/Eclat/frontend/parser.ml"
+# 2398 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_078 =
@@ -2407,7 +2408,7 @@ let _menhir_action_078 =
         Prelude.Errors.raise_error ~loc:(with_file _loc)
             ~msg:"missing ``default'' close; `exec e default e` expected" ()
     )
-# 2411 "src/Eclat/frontend/parser.ml"
+# 2412 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_079 =
@@ -2421,7 +2422,7 @@ let _menhir_action_079 =
         Prelude.Errors.raise_error ~loc:(with_file _loc)
             ~msg:"missing expression after keyword ``default''; `exec e default e` expected" ()
     )
-# 2425 "src/Eclat/frontend/parser.ml"
+# 2426 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_080 =
@@ -2429,7 +2430,7 @@ let _menhir_action_080 =
     (
 # 617 "src/Eclat/frontend/parser.mly"
      ( E_run(i, e) )
-# 2433 "src/Eclat/frontend/parser.ml"
+# 2434 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_081 =
@@ -2437,7 +2438,7 @@ let _menhir_action_081 =
     (
 # 621 "src/Eclat/frontend/parser.mly"
          ( e )
-# 2441 "src/Eclat/frontend/parser.ml"
+# 2442 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_082 =
@@ -2445,7 +2446,7 @@ let _menhir_action_082 =
     (
 # 443 "src/Eclat/frontend/parser.mly"
                                  ( a )
-# 2449 "src/Eclat/frontend/parser.ml"
+# 2450 "src/Eclat/frontend/parser.ml"
      : (Ast.p * Types.ty option))
 
 let _menhir_action_083 =
@@ -2453,7 +2454,7 @@ let _menhir_action_083 =
     (
 # 443 "src/Eclat/frontend/parser.mly"
                                  ( a )
-# 2457 "src/Eclat/frontend/parser.ml"
+# 2458 "src/Eclat/frontend/parser.ml"
      : (Ast.p * Types.ty option))
 
 let _menhir_action_084 =
@@ -2461,7 +2462,7 @@ let _menhir_action_084 =
     (
 # 446 "src/Eclat/frontend/parser.mly"
                       ( p, None )
-# 2465 "src/Eclat/frontend/parser.ml"
+# 2466 "src/Eclat/frontend/parser.ml"
      : (Ast.p * Types.ty option))
 
 let _menhir_action_085 =
@@ -2469,7 +2470,7 @@ let _menhir_action_085 =
     (
 # 447 "src/Eclat/frontend/parser.mly"
                                  (p, Some ty)
-# 2473 "src/Eclat/frontend/parser.ml"
+# 2474 "src/Eclat/frontend/parser.ml"
      : (Ast.p * Types.ty option))
 
 let _menhir_action_086 =
@@ -2477,7 +2478,7 @@ let _menhir_action_086 =
     (
 # 448 "src/Eclat/frontend/parser.mly"
          ( p, None )
-# 2481 "src/Eclat/frontend/parser.ml"
+# 2482 "src/Eclat/frontend/parser.ml"
      : (Ast.p * Types.ty option))
 
 let _menhir_action_087 =
@@ -2485,7 +2486,7 @@ let _menhir_action_087 =
     (
 # 438 "src/Eclat/frontend/parser.mly"
         ( p, None )
-# 2489 "src/Eclat/frontend/parser.ml"
+# 2490 "src/Eclat/frontend/parser.ml"
      : (Ast.p * Types.ty option))
 
 let _menhir_action_088 =
@@ -2493,7 +2494,7 @@ let _menhir_action_088 =
     (
 # 439 "src/Eclat/frontend/parser.mly"
                      (p, Some ty)
-# 2497 "src/Eclat/frontend/parser.ml"
+# 2498 "src/Eclat/frontend/parser.ml"
      : (Ast.p * Types.ty option))
 
 let _menhir_action_089 =
@@ -2501,7 +2502,7 @@ let _menhir_action_089 =
     (
 # 396 "src/Eclat/frontend/parser.mly"
       ( ty )
-# 2505 "src/Eclat/frontend/parser.ml"
+# 2506 "src/Eclat/frontend/parser.ml"
      : (Types.ty))
 
 let _menhir_action_090 =
@@ -2509,7 +2510,7 @@ let _menhir_action_090 =
     (
 # 415 "src/Eclat/frontend/parser.mly"
                         ( e )
-# 2513 "src/Eclat/frontend/parser.ml"
+# 2514 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_091 =
@@ -2517,7 +2518,7 @@ let _menhir_action_091 =
     (
 # 416 "src/Eclat/frontend/parser.mly"
           ( E_const c )
-# 2521 "src/Eclat/frontend/parser.ml"
+# 2522 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_092 =
@@ -2528,7 +2529,7 @@ let _menhir_action_092 =
             let p,ty_opt = p_ty_opt in
             p,ty_annot_opt ~ty:ty_opt e
         )
-# 2532 "src/Eclat/frontend/parser.ml"
+# 2533 "src/Eclat/frontend/parser.ml"
      : (Ast.p * Ast.e_static))
 
 let _menhir_action_093 =
@@ -2536,7 +2537,7 @@ let _menhir_action_093 =
     (
 # 511 "src/Eclat/frontend/parser.mly"
     ( p,e )
-# 2540 "src/Eclat/frontend/parser.ml"
+# 2541 "src/Eclat/frontend/parser.ml"
      : (Ast.p * Ast.e_static))
 
 let _menhir_action_094 =
@@ -2547,7 +2548,7 @@ let _menhir_action_094 =
     | [],_ | _,[] -> assert false
     | [p],[e] -> (p,e)
     | ps,es -> (P_tuple ps, E_par es) )
-# 2551 "src/Eclat/frontend/parser.ml"
+# 2552 "src/Eclat/frontend/parser.ml"
      : (Ast.p * Ast.e_static))
 
 let _menhir_action_095 =
@@ -2555,7 +2556,7 @@ let _menhir_action_095 =
     (
 # 496 "src/Eclat/frontend/parser.mly"
                  ( let (p,e) = b in ([p],[e]) )
-# 2559 "src/Eclat/frontend/parser.ml"
+# 2560 "src/Eclat/frontend/parser.ml"
      : (Ast.p list * Ast.e_static list))
 
 let _menhir_action_096 =
@@ -2565,32 +2566,32 @@ let _menhir_action_096 =
    ( let (p1,e1) = b1 in
      let (ps,es) = bs in
      (p1::ps,e1::es) )
-# 2569 "src/Eclat/frontend/parser.ml"
+# 2570 "src/Eclat/frontend/parser.ml"
      : (Ast.p list * Ast.e_static list))
 
 let _menhir_action_097 =
   fun () ->
     (
-# 739 "src/Eclat/frontend/parser.mly"
+# 740 "src/Eclat/frontend/parser.mly"
                 ( Unit )
-# 2577 "src/Eclat/frontend/parser.ml"
+# 2578 "src/Eclat/frontend/parser.ml"
      : (Ast.c))
 
 let _menhir_action_098 =
   fun b ->
     (
-# 740 "src/Eclat/frontend/parser.mly"
+# 741 "src/Eclat/frontend/parser.mly"
                 ( Bool b )
-# 2585 "src/Eclat/frontend/parser.ml"
+# 2586 "src/Eclat/frontend/parser.ml"
      : (Ast.c))
 
 let _menhir_action_099 =
   fun n ->
     (
-# 741 "src/Eclat/frontend/parser.mly"
+# 742 "src/Eclat/frontend/parser.mly"
             (
     Int (n,new_size_unknown()) )
-# 2594 "src/Eclat/frontend/parser.ml"
+# 2595 "src/Eclat/frontend/parser.ml"
      : (Ast.c))
 
 let _menhir_action_100 =
@@ -2599,7 +2600,7 @@ let _menhir_action_100 =
     let _startpos = _startpos_n_ in
     let _loc = (_startpos, _endpos) in
     (
-# 744 "src/Eclat/frontend/parser.mly"
+# 745 "src/Eclat/frontend/parser.mly"
     ( if Float.log2 (float n) >= float (k-1) then
        Prelude.Errors.raise_error ~loc:(with_file _loc)
           ~msg:("Integer literal "^
@@ -2607,299 +2608,299 @@ let _menhir_action_100 =
                 " exceeds the range of representable integers of type int<"^
                 string_of_int k ^">") ()
       else Int (n,Sz_lit k) )
-# 2611 "src/Eclat/frontend/parser.ml"
+# 2612 "src/Eclat/frontend/parser.ml"
      : (Ast.c))
 
 let _menhir_action_101 =
   fun s ->
     (
-# 751 "src/Eclat/frontend/parser.mly"
+# 752 "src/Eclat/frontend/parser.mly"
                          ( String s )
-# 2619 "src/Eclat/frontend/parser.ml"
+# 2620 "src/Eclat/frontend/parser.ml"
      : (Ast.c))
 
 let _menhir_action_102 =
   fun x ->
     (
-# 752 "src/Eclat/frontend/parser.mly"
+# 753 "src/Eclat/frontend/parser.mly"
                    ( Op(Runtime(External_fun(x,new_ty_unknown()))) )
-# 2627 "src/Eclat/frontend/parser.ml"
+# 2628 "src/Eclat/frontend/parser.ml"
      : (Ast.c))
 
 let _menhir_action_103 =
   fun x ->
     (
-# 753 "src/Eclat/frontend/parser.mly"
+# 754 "src/Eclat/frontend/parser.mly"
                          ( Inj x )
-# 2635 "src/Eclat/frontend/parser.ml"
+# 2636 "src/Eclat/frontend/parser.ml"
      : (Ast.c))
 
 let _menhir_action_104 =
   fun () ->
     let op = 
-# 765 "src/Eclat/frontend/parser.mly"
+# 766 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.add",new_ty_unknown ()) )
-# 2643 "src/Eclat/frontend/parser.ml"
+# 2644 "src/Eclat/frontend/parser.ml"
      in
     (
-# 754 "src/Eclat/frontend/parser.mly"
+# 755 "src/Eclat/frontend/parser.mly"
                          ( Op(Runtime(op)) )
-# 2648 "src/Eclat/frontend/parser.ml"
+# 2649 "src/Eclat/frontend/parser.ml"
      : (Ast.c))
 
 let _menhir_action_105 =
   fun () ->
     let op = 
-# 766 "src/Eclat/frontend/parser.mly"
+# 767 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.sub",new_ty_unknown ()) )
-# 2656 "src/Eclat/frontend/parser.ml"
+# 2657 "src/Eclat/frontend/parser.ml"
      in
     (
-# 754 "src/Eclat/frontend/parser.mly"
+# 755 "src/Eclat/frontend/parser.mly"
                          ( Op(Runtime(op)) )
-# 2661 "src/Eclat/frontend/parser.ml"
+# 2662 "src/Eclat/frontend/parser.ml"
      : (Ast.c))
 
 let _menhir_action_106 =
   fun () ->
     let op = 
-# 767 "src/Eclat/frontend/parser.mly"
+# 768 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.mul",new_ty_unknown ()) )
-# 2669 "src/Eclat/frontend/parser.ml"
+# 2670 "src/Eclat/frontend/parser.ml"
      in
     (
-# 754 "src/Eclat/frontend/parser.mly"
+# 755 "src/Eclat/frontend/parser.mly"
                          ( Op(Runtime(op)) )
-# 2674 "src/Eclat/frontend/parser.ml"
+# 2675 "src/Eclat/frontend/parser.ml"
      : (Ast.c))
 
 let _menhir_action_107 =
   fun () ->
     let op = 
-# 768 "src/Eclat/frontend/parser.mly"
+# 769 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.div",new_ty_unknown ()) )
-# 2682 "src/Eclat/frontend/parser.ml"
+# 2683 "src/Eclat/frontend/parser.ml"
      in
     (
-# 754 "src/Eclat/frontend/parser.mly"
+# 755 "src/Eclat/frontend/parser.mly"
                          ( Op(Runtime(op)) )
-# 2687 "src/Eclat/frontend/parser.ml"
+# 2688 "src/Eclat/frontend/parser.ml"
      : (Ast.c))
 
 let _menhir_action_108 =
   fun () ->
     let op = 
-# 769 "src/Eclat/frontend/parser.mly"
+# 770 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.modulo",new_ty_unknown ()) )
-# 2695 "src/Eclat/frontend/parser.ml"
+# 2696 "src/Eclat/frontend/parser.ml"
      in
     (
-# 754 "src/Eclat/frontend/parser.mly"
+# 755 "src/Eclat/frontend/parser.mly"
                          ( Op(Runtime(op)) )
-# 2700 "src/Eclat/frontend/parser.ml"
+# 2701 "src/Eclat/frontend/parser.ml"
      : (Ast.c))
 
 let _menhir_action_109 =
   fun () ->
     let op = 
-# 770 "src/Eclat/frontend/parser.mly"
+# 771 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.lt",new_ty_unknown ()) )
-# 2708 "src/Eclat/frontend/parser.ml"
+# 2709 "src/Eclat/frontend/parser.ml"
      in
     (
-# 754 "src/Eclat/frontend/parser.mly"
+# 755 "src/Eclat/frontend/parser.mly"
                          ( Op(Runtime(op)) )
-# 2713 "src/Eclat/frontend/parser.ml"
+# 2714 "src/Eclat/frontend/parser.ml"
      : (Ast.c))
 
 let _menhir_action_110 =
   fun () ->
     let op = 
-# 771 "src/Eclat/frontend/parser.mly"
+# 772 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.gt",new_ty_unknown ()) )
-# 2721 "src/Eclat/frontend/parser.ml"
+# 2722 "src/Eclat/frontend/parser.ml"
      in
     (
-# 754 "src/Eclat/frontend/parser.mly"
+# 755 "src/Eclat/frontend/parser.mly"
                          ( Op(Runtime(op)) )
-# 2726 "src/Eclat/frontend/parser.ml"
+# 2727 "src/Eclat/frontend/parser.ml"
      : (Ast.c))
 
 let _menhir_action_111 =
   fun () ->
     let op = 
-# 772 "src/Eclat/frontend/parser.mly"
+# 773 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.le",new_ty_unknown ()) )
-# 2734 "src/Eclat/frontend/parser.ml"
+# 2735 "src/Eclat/frontend/parser.ml"
      in
     (
-# 754 "src/Eclat/frontend/parser.mly"
+# 755 "src/Eclat/frontend/parser.mly"
                          ( Op(Runtime(op)) )
-# 2739 "src/Eclat/frontend/parser.ml"
+# 2740 "src/Eclat/frontend/parser.ml"
      : (Ast.c))
 
 let _menhir_action_112 =
   fun () ->
     let op = 
-# 773 "src/Eclat/frontend/parser.mly"
+# 774 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.ge",new_ty_unknown ()) )
-# 2747 "src/Eclat/frontend/parser.ml"
+# 2748 "src/Eclat/frontend/parser.ml"
      in
     (
-# 754 "src/Eclat/frontend/parser.mly"
+# 755 "src/Eclat/frontend/parser.mly"
                          ( Op(Runtime(op)) )
-# 2752 "src/Eclat/frontend/parser.ml"
+# 2753 "src/Eclat/frontend/parser.ml"
      : (Ast.c))
 
 let _menhir_action_113 =
   fun () ->
     let op = 
-# 774 "src/Eclat/frontend/parser.mly"
+# 775 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.eq",new_ty_unknown ()) )
-# 2760 "src/Eclat/frontend/parser.ml"
+# 2761 "src/Eclat/frontend/parser.ml"
      in
     (
-# 754 "src/Eclat/frontend/parser.mly"
+# 755 "src/Eclat/frontend/parser.mly"
                          ( Op(Runtime(op)) )
-# 2765 "src/Eclat/frontend/parser.ml"
+# 2766 "src/Eclat/frontend/parser.ml"
      : (Ast.c))
 
 let _menhir_action_114 =
   fun () ->
     let op = 
-# 774 "src/Eclat/frontend/parser.mly"
+# 775 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.eq",new_ty_unknown ()) )
-# 2773 "src/Eclat/frontend/parser.ml"
+# 2774 "src/Eclat/frontend/parser.ml"
      in
     (
-# 754 "src/Eclat/frontend/parser.mly"
+# 755 "src/Eclat/frontend/parser.mly"
                          ( Op(Runtime(op)) )
-# 2778 "src/Eclat/frontend/parser.ml"
+# 2779 "src/Eclat/frontend/parser.ml"
      : (Ast.c))
 
 let _menhir_action_115 =
   fun () ->
     let op = 
-# 775 "src/Eclat/frontend/parser.mly"
+# 776 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.neq",new_ty_unknown ()) )
-# 2786 "src/Eclat/frontend/parser.ml"
+# 2787 "src/Eclat/frontend/parser.ml"
      in
     (
-# 754 "src/Eclat/frontend/parser.mly"
+# 755 "src/Eclat/frontend/parser.mly"
                          ( Op(Runtime(op)) )
-# 2791 "src/Eclat/frontend/parser.ml"
+# 2792 "src/Eclat/frontend/parser.ml"
      : (Ast.c))
 
 let _menhir_action_116 =
   fun () ->
     let op = 
-# 776 "src/Eclat/frontend/parser.mly"
+# 777 "src/Eclat/frontend/parser.mly"
              ( External_fun("Bool.land",new_ty_unknown ()) )
-# 2799 "src/Eclat/frontend/parser.ml"
+# 2800 "src/Eclat/frontend/parser.ml"
      in
     (
-# 754 "src/Eclat/frontend/parser.mly"
+# 755 "src/Eclat/frontend/parser.mly"
                          ( Op(Runtime(op)) )
-# 2804 "src/Eclat/frontend/parser.ml"
+# 2805 "src/Eclat/frontend/parser.ml"
      : (Ast.c))
 
 let _menhir_action_117 =
   fun () ->
     let op = 
-# 777 "src/Eclat/frontend/parser.mly"
+# 778 "src/Eclat/frontend/parser.mly"
              ( External_fun("Bool.lxor",new_ty_unknown ()) )
-# 2812 "src/Eclat/frontend/parser.ml"
+# 2813 "src/Eclat/frontend/parser.ml"
      in
     (
-# 754 "src/Eclat/frontend/parser.mly"
+# 755 "src/Eclat/frontend/parser.mly"
                          ( Op(Runtime(op)) )
-# 2817 "src/Eclat/frontend/parser.ml"
+# 2818 "src/Eclat/frontend/parser.ml"
      : (Ast.c))
 
 let _menhir_action_118 =
   fun () ->
     let op = 
-# 778 "src/Eclat/frontend/parser.mly"
+# 779 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.lxor",new_ty_unknown ()) )
-# 2825 "src/Eclat/frontend/parser.ml"
+# 2826 "src/Eclat/frontend/parser.ml"
      in
     (
-# 754 "src/Eclat/frontend/parser.mly"
+# 755 "src/Eclat/frontend/parser.mly"
                          ( Op(Runtime(op)) )
-# 2830 "src/Eclat/frontend/parser.ml"
+# 2831 "src/Eclat/frontend/parser.ml"
      : (Ast.c))
 
 let _menhir_action_119 =
   fun () ->
     let op = 
-# 779 "src/Eclat/frontend/parser.mly"
+# 780 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.land",new_ty_unknown ()) )
-# 2838 "src/Eclat/frontend/parser.ml"
+# 2839 "src/Eclat/frontend/parser.ml"
      in
     (
-# 754 "src/Eclat/frontend/parser.mly"
+# 755 "src/Eclat/frontend/parser.mly"
                          ( Op(Runtime(op)) )
-# 2843 "src/Eclat/frontend/parser.ml"
+# 2844 "src/Eclat/frontend/parser.ml"
      : (Ast.c))
 
 let _menhir_action_120 =
   fun () ->
     let op = 
-# 780 "src/Eclat/frontend/parser.mly"
+# 781 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.lor",new_ty_unknown ()) )
-# 2851 "src/Eclat/frontend/parser.ml"
+# 2852 "src/Eclat/frontend/parser.ml"
      in
     (
-# 754 "src/Eclat/frontend/parser.mly"
+# 755 "src/Eclat/frontend/parser.mly"
                          ( Op(Runtime(op)) )
-# 2856 "src/Eclat/frontend/parser.ml"
+# 2857 "src/Eclat/frontend/parser.ml"
      : (Ast.c))
 
 let _menhir_action_121 =
   fun () ->
     let op = 
-# 781 "src/Eclat/frontend/parser.mly"
+# 782 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.lsl",new_ty_unknown ()) )
-# 2864 "src/Eclat/frontend/parser.ml"
+# 2865 "src/Eclat/frontend/parser.ml"
      in
     (
-# 754 "src/Eclat/frontend/parser.mly"
+# 755 "src/Eclat/frontend/parser.mly"
                          ( Op(Runtime(op)) )
-# 2869 "src/Eclat/frontend/parser.ml"
+# 2870 "src/Eclat/frontend/parser.ml"
      : (Ast.c))
 
 let _menhir_action_122 =
   fun () ->
     let op = 
-# 782 "src/Eclat/frontend/parser.mly"
+# 783 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.lsr",new_ty_unknown ()) )
-# 2877 "src/Eclat/frontend/parser.ml"
+# 2878 "src/Eclat/frontend/parser.ml"
      in
     (
-# 754 "src/Eclat/frontend/parser.mly"
+# 755 "src/Eclat/frontend/parser.mly"
                          ( Op(Runtime(op)) )
-# 2882 "src/Eclat/frontend/parser.ml"
+# 2883 "src/Eclat/frontend/parser.ml"
      : (Ast.c))
 
 let _menhir_action_123 =
   fun () ->
     let op = 
-# 783 "src/Eclat/frontend/parser.mly"
+# 784 "src/Eclat/frontend/parser.mly"
              ( External_fun("Int.asr",new_ty_unknown ()) )
-# 2890 "src/Eclat/frontend/parser.ml"
+# 2891 "src/Eclat/frontend/parser.ml"
      in
     (
-# 754 "src/Eclat/frontend/parser.mly"
+# 755 "src/Eclat/frontend/parser.mly"
                          ( Op(Runtime(op)) )
-# 2895 "src/Eclat/frontend/parser.ml"
+# 2896 "src/Eclat/frontend/parser.ml"
      : (Ast.c))
 
 let _menhir_action_124 =
   fun cs ->
     (
-# 756 "src/Eclat/frontend/parser.mly"
+# 757 "src/Eclat/frontend/parser.mly"
     ( C_vector cs )
-# 2903 "src/Eclat/frontend/parser.ml"
+# 2904 "src/Eclat/frontend/parser.ml"
      : (Ast.c))
 
 let _menhir_action_125 =
@@ -2908,7 +2909,7 @@ let _menhir_action_125 =
 # 205 "src/Eclat/frontend/parser.mly"
   ( clear_tyvar_constraints();
     d )
-# 2912 "src/Eclat/frontend/parser.ml"
+# 2913 "src/Eclat/frontend/parser.ml"
      : ((Ast.p * Ast.e_static) * Prelude.loc))
 
 let _menhir_action_126 =
@@ -2919,7 +2920,7 @@ let _menhir_action_126 =
     (
 # 210 "src/Eclat/frontend/parser.mly"
         ( b,(with_file _loc) )
-# 2923 "src/Eclat/frontend/parser.ml"
+# 2924 "src/Eclat/frontend/parser.ml"
      : ((Ast.p * Ast.e_static) * Prelude.loc))
 
 let _menhir_action_127 =
@@ -2930,7 +2931,7 @@ let _menhir_action_127 =
     (
 # 214 "src/Eclat/frontend/parser.mly"
                   ( ((P_var "_", e),(with_file _loc))  )
-# 2934 "src/Eclat/frontend/parser.ml"
+# 2935 "src/Eclat/frontend/parser.ml"
      : ((Ast.p * Ast.e_static) * Prelude.loc))
 
 let _menhir_action_128 =
@@ -2938,7 +2939,7 @@ let _menhir_action_128 =
     (
 # 625 "src/Eclat/frontend/parser.mly"
                         ( e )
-# 2942 "src/Eclat/frontend/parser.ml"
+# 2943 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_129 =
@@ -2949,7 +2950,7 @@ let _menhir_action_129 =
     (
 # 421 "src/Eclat/frontend/parser.mly"
              ( mk_loc (with_file _loc) e )
-# 2953 "src/Eclat/frontend/parser.ml"
+# 2954 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_130 =
@@ -2959,7 +2960,7 @@ let _menhir_action_130 =
         (
             E_letIn(P_unit,Ty_base TyB_unit, e1,e2)
         )
-# 2963 "src/Eclat/frontend/parser.ml"
+# 2964 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_131 =
@@ -2969,7 +2970,7 @@ let _menhir_action_131 =
         (
             E_tuple (e::es)
         )
-# 2973 "src/Eclat/frontend/parser.ml"
+# 2974 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_132 =
@@ -2977,7 +2978,7 @@ let _menhir_action_132 =
     (
 # 435 "src/Eclat/frontend/parser.mly"
          ( e )
-# 2981 "src/Eclat/frontend/parser.ml"
+# 2982 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_133 =
@@ -2985,7 +2986,7 @@ let _menhir_action_133 =
     (
 # 201 "src/Eclat/frontend/parser.mly"
             (e)
-# 2989 "src/Eclat/frontend/parser.ml"
+# 2990 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_134 =
@@ -2993,7 +2994,7 @@ let _menhir_action_134 =
     (
 # 165 "src/Eclat/frontend/parser.mly"
                                       ( (x, (t, false)) )
-# 2997 "src/Eclat/frontend/parser.ml"
+# 2998 "src/Eclat/frontend/parser.ml"
      : (Ast.x * (Types.ty * bool)))
 
 let _menhir_action_135 =
@@ -3001,7 +3002,7 @@ let _menhir_action_135 =
     (
 # 166 "src/Eclat/frontend/parser.mly"
                                              ( (x, (t, true)) )
-# 3005 "src/Eclat/frontend/parser.ml"
+# 3006 "src/Eclat/frontend/parser.ml"
      : (Ast.x * (Types.ty * bool)))
 
 let _menhir_action_136 =
@@ -3009,13 +3010,13 @@ let _menhir_action_136 =
     let imp = 
 # 161 "src/Eclat/frontend/parser.mly"
             ( true )
-# 3013 "src/Eclat/frontend/parser.ml"
+# 3014 "src/Eclat/frontend/parser.ml"
      in
     (
 # 154 "src/Eclat/frontend/parser.mly"
    ( Hashtbl.clear hash_size_tvar;
      (x, (t,(false,get_arity t,imp))) )
-# 3019 "src/Eclat/frontend/parser.ml"
+# 3020 "src/Eclat/frontend/parser.ml"
      : (Ast.x * (Types.ty * (bool * int * bool))))
 
 let _menhir_action_137 =
@@ -3023,13 +3024,13 @@ let _menhir_action_137 =
     let imp = 
 # 162 "src/Eclat/frontend/parser.mly"
   (false)
-# 3027 "src/Eclat/frontend/parser.ml"
+# 3028 "src/Eclat/frontend/parser.ml"
      in
     (
 # 154 "src/Eclat/frontend/parser.mly"
    ( Hashtbl.clear hash_size_tvar;
      (x, (t,(false,get_arity t,imp))) )
-# 3033 "src/Eclat/frontend/parser.ml"
+# 3034 "src/Eclat/frontend/parser.ml"
      : (Ast.x * (Types.ty * (bool * int * bool))))
 
 let _menhir_action_138 =
@@ -3037,13 +3038,13 @@ let _menhir_action_138 =
     let imp = 
 # 161 "src/Eclat/frontend/parser.mly"
             ( true )
-# 3041 "src/Eclat/frontend/parser.ml"
+# 3042 "src/Eclat/frontend/parser.ml"
      in
     (
 # 157 "src/Eclat/frontend/parser.mly"
    ( Hashtbl.clear hash_size_tvar;
      (x, (t,(true,get_arity t,imp))) )
-# 3047 "src/Eclat/frontend/parser.ml"
+# 3048 "src/Eclat/frontend/parser.ml"
      : (Ast.x * (Types.ty * (bool * int * bool))))
 
 let _menhir_action_139 =
@@ -3051,13 +3052,13 @@ let _menhir_action_139 =
     let imp = 
 # 162 "src/Eclat/frontend/parser.mly"
   (false)
-# 3055 "src/Eclat/frontend/parser.ml"
+# 3056 "src/Eclat/frontend/parser.ml"
      in
     (
 # 157 "src/Eclat/frontend/parser.mly"
    ( Hashtbl.clear hash_size_tvar;
      (x, (t,(true,get_arity t,imp))) )
-# 3061 "src/Eclat/frontend/parser.ml"
+# 3062 "src/Eclat/frontend/parser.ml"
      : (Ast.x * (Types.ty * (bool * int * bool))))
 
 let _menhir_action_140 =
@@ -3072,7 +3073,7 @@ let _menhir_action_140 =
             in
             (P_var f,ef)
         )
-# 3076 "src/Eclat/frontend/parser.ml"
+# 3077 "src/Eclat/frontend/parser.ml"
      : (Ast.p * Ast.e_static))
 
 let _menhir_action_141 =
@@ -3087,7 +3088,7 @@ let _menhir_action_141 =
             in
             (P_var f,ef)
         )
-# 3091 "src/Eclat/frontend/parser.ml"
+# 3092 "src/Eclat/frontend/parser.ml"
      : (Ast.p * Ast.e_static))
 
 let _menhir_action_142 =
@@ -3110,7 +3111,7 @@ let _menhir_action_142 =
             | None -> *)P_var f, v
             (* | Some _ -> P_var f, E_letIn(P_var f,v,e1)*)
         )
-# 3114 "src/Eclat/frontend/parser.ml"
+# 3115 "src/Eclat/frontend/parser.ml"
      : (Ast.p * Ast.e_static))
 
 let _menhir_action_143 =
@@ -3133,7 +3134,7 @@ let _menhir_action_143 =
             | None -> *)P_var f, v
             (* | Some _ -> P_var f, E_letIn(P_var f,v,e1)*)
         )
-# 3137 "src/Eclat/frontend/parser.ml"
+# 3138 "src/Eclat/frontend/parser.ml"
      : (Ast.p * Ast.e_static))
 
 let _menhir_action_144 =
@@ -3141,7 +3142,7 @@ let _menhir_action_144 =
     (
 # 481 "src/Eclat/frontend/parser.mly"
           ( e2,E_const Unit )
-# 3145 "src/Eclat/frontend/parser.ml"
+# 3146 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static * Ast.e_static))
 
 let _menhir_action_145 =
@@ -3149,7 +3150,7 @@ let _menhir_action_145 =
     (
 # 482 "src/Eclat/frontend/parser.mly"
                        ( e2, e3 )
-# 3153 "src/Eclat/frontend/parser.ml"
+# 3154 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static * Ast.e_static))
 
 let _menhir_action_146 =
@@ -3160,7 +3161,7 @@ let _menhir_action_146 =
     (
 # 452 "src/Eclat/frontend/parser.mly"
               ( mk_loc (with_file _loc) e )
-# 3164 "src/Eclat/frontend/parser.ml"
+# 3165 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_147 =
@@ -3168,7 +3169,7 @@ let _menhir_action_147 =
     (
 # 455 "src/Eclat/frontend/parser.mly"
             ( e )
-# 3172 "src/Eclat/frontend/parser.ml"
+# 3173 "src/Eclat/frontend/parser.ml"
      : (Ast.e))
 
 let _menhir_action_148 =
@@ -3179,7 +3180,7 @@ let _menhir_action_148 =
     (
 # 457 "src/Eclat/frontend/parser.mly"
         ( mk_fix f e (with_file _loc) )
-# 3183 "src/Eclat/frontend/parser.ml"
+# 3184 "src/Eclat/frontend/parser.ml"
      : (Ast.e))
 
 let _menhir_action_149 =
@@ -3188,7 +3189,7 @@ let _menhir_action_149 =
 # 459 "src/Eclat/frontend/parser.mly"
         ( let (p,ty_p_opt) = p_ty_opt in
           mk_fun_ty_annot_p p ty_p_opt e )
-# 3192 "src/Eclat/frontend/parser.ml"
+# 3193 "src/Eclat/frontend/parser.ml"
      : (Ast.e))
 
 let _menhir_action_150 =
@@ -3196,7 +3197,7 @@ let _menhir_action_150 =
     (
 # 462 "src/Eclat/frontend/parser.mly"
         ( let (e2,e3) = e2_e3 in E_if(e1,e2,e3) )
-# 3200 "src/Eclat/frontend/parser.ml"
+# 3201 "src/Eclat/frontend/parser.ml"
      : (Ast.e))
 
 let _menhir_action_151 =
@@ -3205,7 +3206,7 @@ let _menhir_action_151 =
 # 464 "src/Eclat/frontend/parser.mly"
         ( let (p,e1) = b in
           E_letIn(p,Types.new_ty_unknown(),e1,e2) )
-# 3209 "src/Eclat/frontend/parser.ml"
+# 3210 "src/Eclat/frontend/parser.ml"
      : (Ast.e))
 
 let _menhir_action_152 =
@@ -3215,7 +3216,7 @@ let _menhir_action_152 =
         (
             E_par(e1::es)
         )
-# 3219 "src/Eclat/frontend/parser.ml"
+# 3220 "src/Eclat/frontend/parser.ml"
      : (Ast.e))
 
 let _menhir_action_153 =
@@ -3225,7 +3226,7 @@ let _menhir_action_153 =
         (
             E_par(e1::es)
         )
-# 3229 "src/Eclat/frontend/parser.ml"
+# 3230 "src/Eclat/frontend/parser.ml"
      : (Ast.e))
 
 let _menhir_action_154 =
@@ -3233,7 +3234,7 @@ let _menhir_action_154 =
     (
 # 216 "<standard.mly>"
     ( [] )
-# 3237 "src/Eclat/frontend/parser.ml"
+# 3238 "src/Eclat/frontend/parser.ml"
      : ((Ast.c list * Ast.e_static) list))
 
 let _menhir_action_155 =
@@ -3241,7 +3242,7 @@ let _menhir_action_155 =
     (
 # 219 "<standard.mly>"
     ( x :: xs )
-# 3245 "src/Eclat/frontend/parser.ml"
+# 3246 "src/Eclat/frontend/parser.ml"
      : ((Ast.c list * Ast.e_static) list))
 
 let _menhir_action_156 =
@@ -3249,7 +3250,7 @@ let _menhir_action_156 =
     (
 # 145 "<standard.mly>"
     ( [] )
-# 3253 "src/Eclat/frontend/parser.ml"
+# 3254 "src/Eclat/frontend/parser.ml"
      : (Ast.e list))
 
 let _menhir_action_157 =
@@ -3257,7 +3258,7 @@ let _menhir_action_157 =
     (
 # 148 "<standard.mly>"
     ( x )
-# 3261 "src/Eclat/frontend/parser.ml"
+# 3262 "src/Eclat/frontend/parser.ml"
      : (Ast.e list))
 
 let _menhir_action_158 =
@@ -3265,7 +3266,7 @@ let _menhir_action_158 =
     (
 # 407 "src/Eclat/frontend/parser.mly"
            ( v )
-# 3269 "src/Eclat/frontend/parser.ml"
+# 3270 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_159 =
@@ -3276,47 +3277,47 @@ let _menhir_action_159 =
         let p,ty_opt = p_ty_opt in
         mk_fun_ty_annot p ty_opt e
     )
-# 3280 "src/Eclat/frontend/parser.ml"
+# 3281 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_160 =
   fun e p x ->
     (
-# 712 "src/Eclat/frontend/parser.mly"
+# 713 "src/Eclat/frontend/parser.mly"
                                       ( (x,(p,e)) )
-# 3288 "src/Eclat/frontend/parser.ml"
+# 3289 "src/Eclat/frontend/parser.ml"
      : (Ast.x * (Ast.p * Ast.e_static)))
 
 let _menhir_action_161 =
   fun cs e ->
     (
-# 704 "src/Eclat/frontend/parser.mly"
+# 705 "src/Eclat/frontend/parser.mly"
                                                                 ( (cs,e) )
-# 3296 "src/Eclat/frontend/parser.ml"
+# 3297 "src/Eclat/frontend/parser.ml"
      : (Ast.c list * Ast.e_static))
 
 let _menhir_action_162 =
   fun e ->
     (
-# 707 "src/Eclat/frontend/parser.mly"
+# 708 "src/Eclat/frontend/parser.mly"
                                           ( [],Some e )
-# 3304 "src/Eclat/frontend/parser.ml"
+# 3305 "src/Eclat/frontend/parser.ml"
      : ((Ast.x * (Ast.p * Ast.e_static)) list * Ast.e_static option))
 
 let _menhir_action_163 =
   fun h ->
     (
-# 708 "src/Eclat/frontend/parser.mly"
+# 709 "src/Eclat/frontend/parser.mly"
                                           ( [h],None )
-# 3312 "src/Eclat/frontend/parser.ml"
+# 3313 "src/Eclat/frontend/parser.ml"
      : ((Ast.x * (Ast.p * Ast.e_static)) list * Ast.e_static option))
 
 let _menhir_action_164 =
   fun h rev_cases ->
     (
-# 709 "src/Eclat/frontend/parser.mly"
+# 710 "src/Eclat/frontend/parser.mly"
                                           ( let (hs,eo) = rev_cases in h::hs,eo )
-# 3320 "src/Eclat/frontend/parser.ml"
+# 3321 "src/Eclat/frontend/parser.ml"
      : ((Ast.x * (Ast.p * Ast.e_static)) list * Ast.e_static option))
 
 let _menhir_action_165 =
@@ -3324,7 +3325,7 @@ let _menhir_action_165 =
     (
 # 228 "<standard.mly>"
     ( [ x ] )
-# 3328 "src/Eclat/frontend/parser.ml"
+# 3329 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static list))
 
 let _menhir_action_166 =
@@ -3332,7 +3333,7 @@ let _menhir_action_166 =
     (
 # 231 "<standard.mly>"
     ( x :: xs )
-# 3336 "src/Eclat/frontend/parser.ml"
+# 3337 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static list))
 
 let _menhir_action_167 =
@@ -3340,7 +3341,7 @@ let _menhir_action_167 =
     (
 # 111 "<standard.mly>"
     ( None )
-# 3344 "src/Eclat/frontend/parser.ml"
+# 3345 "src/Eclat/frontend/parser.ml"
      : (unit option))
 
 let _menhir_action_168 =
@@ -3348,7 +3349,7 @@ let _menhir_action_168 =
     (
 # 114 "<standard.mly>"
     ( Some x )
-# 3352 "src/Eclat/frontend/parser.ml"
+# 3353 "src/Eclat/frontend/parser.ml"
      : (unit option))
 
 let _menhir_action_169 =
@@ -3356,7 +3357,7 @@ let _menhir_action_169 =
     (
 # 111 "<standard.mly>"
     ( None )
-# 3360 "src/Eclat/frontend/parser.ml"
+# 3361 "src/Eclat/frontend/parser.ml"
      : (unit option))
 
 let _menhir_action_170 =
@@ -3364,7 +3365,7 @@ let _menhir_action_170 =
     (
 # 114 "<standard.mly>"
     ( Some x )
-# 3368 "src/Eclat/frontend/parser.ml"
+# 3369 "src/Eclat/frontend/parser.ml"
      : (unit option))
 
 let _menhir_action_171 =
@@ -3372,7 +3373,7 @@ let _menhir_action_171 =
     (
 # 111 "<standard.mly>"
     ( None )
-# 3376 "src/Eclat/frontend/parser.ml"
+# 3377 "src/Eclat/frontend/parser.ml"
      : (unit option))
 
 let _menhir_action_172 =
@@ -3380,23 +3381,23 @@ let _menhir_action_172 =
     (
 # 114 "<standard.mly>"
     ( Some x )
-# 3384 "src/Eclat/frontend/parser.ml"
+# 3385 "src/Eclat/frontend/parser.ml"
      : (unit option))
 
 let _menhir_action_173 =
   fun p ->
     (
-# 723 "src/Eclat/frontend/parser.mly"
+# 724 "src/Eclat/frontend/parser.mly"
          ( p )
-# 3392 "src/Eclat/frontend/parser.ml"
+# 3393 "src/Eclat/frontend/parser.ml"
      : (Ast.p))
 
 let _menhir_action_174 =
   fun p ps ->
     (
-# 725 "src/Eclat/frontend/parser.mly"
+# 726 "src/Eclat/frontend/parser.mly"
   ( P_tuple (p::ps) )
-# 3400 "src/Eclat/frontend/parser.ml"
+# 3401 "src/Eclat/frontend/parser.ml"
      : (Ast.p))
 
 let _menhir_action_175 =
@@ -3413,7 +3414,7 @@ let _menhir_action_175 =
                         let v = E_fun(P_var arg,(Types.new_ty_unknown(),Types.new_tyB_unknown()), 
                              E_run(f,E_var arg)) in
                         (((f,t)::ecs,efs), gs,    ts,    (((P_var x,v),with_file _loc)::ds)) )
-# 3417 "src/Eclat/frontend/parser.ml"
+# 3418 "src/Eclat/frontend/parser.ml"
      : (((Ast.x * (Types.ty * bool)) list *
    (Ast.x * (Types.ty * (bool * int * bool))) list) *
   (Ast.x * Ast.static) list * (Ast.x * (Ast.x * Types.tyB) list) list *
@@ -3424,7 +3425,7 @@ let _menhir_action_176 =
     (
 # 141 "src/Eclat/frontend/parser.mly"
                       ( let (ecs,efs),gs,ts,ds = pi in ((ecs,ef::efs), gs,    ts,    ds   ) )
-# 3428 "src/Eclat/frontend/parser.ml"
+# 3429 "src/Eclat/frontend/parser.ml"
      : (((Ast.x * (Types.ty * bool)) list *
    (Ast.x * (Types.ty * (bool * int * bool))) list) *
   (Ast.x * Ast.static) list * (Ast.x * (Ast.x * Types.tyB) list) list *
@@ -3435,7 +3436,7 @@ let _menhir_action_177 =
     (
 # 142 "src/Eclat/frontend/parser.mly"
                       ( let (ecs,efs),gs,ts,ds = pi in ((ecs,    efs), g::gs, ts,    ds   ) )
-# 3439 "src/Eclat/frontend/parser.ml"
+# 3440 "src/Eclat/frontend/parser.ml"
      : (((Ast.x * (Types.ty * bool)) list *
    (Ast.x * (Types.ty * (bool * int * bool))) list) *
   (Ast.x * Ast.static) list * (Ast.x * (Ast.x * Types.tyB) list) list *
@@ -3446,7 +3447,7 @@ let _menhir_action_178 =
     (
 # 143 "src/Eclat/frontend/parser.mly"
                       ( let (ecs,efs),gs,ts,ds = pi in ((ecs,    efs), gs,    d::ts, ds   ) )
-# 3450 "src/Eclat/frontend/parser.ml"
+# 3451 "src/Eclat/frontend/parser.ml"
      : (((Ast.x * (Types.ty * bool)) list *
    (Ast.x * (Types.ty * (bool * int * bool))) list) *
   (Ast.x * Ast.static) list * (Ast.x * (Ast.x * Types.tyB) list) list *
@@ -3457,7 +3458,7 @@ let _menhir_action_179 =
     (
 # 144 "src/Eclat/frontend/parser.mly"
                       ( let (ecs,efs),gs,ts,ds = pi in ((ecs,    efs), gs,    ts,    d::ds) )
-# 3461 "src/Eclat/frontend/parser.ml"
+# 3462 "src/Eclat/frontend/parser.ml"
      : (((Ast.x * (Types.ty * bool)) list *
    (Ast.x * (Types.ty * (bool * int * bool))) list) *
   (Ast.x * Ast.static) list * (Ast.x * (Ast.x * Types.tyB) list) list *
@@ -3468,7 +3469,7 @@ let _menhir_action_180 =
     (
 # 145 "src/Eclat/frontend/parser.mly"
                       ( pi )
-# 3472 "src/Eclat/frontend/parser.ml"
+# 3473 "src/Eclat/frontend/parser.ml"
      : (((Ast.x * (Types.ty * bool)) list *
    (Ast.x * (Types.ty * (bool * int * bool))) list) *
   (Ast.x * Ast.static) list * (Ast.x * (Ast.x * Types.tyB) list) list *
@@ -3479,7 +3480,7 @@ let _menhir_action_181 =
     (
 # 146 "src/Eclat/frontend/parser.mly"
                       ( ([],[]),[],[],[] )
-# 3483 "src/Eclat/frontend/parser.ml"
+# 3484 "src/Eclat/frontend/parser.ml"
      : (((Ast.x * (Types.ty * bool)) list *
    (Ast.x * (Types.ty * (bool * int * bool))) list) *
   (Ast.x * Ast.static) list * (Ast.x * (Ast.x * Types.tyB) list) list *
@@ -3490,7 +3491,7 @@ let _menhir_action_182 =
     (
 # 485 "src/Eclat/frontend/parser.mly"
      ( None )
-# 3494 "src/Eclat/frontend/parser.ml"
+# 3495 "src/Eclat/frontend/parser.ml"
      : (Types.ty option))
 
 let _menhir_action_183 =
@@ -3498,7 +3499,7 @@ let _menhir_action_183 =
     (
 # 486 "src/Eclat/frontend/parser.mly"
                ( Some ty )
-# 3502 "src/Eclat/frontend/parser.ml"
+# 3503 "src/Eclat/frontend/parser.ml"
      : (Types.ty option))
 
 let _menhir_action_184 =
@@ -3506,7 +3507,7 @@ let _menhir_action_184 =
     (
 # 250 "<standard.mly>"
     ( [ x ] )
-# 3510 "src/Eclat/frontend/parser.ml"
+# 3511 "src/Eclat/frontend/parser.ml"
      : (int list))
 
 let _menhir_action_185 =
@@ -3514,7 +3515,7 @@ let _menhir_action_185 =
     (
 # 253 "<standard.mly>"
     ( x :: xs )
-# 3518 "src/Eclat/frontend/parser.ml"
+# 3519 "src/Eclat/frontend/parser.ml"
      : (int list))
 
 let _menhir_action_186 =
@@ -3522,7 +3523,7 @@ let _menhir_action_186 =
     (
 # 250 "<standard.mly>"
     ( [ x ] )
-# 3526 "src/Eclat/frontend/parser.ml"
+# 3527 "src/Eclat/frontend/parser.ml"
      : (Ast.p list))
 
 let _menhir_action_187 =
@@ -3530,7 +3531,7 @@ let _menhir_action_187 =
     (
 # 253 "<standard.mly>"
     ( x :: xs )
-# 3534 "src/Eclat/frontend/parser.ml"
+# 3535 "src/Eclat/frontend/parser.ml"
      : (Ast.p list))
 
 let _menhir_action_188 =
@@ -3538,7 +3539,7 @@ let _menhir_action_188 =
     (
 # 250 "<standard.mly>"
     ( [ x ] )
-# 3542 "src/Eclat/frontend/parser.ml"
+# 3543 "src/Eclat/frontend/parser.ml"
      : (Ast.e list))
 
 let _menhir_action_189 =
@@ -3546,7 +3547,7 @@ let _menhir_action_189 =
     (
 # 253 "<standard.mly>"
     ( x :: xs )
-# 3550 "src/Eclat/frontend/parser.ml"
+# 3551 "src/Eclat/frontend/parser.ml"
      : (Ast.e list))
 
 let _menhir_action_190 =
@@ -3554,7 +3555,7 @@ let _menhir_action_190 =
     (
 # 250 "<standard.mly>"
     ( [ x ] )
-# 3558 "src/Eclat/frontend/parser.ml"
+# 3559 "src/Eclat/frontend/parser.ml"
      : (Ast.c list))
 
 let _menhir_action_191 =
@@ -3562,7 +3563,7 @@ let _menhir_action_191 =
     (
 # 253 "<standard.mly>"
     ( x :: xs )
-# 3566 "src/Eclat/frontend/parser.ml"
+# 3567 "src/Eclat/frontend/parser.ml"
      : (Ast.c list))
 
 let _menhir_action_192 =
@@ -3570,7 +3571,7 @@ let _menhir_action_192 =
     (
 # 250 "<standard.mly>"
     ( [ x ] )
-# 3574 "src/Eclat/frontend/parser.ml"
+# 3575 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static list))
 
 let _menhir_action_193 =
@@ -3578,7 +3579,7 @@ let _menhir_action_193 =
     (
 # 253 "<standard.mly>"
     ( x :: xs )
-# 3582 "src/Eclat/frontend/parser.ml"
+# 3583 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static list))
 
 let _menhir_action_194 =
@@ -3586,7 +3587,7 @@ let _menhir_action_194 =
     (
 # 250 "<standard.mly>"
     ( [ x ] )
-# 3590 "src/Eclat/frontend/parser.ml"
+# 3591 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static list))
 
 let _menhir_action_195 =
@@ -3594,7 +3595,7 @@ let _menhir_action_195 =
     (
 # 253 "<standard.mly>"
     ( x :: xs )
-# 3598 "src/Eclat/frontend/parser.ml"
+# 3599 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static list))
 
 let _menhir_action_196 =
@@ -3602,7 +3603,7 @@ let _menhir_action_196 =
     (
 # 250 "<standard.mly>"
     ( [ x ] )
-# 3606 "src/Eclat/frontend/parser.ml"
+# 3607 "src/Eclat/frontend/parser.ml"
      : (Types.size list))
 
 let _menhir_action_197 =
@@ -3610,7 +3611,7 @@ let _menhir_action_197 =
     (
 # 253 "<standard.mly>"
     ( x :: xs )
-# 3614 "src/Eclat/frontend/parser.ml"
+# 3615 "src/Eclat/frontend/parser.ml"
      : (Types.size list))
 
 let _menhir_action_198 =
@@ -3618,7 +3619,7 @@ let _menhir_action_198 =
     (
 # 250 "<standard.mly>"
     ( [ x ] )
-# 3622 "src/Eclat/frontend/parser.ml"
+# 3623 "src/Eclat/frontend/parser.ml"
      : (Types.tyB list))
 
 let _menhir_action_199 =
@@ -3626,7 +3627,7 @@ let _menhir_action_199 =
     (
 # 253 "<standard.mly>"
     ( x :: xs )
-# 3630 "src/Eclat/frontend/parser.ml"
+# 3631 "src/Eclat/frontend/parser.ml"
      : (Types.tyB list))
 
 let _menhir_action_200 =
@@ -3634,7 +3635,7 @@ let _menhir_action_200 =
     (
 # 250 "<standard.mly>"
     ( [ x ] )
-# 3638 "src/Eclat/frontend/parser.ml"
+# 3639 "src/Eclat/frontend/parser.ml"
      : (Ast.c list))
 
 let _menhir_action_201 =
@@ -3642,7 +3643,7 @@ let _menhir_action_201 =
     (
 # 253 "<standard.mly>"
     ( x :: xs )
-# 3646 "src/Eclat/frontend/parser.ml"
+# 3647 "src/Eclat/frontend/parser.ml"
      : (Ast.c list))
 
 let _menhir_action_202 =
@@ -3650,7 +3651,7 @@ let _menhir_action_202 =
     (
 # 250 "<standard.mly>"
     ( [ x ] )
-# 3654 "src/Eclat/frontend/parser.ml"
+# 3655 "src/Eclat/frontend/parser.ml"
      : ((Ast.x * Types.tyB) list))
 
 let _menhir_action_203 =
@@ -3658,7 +3659,7 @@ let _menhir_action_203 =
     (
 # 253 "<standard.mly>"
     ( x :: xs )
-# 3662 "src/Eclat/frontend/parser.ml"
+# 3663 "src/Eclat/frontend/parser.ml"
      : ((Ast.x * Types.tyB) list))
 
 let _menhir_action_204 =
@@ -3666,7 +3667,7 @@ let _menhir_action_204 =
     (
 # 250 "<standard.mly>"
     ( [ x ] )
-# 3670 "src/Eclat/frontend/parser.ml"
+# 3671 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static list))
 
 let _menhir_action_205 =
@@ -3674,7 +3675,7 @@ let _menhir_action_205 =
     (
 # 253 "<standard.mly>"
     ( x :: xs )
-# 3678 "src/Eclat/frontend/parser.ml"
+# 3679 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static list))
 
 let _menhir_action_206 =
@@ -3682,7 +3683,7 @@ let _menhir_action_206 =
     (
 # 250 "<standard.mly>"
     ( [ x ] )
-# 3686 "src/Eclat/frontend/parser.ml"
+# 3687 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static list))
 
 let _menhir_action_207 =
@@ -3690,7 +3691,7 @@ let _menhir_action_207 =
     (
 # 253 "<standard.mly>"
     ( x :: xs )
-# 3694 "src/Eclat/frontend/parser.ml"
+# 3695 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static list))
 
 let _menhir_action_208 =
@@ -3698,7 +3699,7 @@ let _menhir_action_208 =
     (
 # 250 "<standard.mly>"
     ( [ x ] )
-# 3702 "src/Eclat/frontend/parser.ml"
+# 3703 "src/Eclat/frontend/parser.ml"
      : (Types.tyB list))
 
 let _menhir_action_209 =
@@ -3706,7 +3707,7 @@ let _menhir_action_209 =
     (
 # 253 "<standard.mly>"
     ( x :: xs )
-# 3710 "src/Eclat/frontend/parser.ml"
+# 3711 "src/Eclat/frontend/parser.ml"
      : (Types.tyB list))
 
 let _menhir_action_210 =
@@ -3714,7 +3715,7 @@ let _menhir_action_210 =
     (
 # 250 "<standard.mly>"
     ( [ x ] )
-# 3718 "src/Eclat/frontend/parser.ml"
+# 3719 "src/Eclat/frontend/parser.ml"
      : (Types.ty list))
 
 let _menhir_action_211 =
@@ -3722,7 +3723,7 @@ let _menhir_action_211 =
     (
 # 253 "<standard.mly>"
     ( x :: xs )
-# 3726 "src/Eclat/frontend/parser.ml"
+# 3727 "src/Eclat/frontend/parser.ml"
      : (Types.ty list))
 
 let _menhir_action_212 =
@@ -3730,7 +3731,7 @@ let _menhir_action_212 =
     (
 # 390 "src/Eclat/frontend/parser.mly"
             ( Sz_lit n )
-# 3734 "src/Eclat/frontend/parser.ml"
+# 3735 "src/Eclat/frontend/parser.ml"
      : (Types.size))
 
 let _menhir_action_213 =
@@ -3740,7 +3741,7 @@ let _menhir_action_213 =
                (
     decl_size_var x
   )
-# 3744 "src/Eclat/frontend/parser.ml"
+# 3745 "src/Eclat/frontend/parser.ml"
      : (Types.size))
 
 let _menhir_action_214 =
@@ -3748,7 +3749,7 @@ let _menhir_action_214 =
     (
 # 359 "src/Eclat/frontend/parser.mly"
           ( [sz] )
-# 3752 "src/Eclat/frontend/parser.ml"
+# 3753 "src/Eclat/frontend/parser.ml"
      : (Types.size list))
 
 let _menhir_action_215 =
@@ -3756,7 +3757,7 @@ let _menhir_action_215 =
     (
 # 360 "src/Eclat/frontend/parser.mly"
                                                 ( szs )
-# 3760 "src/Eclat/frontend/parser.ml"
+# 3761 "src/Eclat/frontend/parser.ml"
      : (Types.size list))
 
 let _menhir_action_216 =
@@ -3774,7 +3775,7 @@ let _menhir_action_216 =
       in
       x,Static_array(e2c ec,to_int e)
   )
-# 3778 "src/Eclat/frontend/parser.ml"
+# 3779 "src/Eclat/frontend/parser.ml"
      : (Ast.x * Ast.static))
 
 let _menhir_action_217 =
@@ -3792,7 +3793,7 @@ let _menhir_action_217 =
       ) ();
       x,Static_array_of (ty,loc)
     )
-# 3796 "src/Eclat/frontend/parser.ml"
+# 3797 "src/Eclat/frontend/parser.ml"
      : (Ast.x * Ast.static))
 
 let _menhir_action_218 =
@@ -3800,7 +3801,7 @@ let _menhir_action_218 =
     (
 # 194 "src/Eclat/frontend/parser.mly"
                            ( e )
-# 3804 "src/Eclat/frontend/parser.ml"
+# 3805 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_219 =
@@ -3808,7 +3809,7 @@ let _menhir_action_219 =
     (
 # 369 "src/Eclat/frontend/parser.mly"
     ( Ty_tuple (ty::tys) )
-# 3812 "src/Eclat/frontend/parser.ml"
+# 3813 "src/Eclat/frontend/parser.ml"
      : (Types.ty))
 
 let _menhir_action_220 =
@@ -3816,7 +3817,7 @@ let _menhir_action_220 =
     (
 # 370 "src/Eclat/frontend/parser.mly"
              (ty)
-# 3820 "src/Eclat/frontend/parser.ml"
+# 3821 "src/Eclat/frontend/parser.ml"
      : (Types.ty))
 
 let _menhir_action_221 =
@@ -3824,7 +3825,7 @@ let _menhir_action_221 =
     (
 # 325 "src/Eclat/frontend/parser.mly"
                 ( TyB_size(sz) )
-# 3828 "src/Eclat/frontend/parser.ml"
+# 3829 "src/Eclat/frontend/parser.ml"
      : (Types.tyB))
 
 let _menhir_action_222 =
@@ -3832,7 +3833,7 @@ let _menhir_action_222 =
     (
 # 327 "src/Eclat/frontend/parser.mly"
     ( TyB_tuple (tyB::tyBs) )
-# 3836 "src/Eclat/frontend/parser.ml"
+# 3837 "src/Eclat/frontend/parser.ml"
      : (Types.tyB))
 
 let _menhir_action_223 =
@@ -3840,7 +3841,7 @@ let _menhir_action_223 =
     (
 # 328 "src/Eclat/frontend/parser.mly"
                (tyB)
-# 3844 "src/Eclat/frontend/parser.ml"
+# 3845 "src/Eclat/frontend/parser.ml"
      : (Types.tyB))
 
 let _menhir_action_224 =
@@ -3857,7 +3858,7 @@ let _menhir_action_224 =
                     | Some (t,_) -> t
                     | None ->  TyB_abstract(x,[Sz_lit 1],[])) (* Prelude.Errors.raise_error ~loc:(with_file $loc)
                               ~msg:("unbound type constructor "^s) ()) *) )
-# 3861 "src/Eclat/frontend/parser.ml"
+# 3862 "src/Eclat/frontend/parser.ml"
      : (Types.tyB))
 
 let _menhir_action_225 =
@@ -3865,7 +3866,7 @@ let _menhir_action_225 =
     (
 # 332 "src/Eclat/frontend/parser.mly"
                   ( decl_tyB_var x )
-# 3869 "src/Eclat/frontend/parser.ml"
+# 3870 "src/Eclat/frontend/parser.ml"
      : (Types.tyB))
 
 let _menhir_action_226 =
@@ -3873,7 +3874,7 @@ let _menhir_action_226 =
     (
 # 332 "src/Eclat/frontend/parser.mly"
                   ( decl_tyB_var x )
-# 3877 "src/Eclat/frontend/parser.ml"
+# 3878 "src/Eclat/frontend/parser.ml"
      : (Types.tyB))
 
 let _menhir_action_227 =
@@ -3881,7 +3882,7 @@ let _menhir_action_227 =
     (
 # 333 "src/Eclat/frontend/parser.mly"
                 ( tyB )
-# 3885 "src/Eclat/frontend/parser.ml"
+# 3886 "src/Eclat/frontend/parser.ml"
      : (Types.tyB))
 
 let _menhir_action_228 =
@@ -3889,7 +3890,7 @@ let _menhir_action_228 =
     (
 # 334 "src/Eclat/frontend/parser.mly"
                         ( tyB )
-# 3893 "src/Eclat/frontend/parser.ml"
+# 3894 "src/Eclat/frontend/parser.ml"
      : (Types.tyB))
 
 let _menhir_action_229 =
@@ -3909,7 +3910,7 @@ let _menhir_action_229 =
             Prelude.Errors.raise_error ~loc:(with_file _loc)
                  ~msg:("type parameter expected for type constructor "^x) ()
        | _ -> TyB_abstract(x,szs,[]) )
-# 3913 "src/Eclat/frontend/parser.ml"
+# 3914 "src/Eclat/frontend/parser.ml"
      : (Types.tyB))
 
 let _menhir_action_230 =
@@ -3917,7 +3918,7 @@ let _menhir_action_230 =
     let tyBs = 
 # 363 "src/Eclat/frontend/parser.mly"
                ( [tyB] )
-# 3921 "src/Eclat/frontend/parser.ml"
+# 3922 "src/Eclat/frontend/parser.ml"
      in
     let _startpos_tyBs_ = _startpos_tyB_ in
     let _endpos = _endpos_szs_ in
@@ -3935,7 +3936,7 @@ let _menhir_action_230 =
        | x -> TyB_abstract(x,szs,tyBs)
        (* Prelude.Errors.raise_error ~loc:(with_file $loc) ()
                  ~msg:("unknown type constructor "^x) *) )
-# 3939 "src/Eclat/frontend/parser.ml"
+# 3940 "src/Eclat/frontend/parser.ml"
      : (Types.tyB))
 
 let _menhir_action_231 =
@@ -3943,7 +3944,7 @@ let _menhir_action_231 =
     let tyBs = 
 # 364 "src/Eclat/frontend/parser.mly"
                                                         ( tyBs )
-# 3947 "src/Eclat/frontend/parser.ml"
+# 3948 "src/Eclat/frontend/parser.ml"
      in
     let _startpos_tyBs_ = _startpos__1_ in
     let _endpos = _endpos_szs_ in
@@ -3961,7 +3962,7 @@ let _menhir_action_231 =
        | x -> TyB_abstract(x,szs,tyBs)
        (* Prelude.Errors.raise_error ~loc:(with_file $loc) ()
                  ~msg:("unknown type constructor "^x) *) )
-# 3965 "src/Eclat/frontend/parser.ml"
+# 3966 "src/Eclat/frontend/parser.ml"
      : (Types.tyB))
 
 let _menhir_action_232 =
@@ -3969,7 +3970,7 @@ let _menhir_action_232 =
     (
 # 302 "src/Eclat/frontend/parser.mly"
         ( x,None )
-# 3973 "src/Eclat/frontend/parser.ml"
+# 3974 "src/Eclat/frontend/parser.ml"
      : (Types.x * Types.ty option))
 
 let _menhir_action_233 =
@@ -3977,7 +3978,7 @@ let _menhir_action_233 =
     (
 # 304 "src/Eclat/frontend/parser.mly"
         ( x,Some ty )
-# 3981 "src/Eclat/frontend/parser.ml"
+# 3982 "src/Eclat/frontend/parser.ml"
      : (Types.x * Types.ty option))
 
 let _menhir_action_234 =
@@ -3985,7 +3986,7 @@ let _menhir_action_234 =
     (
 # 306 "src/Eclat/frontend/parser.mly"
         ( x_ty_opt )
-# 3989 "src/Eclat/frontend/parser.ml"
+# 3990 "src/Eclat/frontend/parser.ml"
      : (Types.x * Types.ty option))
 
 let _menhir_action_235 =
@@ -3993,7 +3994,7 @@ let _menhir_action_235 =
     (
 # 302 "src/Eclat/frontend/parser.mly"
         ( x,None )
-# 3997 "src/Eclat/frontend/parser.ml"
+# 3998 "src/Eclat/frontend/parser.ml"
      : (Ast.p * Types.ty option))
 
 let _menhir_action_236 =
@@ -4001,7 +4002,7 @@ let _menhir_action_236 =
     (
 # 304 "src/Eclat/frontend/parser.mly"
         ( x,Some ty )
-# 4005 "src/Eclat/frontend/parser.ml"
+# 4006 "src/Eclat/frontend/parser.ml"
      : (Ast.p * Types.ty option))
 
 let _menhir_action_237 =
@@ -4009,7 +4010,7 @@ let _menhir_action_237 =
     (
 # 306 "src/Eclat/frontend/parser.mly"
         ( x_ty_opt )
-# 4013 "src/Eclat/frontend/parser.ml"
+# 4014 "src/Eclat/frontend/parser.ml"
      : (Ast.p * Types.ty option))
 
 let _menhir_action_238 =
@@ -4017,7 +4018,7 @@ let _menhir_action_238 =
     (
 # 250 "src/Eclat/frontend/parser.mly"
                         ( x,tyB )
-# 4021 "src/Eclat/frontend/parser.ml"
+# 4022 "src/Eclat/frontend/parser.ml"
      : (Ast.x * Types.tyB))
 
 let _menhir_action_239 =
@@ -4025,7 +4026,7 @@ let _menhir_action_239 =
     (
 # 322 "src/Eclat/frontend/parser.mly"
                 ( Ty_base tyB )
-# 4029 "src/Eclat/frontend/parser.ml"
+# 4030 "src/Eclat/frontend/parser.ml"
      : (Types.ty))
 
 let _menhir_action_240 =
@@ -4033,7 +4034,7 @@ let _menhir_action_240 =
     (
 # 374 "src/Eclat/frontend/parser.mly"
                ( decl_ty_var x )
-# 4037 "src/Eclat/frontend/parser.ml"
+# 4038 "src/Eclat/frontend/parser.ml"
      : (Types.ty))
 
 let _menhir_action_241 =
@@ -4041,7 +4042,7 @@ let _menhir_action_241 =
     (
 # 375 "src/Eclat/frontend/parser.mly"
                                    ( Ty_array(sz,tyB) )
-# 4045 "src/Eclat/frontend/parser.ml"
+# 4046 "src/Eclat/frontend/parser.ml"
      : (Types.ty))
 
 let _menhir_action_242 =
@@ -4049,7 +4050,7 @@ let _menhir_action_242 =
     (
 # 376 "src/Eclat/frontend/parser.mly"
               ( ty )
-# 4053 "src/Eclat/frontend/parser.ml"
+# 4054 "src/Eclat/frontend/parser.ml"
      : (Types.ty))
 
 let _menhir_action_243 =
@@ -4057,7 +4058,7 @@ let _menhir_action_243 =
     (
 # 383 "src/Eclat/frontend/parser.mly"
                                  ( Ty_fun(ty,Dur_one,tyB) )
-# 4061 "src/Eclat/frontend/parser.ml"
+# 4062 "src/Eclat/frontend/parser.ml"
      : (Types.ty))
 
 let _menhir_action_244 =
@@ -4065,7 +4066,7 @@ let _menhir_action_244 =
     (
 # 384 "src/Eclat/frontend/parser.mly"
                                                ( Ty_fun(ty,new_dur_unknown(),tyB) )
-# 4069 "src/Eclat/frontend/parser.ml"
+# 4070 "src/Eclat/frontend/parser.ml"
      : (Types.ty))
 
 let _menhir_action_245 =
@@ -4073,7 +4074,7 @@ let _menhir_action_245 =
     (
 # 385 "src/Eclat/frontend/parser.mly"
                            ( Ty_fun(ty,Dur_zero,tyB) )
-# 4077 "src/Eclat/frontend/parser.ml"
+# 4078 "src/Eclat/frontend/parser.ml"
      : (Types.ty))
 
 let _menhir_action_246 =
@@ -4081,7 +4082,7 @@ let _menhir_action_246 =
     (
 # 386 "src/Eclat/frontend/parser.mly"
                ( Ty_base tyB )
-# 4085 "src/Eclat/frontend/parser.ml"
+# 4086 "src/Eclat/frontend/parser.ml"
      : (Types.ty))
 
 let _menhir_action_247 =
@@ -4089,7 +4090,7 @@ let _menhir_action_247 =
     (
 # 387 "src/Eclat/frontend/parser.mly"
                       ( ty )
-# 4093 "src/Eclat/frontend/parser.ml"
+# 4094 "src/Eclat/frontend/parser.ml"
      : (Types.ty))
 
 let _menhir_action_248 =
@@ -4102,7 +4103,7 @@ let _menhir_action_248 =
    ( add_alias x (TyB_sum ts) (with_file _loc);
      clear_tyvar_constraints();
      x,ts )
-# 4106 "src/Eclat/frontend/parser.ml"
+# 4107 "src/Eclat/frontend/parser.ml"
      : (Ast.x * (Ast.x * Types.tyB) list))
 
 let _menhir_action_249 =
@@ -4113,7 +4114,7 @@ let _menhir_action_249 =
     (
 # 220 "src/Eclat/frontend/parser.mly"
                                      ( add_alias x tyB (with_file _loc) )
-# 4117 "src/Eclat/frontend/parser.ml"
+# 4118 "src/Eclat/frontend/parser.ml"
      : (unit))
 
 let _menhir_action_250 =
@@ -4121,7 +4122,7 @@ let _menhir_action_250 =
     let r = 
 # 237 "src/Eclat/frontend/parser.mly"
              ( None )
-# 4125 "src/Eclat/frontend/parser.ml"
+# 4126 "src/Eclat/frontend/parser.ml"
      in
     let _endpos_r_ = _endpos__1_inlined1_ in
     let _endpos = _endpos_r_ in
@@ -4143,7 +4144,7 @@ let _menhir_action_250 =
    ;
    clear_tyvar_constraints () 
    )
-# 4147 "src/Eclat/frontend/parser.ml"
+# 4148 "src/Eclat/frontend/parser.ml"
      : (unit))
 
 let _menhir_action_251 =
@@ -4151,7 +4152,7 @@ let _menhir_action_251 =
     let r = 
 # 238 "src/Eclat/frontend/parser.mly"
                          ( Some (op,[]) )
-# 4155 "src/Eclat/frontend/parser.ml"
+# 4156 "src/Eclat/frontend/parser.ml"
      in
     let _endpos_r_ = _endpos__3_ in
     let _endpos = _endpos_r_ in
@@ -4173,7 +4174,7 @@ let _menhir_action_251 =
    ;
    clear_tyvar_constraints () 
    )
-# 4177 "src/Eclat/frontend/parser.ml"
+# 4178 "src/Eclat/frontend/parser.ml"
      : (unit))
 
 let _menhir_action_252 =
@@ -4181,7 +4182,7 @@ let _menhir_action_252 =
     let r = 
 # 240 "src/Eclat/frontend/parser.mly"
    ( Some (op,intl) )
-# 4185 "src/Eclat/frontend/parser.ml"
+# 4186 "src/Eclat/frontend/parser.ml"
      in
     let _endpos_r_ = _endpos__5_ in
     let _endpos = _endpos_r_ in
@@ -4203,7 +4204,7 @@ let _menhir_action_252 =
    ;
    clear_tyvar_constraints () 
    )
-# 4207 "src/Eclat/frontend/parser.ml"
+# 4208 "src/Eclat/frontend/parser.ml"
      : (unit))
 
 let _menhir_action_253 =
@@ -4214,7 +4215,7 @@ let _menhir_action_253 =
     (
 # 399 "src/Eclat/frontend/parser.mly"
                ( mk_loc (with_file _loc) v )
-# 4218 "src/Eclat/frontend/parser.ml"
+# 4219 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_254 =
@@ -4222,7 +4223,7 @@ let _menhir_action_254 =
     (
 # 403 "src/Eclat/frontend/parser.mly"
     ( E_tuple (e::es) )
-# 4226 "src/Eclat/frontend/parser.ml"
+# 4227 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_255 =
@@ -4230,7 +4231,7 @@ let _menhir_action_255 =
     (
 # 404 "src/Eclat/frontend/parser.mly"
            ( e )
-# 4234 "src/Eclat/frontend/parser.ml"
+# 4235 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_action_256 =
@@ -4239,12 +4240,12 @@ let _menhir_action_256 =
     let _startpos = _startpos_x_ in
     let _loc = (_startpos, _endpos) in
     (
-# 716 "src/Eclat/frontend/parser.mly"
+# 717 "src/Eclat/frontend/parser.mly"
         ( match x with
           | "_" -> e
           | _ -> Prelude.Errors.raise_error ~loc:(with_file _loc)
                   ~msg:"the wildcard_case should be named \"_\"" () )
-# 4248 "src/Eclat/frontend/parser.ml"
+# 4249 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
 let _menhir_print_token : token -> string =
@@ -4484,6 +4485,8 @@ let _menhir_print_token : token -> string =
         "VECT_CREATE"
     | WHEN ->
         "WHEN"
+    | WHERE ->
+        "WHERE"
     | WITH ->
         "WITH"
     | WITH_SIZES ->

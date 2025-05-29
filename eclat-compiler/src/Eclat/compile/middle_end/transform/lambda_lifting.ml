@@ -300,6 +300,9 @@ let globalize_e (e:e) : ((x * _ * e) list * e) =
     | E_pause e ->
       let ds,e' = glob e in
       ds,E_pause e'
+    | E_equations(p,eqs) ->
+        let dss,eqs' = List.split @@ List.map (fun (p,e) -> let ds,e' = glob e in ds,(p,e')) eqs in
+        List.concat dss,E_equations(p,eqs')
   in glob e
 
 
