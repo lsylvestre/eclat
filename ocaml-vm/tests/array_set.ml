@@ -1,5 +1,3 @@
-open CustomStdlib
-
 let a = [|42;2;3;4;5;6|] ;;
 
 Array.set a 0 200;;

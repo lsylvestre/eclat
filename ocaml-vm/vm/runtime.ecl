@@ -5,13 +5,16 @@ let addint (n,m) = n + m ;;
 let subint (n,m) = n - m ;;
 let mulint (n,m) = n * m ;;
 
+let bxor(a,b) =
+  if a then (not b) else b ;;
+
 let divint (n,m) =
   if m == 0 then 0 (* todo: raise error *) else
   let rec div (a,b,acc) =
     if a < b then acc else div(a-b, b, acc+1)
   in
   let r = div(abs n, abs m, 0) in
-  if (n >= 0) xor (m >= 0) then 0 - r else r ;;
+  if bxor (n >= 0,m >= 0) then 0 - r else r ;;
 
 let modint (n,m) =
   if m == 0 then 0 (* todo: raise error *) else
@@ -45,7 +48,7 @@ let compare_imm(n1,n2) =
 
 let pop_stack_implace (sp_minus_1) =
   (* assert (sp[0] > 0); (see bug 3) *)
-  let v = ram[sp_minus_1] in
+  let v = ram.(sp_minus_1) in
   v ;;
 
 (*** unsigned comparison (<)                  ***)

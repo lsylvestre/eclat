@@ -1,4 +1,3 @@
-open CustomStdlib
 
 (* binary search tree *)
 
@@ -19,10 +18,10 @@ let rec comb n =
 ;;
 
 
-let nb_times = 20 ;; (* nb_times=20 is for RTL simulation on PC,
+let nb_times = 1 ;; (* nb_times=20 is for RTL simulation on PC,
                         augment nb_times for FPGA or PC execution *)
 
-let n = 200 ;;
+let n = 20 ;;
 
 print_int 5 ;;
 

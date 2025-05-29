@@ -82,6 +82,8 @@ let failwith s = raise(Failure s)
 let invalid_arg s = raise(Invalid_argument s)
 
 external print_int : int -> unit = "caml_print_int"
+external print_string : string -> unit = "caml_print_string"
+external print_newline : unit -> unit = "caml_print_newline"
 
 (* Unit operations *)
 
@@ -111,3 +113,21 @@ let rec ( @ ) l1 l2 =
   match l1 with
   | [] -> l2
   | h1 :: t1 -> h1 :: (t1 @ l2)
+
+(* String and byte sequence operations -- more in modules String and Bytes *)
+
+external string_length : string -> int = "%string_length"
+external bytes_length : bytes -> int = "%bytes_length"
+external bytes_create : int -> bytes = "caml_create_bytes"
+external string_blit : string -> int -> bytes -> int -> int -> unit
+                     = "caml_blit_string" [@@noalloc]
+external bytes_blit : bytes -> int -> bytes -> int -> int -> unit
+                        = "caml_blit_bytes" [@@noalloc]
+external bytes_unsafe_to_string : bytes -> string = "%bytes_to_string"
+
+let ( ^ ) s1 s2 =
+  let l1 = string_length s1 and l2 = string_length s2 in
+  let s = bytes_create (l1 + l2) in
+  string_blit s1 0 s 0 l1;
+  string_blit s2 0 s l1 l2;
+  bytes_unsafe_to_string s

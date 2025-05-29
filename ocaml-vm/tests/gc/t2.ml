@@ -1,7 +1,3 @@
-open CustomStdlib ;;
-
-
-(* heap_size = 20 *)
 
 let rec loop i =
    if i < 0 then () else

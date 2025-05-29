@@ -1,4 +1,3 @@
-open CustomStdlib ;;
 
 type t = A of t * t | B of int ;;
 

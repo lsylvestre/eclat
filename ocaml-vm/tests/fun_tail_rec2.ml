@@ -1,5 +1,3 @@
-open CustomStdlib ;;
-
 
 external identity : 'a -> 'a = "caml_identity" ;;
 

@@ -1,5 +1,3 @@
-open CustomStdlib ;;
-
 
 let rec f n = 
   print_int n;

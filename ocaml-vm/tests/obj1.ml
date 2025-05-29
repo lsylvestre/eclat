@@ -1,5 +1,3 @@
-open CustomStdlib ;;
-
 
 let x = object method f = 42 end  ;;
 

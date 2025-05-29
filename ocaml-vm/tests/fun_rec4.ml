@@ -1,6 +1,3 @@
-open CustomStdlib ;;
-
-
 
 let rec sum x = 
   print_int x;

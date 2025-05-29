@@ -9,7 +9,7 @@ let print_stack(sp) =
   print_string "stack: [";
   let rec w(i) =
     if i >= sp then () else
-    let v = ram[i] in (
+    let v = ram.(i) in (
       print_int (long_val(v));
       print_string "|";
       w(i+1)

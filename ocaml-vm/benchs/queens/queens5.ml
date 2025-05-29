@@ -1,0 +1,28 @@
+(* STOP : CY=5548NBI=7pc:6|acc:4096<ptr>|sp:1|env:1<int>
+*)
+
+external foo : int -> int array list = "caml_queens" ;;
+
+let lst = foo(10) ;;
+(*
+print_int (List.length lst) ;;
+
+List.iter (fun a ->
+  print_int 1234567;
+  Array.iter print_int a) lst;;*)
+
+(*
+match lst with 
+| [|a;b;c;d;e;f;g;h|]::v ->
+   print_int a; print_newline ();
+   print_int b;print_newline ();
+   print_int c;print_newline ();
+   print_int d;print_newline ();
+   print_int d;print_newline ();
+   print_int e;print_newline ();
+   print_int f;print_newline ();
+   print_int g;print_newline ();
+   print_int h
+
+*)
+

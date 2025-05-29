@@ -1,7 +1,3 @@
-open CustomStdlib ;;
-
-
-(* heap_size = 50 *)
 
 let rec f l =
   match l with

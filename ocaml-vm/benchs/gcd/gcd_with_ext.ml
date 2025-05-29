@@ -1,4 +1,3 @@
-open CustomStdlib
 
 (*  make vm SRC=benchs/gcd/gcd_with_ext.ml CUSTOM=benchs/gcd/gcd_ext.ecl *)
 

@@ -1,0 +1,112 @@
+(cd ../eclat-compiler; ./eclat \
+		    -ocaml -arg="((true, true, true, true, true, true, true, true, true, true),(true,true))" \
+	        ../ocaml-vm/vm/int.ecl \
+	        ../ocaml-vm/vm/static.ecl \
+	        ../ocaml-vm/vm/mlvalue.ecl \
+	        ../ocaml-vm/vm/opcode.ecl \
+	        ../ocaml-vm/vm/fail.ecl \
+	        ../ocaml-vm/vm/ram.ecl \
+	        ../ocaml-vm/vm/runtime.ecl \
+			../ocaml-vm/vm/debug.ecl \
+	        ../ocaml-vm/vm/alloc.ecl \
+	        ../ocaml-vm/vm/prims.ecl ../ocaml-vm/benchs/queens/queens4_ext.ecl \
+			../ocaml-vm/bytecode.ecl \
+			../ocaml-vm/vm/vm.ecl \
+			../ocaml-vm/vm/vm_exec.ecl \
+			../ocaml-vm/vm/target-specific/intel-max10/IOs.ecl \
+			../ocaml-vm/vm/target-specific/intel-max10/main.ecl)
+======> $22511_loop782
+======> $22512_loop781
+======> $22513_aux780
+======> $22514_make_block679
+======> $24276_forever7864166
+======> $24289_copy_root_in_stack7794165
+======> $24319_copy_root_in_ram7784164
+======> $22527_loop782
+======> $22528_loop781
+======> $22529_aux780
+======> $22530_make_block679
+======> $22612_forever7864172
+======> $22615_forever7864167
+======> $22628_copy_root_in_stack7794171
+======> $22641_copy_root_in_stack7794169
+======> $22688_copy_root_in_ram7784170
+======> $22701_copy_root_in_ram7784168
+======> $22531_loop13767
+======> $22830_loop782
+======> $22831_loop781
+======> $22832_aux780
+======> $22833_make_block679
+======> $24032_forever7864178
+======> $24035_forever7864173
+======> $24048_copy_root_in_stack7794177
+======> $24061_copy_root_in_stack7794175
+======> $24108_copy_root_in_ram7784176
+======> $24121_copy_root_in_ram7784174
+======> $22834_loop1777
+======> $22835_pause_make_block681
+======> $22836_check_bounds699
+======> $23979_forever7864179
+======> $23982_forever7864173
+======> $22837_w755
+======> $22867_w37534194
+======> $22872_w17524193
+======> $22877_w07514192
+======> $22892_loop7544195
+======> $22942_fill7564196
+======> $22956_loop_push7574197
+======> $22976_w7764198
+======> $22991_w7744199
+======> $22999_w7754200
+======> $23006_w7734201
+======> $23034_w7734202
+======> $23038_copy7724203
+======> $23059
+======> $23069_safe_all_aux7174204
+======> $23080
+======> $23090_safe_all_aux7174204
+======> $23101
+======> $23111_safe_all_aux7174204
+======> $23122
+======> $23132_safe_all_aux7174204
+======> $23143
+======> $23153_safe_all_aux7174204
+======> $23164
+======> $23174_safe_all_aux7174204
+======> $23185
+======> $23195_safe_all_aux7174204
+======> $23206
+======> $23216_safe_all_aux7174204
+======> $23227
+======> $23237_safe_all_aux7174204
+======> $23285_modulo7844206
+======> $23291_div7854207
+======> $23344_loop782
+======> $23345_loop781
+======> $23346_aux780
+======> $23347_make_block679
+======> $23385_forever7864185
+======> $23388_forever7864180
+======> $23391_forever7864173
+======> $23404_copy_root_in_stack7794184
+======> $23417_copy_root_in_stack7794182
+======> $23430_copy_root_in_stack7794175
+======> $23494_copy_root_in_ram7784183
+======> $23507_copy_root_in_ram7784181
+======> $23520_copy_root_in_ram7784174
+======> $23655_loop782
+======> $23656_loop781
+======> $23657_aux780
+======> $23658_make_block679
+======> $23697_forever7864191
+======> $23700_forever7864186
+======> $23703_forever7864173
+======> $23716_copy_root_in_stack7794190
+======> $23729_copy_root_in_stack7794188
+======> $23742_copy_root_in_stack7794175
+======> $23806_copy_root_in_ram7784189
+======> $23819_copy_root_in_ram7784187
+======> $23832_copy_root_in_ram7784174
+ocaml code generated in ../target/ml/main_step.ml
+vhdl code generated in ../target/main.vhdl 
+testbench generated in ../target/tb_main.vhdl for software RTL simulation using GHDL.

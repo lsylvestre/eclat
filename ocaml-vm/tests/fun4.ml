@@ -1,4 +1,3 @@
-open CustomStdlib
 
 let f = fun x y z u -> x + y + z + u;;
 

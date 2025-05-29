@@ -1,4 +1,13 @@
-open CustomStdlib ;;
+(* $ make SRC="benchs/queens/queens2.ml"  FLAGS="-ocaml" BCOPT="-load-code -load-data" byte
+   $ make SRC="benchs/queens/queens2.ml"  FLAGS="-ocaml" BCOPT="-load-code -load-data" vm
+   $ cd ../target/ml
+   $ ocamlc runtime.ml main_step.ml
+   $ 
+
+
+   (* CY=20106669NBI=4995332 *)
+ *)
+
 
 let abs_sub (a, b) = if b > a then b-a else a-b;;
 
@@ -32,4 +41,4 @@ let queens n =
   let chess = Array.create n 1 in
    print_int (loop (1, 1, n, chess, 0));;
 
-queens(5);;
+queens(8);;

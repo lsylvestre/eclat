@@ -1,5 +1,3 @@
-open CustomStdlib ;;
-
 
 (* make vm SRC=benchs/apply/apply.ml *)
 
@@ -12,6 +10,6 @@ let succ x = x + 1 ;;
 let nb_times = 1 ;; (* nb_times=1 is for RTL simulation on PC,
                        augment nb_times for FPGA or PC execution *)
 
-for i = 1 to nb_times do
-  print_int (double oct succ 1)
-done ;;
+print_int 42;
+
+double oct succ 1;;

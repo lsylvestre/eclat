@@ -1,4 +1,3 @@
-open CustomStdlib ;;
 
 type t = A of bool | B of int ;;
 

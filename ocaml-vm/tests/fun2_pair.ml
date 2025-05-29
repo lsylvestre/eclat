@@ -1,5 +1,3 @@
-open CustomStdlib
-
 
 let f (x,y) = x + x + y ;;
 

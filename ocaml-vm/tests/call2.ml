@@ -1,5 +1,3 @@
-open CustomStdlib ;;
-
 
 external f : int -> int -> int = "foo" ;;
 

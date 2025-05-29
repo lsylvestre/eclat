@@ -1,5 +1,3 @@
-open CustomStdlib
-
 
 let f = let a = 1000 in fun x y -> x + y + a;;
 

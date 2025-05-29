@@ -1,4 +1,3 @@
-open CustomStdlib ;;
 
 exception E;;
 

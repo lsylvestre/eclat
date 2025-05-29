@@ -1,4 +1,3 @@
-open CustomStdlib ;;
 
 let a = 1 ;;
 

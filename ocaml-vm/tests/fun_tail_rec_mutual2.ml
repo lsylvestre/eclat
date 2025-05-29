@@ -1,6 +1,4 @@
-open CustomStdlib ;;
 
-()
 let rec odd n = 
   print_int n;
   if n < 1 then false else even(n-1)

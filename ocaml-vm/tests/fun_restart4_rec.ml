@@ -1,5 +1,3 @@
-open CustomStdlib ;;
-
 
 let c = 100 ;;
 

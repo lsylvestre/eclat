@@ -1,5 +1,3 @@
-open CustomStdlib
-
 let a = Array.make 10 100 ;;
 
 Array.set a 6 42;;

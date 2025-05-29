@@ -1,4 +1,3 @@
-open CustomStdlib
 
 let f (x,y) = (y,x);;
 

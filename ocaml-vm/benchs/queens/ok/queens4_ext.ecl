@@ -1,0 +1,147 @@
+(* make SRC="benchs/queens/queens4.ml"  FLAGS+="-ocaml" BCOPT="-load_code -load_data" CUSTOM=ocaml-vm/benchs/queens/queens4_ext.ecl 
+
+ *)
+(* valeur absolue d'une soustraction *)
+let abs_sub (a, b) = if b > a then b-a else a-b;;
+
+(* deux reines p et q sont safe : 
+      - pas dans la même colonne 
+      - et la distance verticale n'est pas la même que la distance horizontale 
+*)
+
+let safe (p, q, d) = p <> q && abs_sub(q, p) <> d;;
+
+
+(* une nouvelle reine p est safe vis-à-vis d'un ensemble de n reines q
+ ssi  \forall i \ in[1..n] : S(q_i, p, n+1-i)
+*)
+ 
+let rec safe_all_aux (i, n, p,chess) =
+  if i > n then true
+  else 
+    ( if safe(vect_nth(chess,(resize_int<32>(i-1))), p, n+1-i) 
+      then (safe_all_aux(i+1, n, p,chess))
+      else false 
+    ) ;;
+
+let safe_all (n,p,chess) = safe_all_aux (1,n,p,chess) ;;
+
+
+let sz = 9 ;;
+
+let write_en = create<9>() ;;
+let write_data = create<9>() ;;
+let ref_st = create<1>() ;;
+let ref_link = create<1>() ;;
+
+(* (* optimization: *)
+let safe_all (n,p,chess) =
+  macro_generate (fun (i,acc) -> 
+    acc & ((i+1 > n) or safe(vect_nth(chess,resize_int<32>(i)), p, n-i))
+  ) true sz ;; 
+*)
+
+(* la fonction de double récursion : (trouver une position pour la nouvelle reine, 
+   quand on en a n, itérer le processus dans la configuration suivante : 
+
+   col : col reines déjà traitées 
+   i : en cours pour trouver une position correcte à la nouvelle reine (la col+1 ième)
+   n : max total (invariable)
+   v   : vecteur des reines déjà trouvées (en fait une pile une pile) 
+   nb  : nombre de solutions déjà trouvées
+*)
+
+let rec loop (id,restart,col, i, n,chess, nb) = print_string "!!!-";
+ if i <= n then (
+   if safe_all (col,i,chess) then 
+     ( let chess = vect_copy_with(chess,col,i) in
+       let nb2 = if col+1 = n then ( 
+           print_string "[found!]"; 
+           (* show_chess(chess) ;*)
+           set(write_en,id,true);
+           set(write_data,id,chess);
+           let rec wait() =
+              if get(write_en,id) then wait() else ()
+           in wait();
+           nb+1) 
+           else nb in
+       loop(id,restart,col+1, 1, n,chess,nb2) 
+     )
+   else 
+     loop(id,restart,col, i+1,n,chess, nb) )
+ else 
+   ( if col >= restart then ( loop(id,restart,col-1, vect_nth(chess,(resize_int<32>(col-1)))+1, n,chess, nb)) else nb)
+;;
+
+(*
+let queens_seq(v:int<8> vect<'a>) =
+   (loop (1, 1, 1,vect_size v,v,0)) ;;
+*)
+let queens ((n,v) : int<8> * int<8> vect<'a>) =
+
+  let r = create<1>() in
+  set(r, 0,0);
+  
+  let finish = create<1>() in
+  set(finish,0,false);
+
+  let () = parfor i = 1 to sz do
+              if i <= n then 
+              let v = vect_copy_with(v,0,i) in 
+              let nb = loop (i-1, 2, 1, 1, n, v, 0) in
+              print_string "rang "; print_int i; print_string ": "; print_int nb; print_newline ();
+              set(r,0,nb+get(r,0))
+            done;
+            set(finish,0,true)
+  and () = let rec wait() =
+              if get(finish,0) then () else
+              (for i = 0 to length write_en - 1 do
+                if get(write_en,i) then (
+                  let chess = get(write_data,i) in
+                  let st = get(ref_st,0) in
+                  let (pc,acc,sp, (env, extra_args, trap_sp), others) = st in
+                  print_string "STACK====:"; print_int sp;
+                  let (acc,env,blk) = make_block(sp,acc,env,0,resize_int<16>(n)) in
+                  for j = 0 to n - 1 do
+                    print_string "&&&&&&&&& ";
+                    print_int (vect_nth(chess,j));
+                    print_newline ();
+                    let vv = val_long(as_long(resize_int<16>(vect_nth(chess,j)))) in
+                    set_field(blk,resize_int<16>(j),vv)
+                  done;
+                  let (acc,env,next_link) = make_block(sp,acc,env,1,2) in
+                  let v = get(ref_link,0) in
+                  set_field(v,0,blk);
+                  set_field(v,1,next_link);
+                  set(ref_link,0,next_link);
+                  let st = (pc,acc,sp, (env, extra_args, trap_sp), others) in
+                  set(ref_st,0,st);
+
+                  set(write_en,i,false)
+                ) else ()
+               done;
+               wait())
+            in wait()
+  in
+  (get(r,0),get(ref_st,0));;
+
+let chrono (b) : int<64> =
+  reg (fun c -> if b then c + 1 else c) init (-1) ;;
+
+
+let foo ((v,_),st) = print_string "hello!!!";
+  print_string "DEBUT-:";
+  let (pc,acc,sp, (env, extra_args, trap_sp), others) = st in
+  let (acc,env,link) = make_block(sp,acc,env,0,2) in
+  let st = (pc,acc,sp, (env, extra_args, trap_sp), others) in
+  set(ref_link,0,link);
+  set(ref_st,0,st);
+  let (nb,st2) = let chess = vect_create<20> (1:int<8>) in
+                 (queens(resize_int<8>(long_val v),chess))
+  in
+  set_field(get(ref_link,0),0,val_long(1));
+  print_int nb;
+  print_string "FIN-:";
+  (link, st2)  ;;
+
+

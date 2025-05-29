@@ -1,4 +1,3 @@
-open CustomStdlib ;;
 
 (*  make vm SRC=benchs/list_length/length_with_ext.ml   \
             CUSTOM="benchs/list_length/length_ext.ecl" FLAGS=""

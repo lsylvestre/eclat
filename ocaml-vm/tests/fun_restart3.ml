@@ -1,6 +1,3 @@
-open CustomStdlib ;;
-
-
 let c = 100 ;;
 
 let f x y z = x + y + z + c ;;

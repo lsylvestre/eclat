@@ -1,4 +1,3 @@
-open CustomStdlib
 
 (*   make vm SRC=benchs/bst/bst_with_ext.ml CUSTOM=benchs/bst/bst_ext.ecl   *)
 

@@ -24,6 +24,11 @@ let blink (n) =
 
 let main (ii : inputs) : outputs =
   let (_,(key0,key1)) = ii in
+  let (stop,busy,led,acc) = ocaml_vm (key1) in
+  (all_switches stop, number_to_alpha (resize_int<25>(long_val(acc)))) ;;
+
+  (*
+  let (_,(key0,key1)) = ii in
   (* suspend the VM when input [key0] is true *)
   if not(key0) then
     (all_switches key1, display_coffee)
@@ -46,4 +51,4 @@ let main (ii : inputs) : outputs =
   let b = blink(10000000) in
   let switches = (stop,busy,b,led,false,false,false,false,false,false) in
   (switches, dis) ;;
-
+*)
