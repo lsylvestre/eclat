@@ -191,7 +191,14 @@ let rec anf (e:e) : e =
       E_run(i,xc) 
   | E_pause e -> E_pause (anf e)
   | E_equations(p,eqs) ->
-      E_equations(p,List.map (fun (p,e) -> p,anf e) eqs)
+      let rec anf_le le =
+        match le with
+        | Exp e1 -> Exp (anf e1)
+        | Fby(le1, le2) -> Fby(anf_le le1, anf_le le2)
+        | When(le1, e2) -> When(anf_le le1, anf e2)
+        | Merge(le1, le2, e3) -> Merge(anf_le le1, anf_le le2, anf e3)
+      in
+      E_equations(p,List.map (fun (p,le) -> p, anf_le le) eqs)
   in 
   glob e ;;
 

@@ -671,6 +671,37 @@ let rec typ_exp ?(collect_sig=false) ~statics ~externals ~sums ?(toplevel=false)
                         ~toplevel ~loc:(loc_of e1) g e1 in
         (ty1, Dur_one)
     | E_equations(p,eqs) ->
+        let typ_lexp ~collect_sig ~statics ~externals ~sums
+                            ~toplevel ~loc g le =
+          let rec aux le =
+            match le with
+            | Exp e1 -> let t,d = typ_exp ~collect_sig ~statics ~externals ~sums
+                            ~toplevel ~loc g e1 in
+                        unify_dur ~loc d Dur_zero;
+                        t
+            | Fby(le1,le2) -> let t1 = aux le1 in
+                              let t2 = aux le2 in
+                              unify_ty ~loc t1 t2;
+                              t2
+            | When(le1,e2) -> let t1 = aux le1 in
+                              let t2,d2 = typ_exp ~collect_sig ~statics ~externals ~sums
+                                            ~toplevel ~loc g e2 
+                              in
+                              unify_dur ~loc d2 Dur_zero;
+                              unify_ty ~loc t2 (Ty_base TyB_bool);
+                              t1
+            | Merge(le1, le2, e3) -> let t1 = aux le1 in
+                                     let t2 = aux le2 in
+                                     let t3,d3 = typ_exp ~collect_sig ~statics ~externals ~sums
+                                                    ~toplevel ~loc g e3
+                              in
+                                unify_dur ~loc d3 Dur_zero;
+                                unify_ty ~loc t1 t2;
+                                unify_ty ~loc t3 (Ty_base TyB_bool);
+                                t3
+          in
+          aux le
+        in
         let p_ty_shape p =
           match p with 
           | P_tuple ps -> Ty_base (TyB_tuple (List.map (fun _ -> new_tyB_unknown()) ps))
@@ -679,14 +710,13 @@ let rec typ_exp ?(collect_sig=false) ~statics ~externals ~sums ?(toplevel=false)
         let g' = env_extend ~loc g p (p_ty_shape p) in
         let g2 = List.fold_left (fun g (p,_) ->
                    env_extend ~loc g p (p_ty_shape p)) g' eqs in
-        List.iter (fun (p,e) ->
-            let loc = (loc_of e) in
-            let ty,d = typ_exp ~collect_sig ~statics ~externals ~sums
-                            ~toplevel ~loc g2 e in
-            let tyP,_ = typ_exp ~collect_sig ~statics ~externals ~sums
+        List.iter (fun (p,le) -> 
+          (* let loc = (loc_of_le e) in *)
+          let ty = typ_lexp ~collect_sig ~statics ~externals ~sums
+                            ~toplevel ~loc g2 le in
+          let tyP,_ = typ_exp ~collect_sig ~statics ~externals ~sums
                             ~toplevel ~loc g2 (Pattern.pat2exp p) in
-            unify_ty ~loc ty tyP;
-            unify_dur ~loc d Dur_zero) eqs;
+            unify_ty ~loc ty tyP) eqs;
         let tyOut,_ = typ_exp ~collect_sig ~statics ~externals ~sums
                             ~toplevel ~loc g' (Pattern.pat2exp p) in
         tyOut,Dur_zero  

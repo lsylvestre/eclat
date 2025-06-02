@@ -71,7 +71,7 @@ exception Not_a_pattern
     Raises [Not_a_pattern] if the expression [e] cannot
     be converted into a pattern *)
 let rec exp2pat (e:e) : p =
-  match e with
+  match Ast.un_annot e with
   | E_const Unit ->
       P_unit
   | E_var x ->

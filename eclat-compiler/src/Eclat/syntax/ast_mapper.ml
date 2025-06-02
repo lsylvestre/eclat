@@ -90,7 +90,24 @@ let rec map f e =
       E_generate((p, ty, f e1), f e2, f e_st1, loc)
   | E_pause e1 -> E_pause (f e1)
   | E_equations(p,eqs) ->
-      let eqs' = List.map (fun (p,e) -> p, f e) eqs in
+      let rec map_le f le = 
+        match le with 
+        | Exp e' -> Exp(f e')
+        | Fby(le1,le2) ->
+            let le1' = map_le f le1 in
+            let le2' = map_le f le2 in
+            Fby(le1',le2') 
+        | When(le1,e2) ->
+            let le1' = map_le f le1 in
+            let e2' = f e2 in
+            When(le1',e2')
+        | Merge(le1,le2,e3) ->
+            let le1' = map_le f le1 in
+            let le2' = map_le f le2 in
+            let e3' = f e3 in
+            Merge(le1',le2',e3')
+      in  
+      let eqs' = List.map (fun (p,le) -> p,map_le f le) eqs in
       E_equations(p,eqs')
 
 (** traversal order of sub-expressions is unspecified *)
@@ -149,7 +166,14 @@ let rec iter f (e:e) : unit =
       f e1
   | E_pause e1 -> f e1
   | E_equations(_,eqs) ->
-      List.iter (fun (_,e) -> f e) eqs
+      let rec iter_le f le =
+        match le with
+        | Exp e' -> f e'
+        | Fby(le1,le2) -> iter_le f le1; iter_le f le2
+        | When(le1,e2) -> iter_le f le1; f e2
+        | Merge(le1,le2,e3) -> iter_le f le1; iter_le f le2; f e3
+      in
+      List.iter (fun (_,le) -> iter_le f le) eqs
 
 let declare ds ts e =
   List.fold_right2 (fun (x,v) t e -> E_letIn(P_var x,t,v,e)) ds ts e
@@ -278,9 +302,25 @@ let accum f (e:e) =   (* : ((x * ty * e) list * e)*)
         | E_pause e1 -> 
             let ds1,e1' = aux e1 in
             [],E_pause (declare' ds1 e1')
-        | E_equations(p,eqs) ->
-            let eqs' = List.map (fun (p,e) -> p, let (ds,e') = aux e in declare' ds e') eqs in
-            [], E_equations(p,eqs')
+        | E_equations(p,eqs) ->   
+            let rec accum_le le = 
+                match le with
+                | Exp e -> let (ds,e') = aux e in Exp (declare' ds e)
+                | Fby(le1,le2) -> let le1' = accum_le le1 in
+                                  let le2' = accum_le le2 in
+                                  Fby(le1',le2')
+                | When(le1,e2) -> let le1' = accum_le le1 in
+                                  let (ds2,e2') = aux e2 in
+                                  When(le1',declare' ds2 e2')
+                | Merge(le1,le2,e3) -> let le1' = accum_le le1 in
+                                       let le2' = accum_le le2 in
+                                       let (ds3,e3') = aux e3 in
+                                       Merge(le1',le2',declare' ds3 e3')
+            in
+            let eqs' = List.map (fun (p,le) -> 
+                                       p, accum_le le) eqs in
+            
+                [], E_equations(p,eqs')
   ) 
   in 
   aux e

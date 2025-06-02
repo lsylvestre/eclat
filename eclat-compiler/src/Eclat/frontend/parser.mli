@@ -32,6 +32,7 @@ type token =
   | RUN
   | RPAREN
   | RIGHT_ARROW
+  | RETURNS
   | RESIZE_INT
   | RESET
   | REGISTER
@@ -46,6 +47,7 @@ type token =
   | PIPE_PIPE
   | PIPE_COMMA_PIPE
   | PIPE
+  | PERCENT
   | PAUSE
   | PARFOR
   | OR
@@ -57,6 +59,7 @@ type token =
   | NEQ
   | MOD
   | MINUS
+  | MERGE
   | MATCH
   | MACRO_GENERATE
   | MACRO_FOR
@@ -93,6 +96,7 @@ type token =
   | FUN
   | FOR
   | FIX
+  | FBY
   | EXTERNAL
   | EXIT_REPL
   | EXEC

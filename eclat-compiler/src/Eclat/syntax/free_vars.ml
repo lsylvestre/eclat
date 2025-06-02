@@ -100,7 +100,17 @@ let fv ?(get_arrays=true) ?(xs=SMap.empty) e =
   | E_pause e -> aux xs e
   | E_equations(p,eqs) ->
       let ys = vars_of_p (P_tuple (p::List.map fst eqs)) in
-      fv_list (xs++ys) (List.map snd eqs)
+      let rec fv_le xs le =
+        match le with
+        | Exp e1 -> aux xs e1
+        | Fby(le1, le2) -> fv_le xs le1 ++ fv_le xs le2
+        | When(le1, e2) -> fv_le xs le1 ++  aux xs e2
+        | Merge(le1, le2, e3) -> fv_le xs le1 ++ fv_le xs le2 ++ aux xs e3
+      in
+      let rec fv_list_le xs les =
+        List.fold_left (fun acc lei -> acc ++ fv_le xs lei) SMap.empty les
+      in
+      fv_list_le (xs++ys) (List.map snd eqs)
   in
   aux xs e
 
@@ -197,7 +207,17 @@ let fv_arrays ?(xs=SMap.empty) e =
   | E_pause e -> aux xs e
   | E_equations(p,eqs) ->
       let ys = vars_of_p (P_tuple (p::List.map fst eqs)) in
-      fv_list (xs++ys) (List.map snd eqs)
+      let rec fv_le xs le =
+        match le with
+        | Exp e1 -> aux xs e1
+        | Fby(le1, le2) -> fv_le xs le1 ++ fv_le xs le2
+        | When(le1, e2) -> fv_le xs le1 ++  aux xs e2
+        | Merge(le1, le2, e3) -> fv_le xs le1 ++ fv_le xs le2 ++ aux xs e3
+      in
+      let rec fv_list_le xs les =
+        List.fold_left (fun acc lei -> acc ++ fv_le xs lei) SMap.empty les
+      in
+      fv_list_le (xs++ys) (List.map snd eqs)
   in
   aux xs e
 

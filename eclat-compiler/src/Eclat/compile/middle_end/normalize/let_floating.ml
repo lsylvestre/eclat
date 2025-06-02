@@ -117,7 +117,22 @@ let rec lfloat (e:e) : e =
       let ds,e' = glob e in
       ds,E_pause e'
   | E_equations(p,eqs) ->
-      [],E_equations(p,List.map (fun (p,e) -> p,lfloat e) eqs) 
+      let rec glob_le le =
+        match le with
+        | Exp e1 -> let ds,e1' = glob e1 in (ds, Exp e1')
+        | Fby(le1, le2) -> let ds1,le1' = glob_le le1 in
+                           let ds2,le2' = glob_le le2 in
+                           (ds1@ds2, Fby(le1', le2'))
+        | When(le1, e2) -> let ds1,le1' = glob_le le1 in
+                           let ds2,e2' = glob e2 in
+                           (ds1@ds2, When(le1', e2'))
+        | Merge(le1, le2, e3) -> let ds1,le1' = glob_le le1 in
+                                 let ds2,le2' = glob_le le2 in
+                                 let ds3,e3' = glob e3 in
+                                 (ds1@ds2@ds3, Merge(le1', le2', e3'))
+      in
+      let dss,eqs' = List.split @@ List.map (fun (p,le) -> let ds,le' = glob_le le in ds,(p,le')) eqs in
+      List.concat dss, E_equations(p,eqs') 
   in 
   let ds,e' = glob e in 
   declare ds e'

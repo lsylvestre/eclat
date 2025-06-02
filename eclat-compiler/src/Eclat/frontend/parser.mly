@@ -70,7 +70,7 @@
 
 %token LPAREN RPAREN LCUR RCUR LBRACKET RBRACKET COMMA PIPE_PIPE PIPE_COMMA_PIPE EQ EQ_EQ COL SEMI HAT STATIC DOT_LENGTH ARRAY_LENGTH
 %token SHARP_PIPE_LBRACKET LBRACKET_PIPE PIPE_RBRACKET
-%token FUN AMP DOT REGISTER EXEC INIT DEFAULT RESET WHEN WHERE
+%token FUN AMP DOT REGISTER EXEC INIT DEFAULT RESET WHERE RETURNS PERCENT
 %token NODE IMPLY
 %token MATCH WITH PIPE END
 %token OF
@@ -79,7 +79,7 @@
 %token <string> IDENT UP_IDENT TVAR_IDENT TYB_VAR_IDENT 
 %token <bool> BOOL_LIT
 %token <int> INT_LIT
-%token PLUS MINUS TIMES LT LE GT GE NEQ NOT MOD DIV AMP_AMP OR
+%token PLUS MINUS TIMES LT LE GT GE NEQ NOT MOD DIV AMP_AMP OR WHEN FBY MERGE
 %token XOR LAND LOR LXOR LSL LSR ASR RESIZE_INT TUPLE_OF_INT INT_OF_TUPLE
 %token TUPLE_GET TUPLE_UPDATE
 %token UNROLL AT AT_AT
@@ -208,6 +208,7 @@ decl:
 decl_all:
 | LET b=after_let(SEMI_SEMI)
         { b,(with_file $loc) }
+| NODE f=IDENT p=apat RETURNS p2=apat EQ eqs=equations SEMI_SEMI { (P_var f, E_fun(p,(Types.new_ty_unknown(),Types.new_tyB_unknown()),E_equations(p2,eqs))),(with_file $loc) }
 /*| NODE b=fun_decl(SEMI_SEMI)
         { enforce_node b,(with_file $loc) }
 */
@@ -458,6 +459,9 @@ lexp_desc:
 | FUN p_ty_opt=arg_ty RIGHT_ARROW e=exp
         { let (p,ty_p_opt) = p_ty_opt in
           mk_fun_ty_annot_p p ty_p_opt e }
+| e=aexp WHERE eqs=equations { 
+          let p = Pattern.exp2pat e in
+          E_letIn(p,Types.new_ty_unknown(),E_equations(p, eqs),e) } 
 | IF e1=exp THEN e2_e3=if_end
         { let (e2,e3) = e2_e3 in E_if(e1,e2,e3) }
 | LET b=after_let(IN) e2=exp
@@ -476,6 +480,20 @@ lexp_desc:
         {
             E_par(e1::es)
         }
+
+equations:
+| REC eqs=separated_nonempty_list(AND,separated_pair(apat,EQ,lustre_lexp)) { eqs }
+
+lustre_lexp:
+| e=lexp { Exp(e) }
+| LPAREN le=lustre_lexp RPAREN { le }
+| le1=lustre_aexp FBY le2=lustre_lexp { Fby(le1,le2) }
+| le1=lustre_aexp WHEN e2=app_exp { When(le1,e2) }
+| MERGE e3=aexp le1=lustre_aexp le2=lustre_aexp { Merge(le1,le2,e3) }
+
+lustre_aexp:
+| e=aexp { Exp(e) }
+| LPAREN le=lustre_lexp RPAREN { le }
 
 if_end:
 | e2=lexp { e2,E_const Unit }
@@ -580,6 +598,8 @@ app_exp_desc:
         let y = gensym () in
          E_reg((P_var y,Types.new_tyB_unknown(),E_app(E_var f,E_var y)),e0,Ast.gensym ())
        }
+| EXEC e1=exp
+       { E_exec(e1,E_app(E_const (Op(Runtime(External_fun("Default.create",new_ty_unknown ())))),E_const(Unit)),None,"") }
 | EXEC e1=exp DEFAULT e2=lexp
        { E_exec(e1,e2,None,"") }
 | EXEC e1=exp DEFAULT e2=lexp RESET e3=app_exp
@@ -588,11 +608,11 @@ app_exp_desc:
   { let z = Ast.gensym () in
     E_generate((P_var z,(Types.new_ty_unknown(),Types.new_tyB_unknown()),  E_app(ef1,E_var z)),e_init2,e_st3,with_file $loc) }
 
-| EXEC e1=exp 
+(* | EXEC e1=exp 
     {
         Prelude.Errors.raise_error ~loc:(with_file $loc)
             ~msg:"missing ``default'' close; `exec e default e` expected" ()
-    }
+    }*)
 | EXEC e1=exp DEFAULT
     {
         Prelude.Errors.raise_error ~loc:(with_file $loc)
@@ -616,6 +636,8 @@ app_exp_desc:
 | RUN i=UP_IDENT e=aexp 
      { E_run(i, e) }
 
+| e1=app_exp x=WHEN e2=aexp { E_if(e2,e1,E_app(E_const (Op(Runtime(External_fun("Default.create",new_ty_unknown ())))),E_const(Unit))) }
+| e1=aexp RIGHT_ARROW e2=app_exp { E_app(E_var "arrow", E_tuple[e1;e2]) }
 
 
 | e=aexp { e }
@@ -671,8 +693,8 @@ aexp_desc:
             | _ -> E_var x }
 | SHARP_PIPE_LBRACKET separated_list(COMMA,app_exp) PIPE_RBRACKET
     { (* Buffer n *) assert false (*todo*)  }
-(*| LAPAREN p=pat WHERE eqs=separated_nonempty_list(AND,separated_pair(pat,EQ,exp)) RPAREN { E_equations(p,eqs) } 
-*)| MATCH e=exp WITH
+
+| MATCH e=exp WITH
     PIPE? cases=match_case_const*
     IDENT RIGHT_ARROW otherwise=exp END?
       { E_case(e,cases,otherwise) }

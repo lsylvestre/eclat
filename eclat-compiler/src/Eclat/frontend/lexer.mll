@@ -18,7 +18,10 @@
        "exec",  EXEC;
        "reset", RESET;
        "when",  WHEN;
+       "fby",   FBY;
+       "merge", MERGE;
        "where", WHERE;
+       "returns", RETURNS;
        "and",   AND;
        "in",    IN;
        "if",    IF;
@@ -157,6 +160,7 @@ rule token = parse
 | "!=" | "<>"         { NEQ }
 | "&&"                { AMP_AMP }
 | "&"                 { AMP }
+| "%"                 { PERCENT }
 | "^"                 { HAT }
 | ".length"           { DOT_LENGTH }
 | ['"']([^'"']* as s)['"'] { STRING_LIT s }

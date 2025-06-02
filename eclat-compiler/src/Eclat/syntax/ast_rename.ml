@@ -80,12 +80,22 @@ let rename_e ~statics e =
       let e1' = ren_e (subst_p_e p (pat2exp pz) e1) in
      E_vector_mapi(is_par,(pz, typ, e1'),ren_e e2,ty)
   | E_equations(p,eqs) ->
+      let rec ren_p_le p ex le =
+        let ren e =
+          ren_e (subst_p_e p ex e)
+        in
+        match le with
+        | Exp e' -> Exp(ren e')
+        | Fby(le1, le2) -> Fby(ren_p_le p ex le1, ren_p_le p ex le2)
+        | When(le1, e2) -> When(ren_p_le p ex le1, ren e2)
+        | Merge(le1, le2, e3) -> Merge(ren_p_le p ex le1, ren_p_le p ex le2, ren e3)
+      in
       let p_tuple = P_tuple (p :: List.map (fun (p,_) -> p) eqs) in 
       let pz = rename_pat ~statics p_tuple in
-      let eqs' = List.map (fun (pj,ei) -> 
+      let eqs' = List.map (fun (pj,lei) -> 
                   let pj' = exp2pat (subst_p_e p_tuple (pat2exp pz) (pat2exp pj)) in
-                  let ei' = ren_e (subst_p_e p_tuple (pat2exp pz) ei) in
-                  pj', ei') eqs in
+                  let lei' = ren_p_le p_tuple (pat2exp pz) lei in
+                  pj', lei') eqs in
       let p' = exp2pat (subst_p_e p_tuple (pat2exp pz) (pat2exp p)) in
       E_equations(p',eqs')
   | e -> Ast_mapper.map ren_e e

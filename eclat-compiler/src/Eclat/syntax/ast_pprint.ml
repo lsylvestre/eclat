@@ -225,10 +225,26 @@ let pp_exp (fmt:fmt) (e:e) : unit =
       fprintf fmt "run %s(%a)" i (pp_e ~paren:false) e
   | E_pause e -> fprintf fmt "pause %a"  (pp_e ~paren:true) e
   | E_equations(p,eqs) ->
+      let rec pp_le ~paren fmt le =
+        parenthesize ~paren (fun fmt () ->
+          match le with
+          | Exp e1 -> pp_e ~paren fmt e1
+          | Fby(le1,le2) -> fprintf fmt "%a fby %a" 
+                              (pp_le ~paren:true) le1
+                              (pp_le ~paren:true) le2
+          | When(le1,e2) -> fprintf fmt "%a when %a" 
+                              (pp_le ~paren:true) le1
+                              (pp_e ~paren:true) e2
+          | Merge(le1,le2,e3) -> fprintf fmt "merge %a and %a with %a" 
+                                  (pp_le ~paren:false) le1
+                                  (pp_le ~paren:false) le2
+                                  (pp_e ~paren:true) e3
+        ) fmt ()
+      in
       fprintf fmt "@[<v 2>(%a where@," pp_pat p;
       pp_print_list
         ~pp_sep:(fun fmt () -> fprintf fmt "@,and ")
-        (fun fmt (p,e) -> fprintf fmt "%a = %a" pp_pat p (pp_e ~paren:false) e) fmt eqs;
+        (fun fmt (p,e) -> fprintf fmt "%a = %a" pp_pat p (pp_le ~paren:false) e) fmt eqs;
       fprintf fmt ")@]"
   in
   fprintf fmt "@[<v 0>%a@]" (pp_e ~paren:false) e

@@ -140,3 +140,5 @@ let print_fixed_point (f) =
   Uint.print y; print_string "}" ;; 
 *)
 
+operator%with_sizes Default.create : unit => 'a ;; (* unsafe *)
+

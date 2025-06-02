@@ -8,7 +8,6 @@ src/Eclat/compile/backend/gen_miniHDL.cmo : \
     src/Eclat/compile/instantaneous.cmo \
     src/miniHDL/compile/flag_mealy.cmo \
     src/Eclat/syntax/ast_subst.cmo \
-    src/Eclat/syntax/ast_rename.cmo \
     src/Eclat/syntax/ast_pprint.cmo \
     src/Eclat/syntax/ast.cmo
 src/Eclat/compile/backend/gen_miniHDL.cmx : \
@@ -21,7 +20,6 @@ src/Eclat/compile/backend/gen_miniHDL.cmx : \
     src/Eclat/compile/instantaneous.cmx \
     src/miniHDL/compile/flag_mealy.cmx \
     src/Eclat/syntax/ast_subst.cmx \
-    src/Eclat/syntax/ast_rename.cmx \
     src/Eclat/syntax/ast_pprint.cmx \
     src/Eclat/syntax/ast.cmx
 src/Eclat/compile/backend/naming_convention.cmo :
@@ -113,6 +111,7 @@ src/Eclat/compile/middle_end/middle_end.cmo : \
     src/Eclat/compile/middle_end/normalize/move_down_gfun_under_exec_and_par.cmo \
     src/Eclat/compile/middle_end/monomorphize.cmo \
     src/Eclat/compile/middle_end/transform/matching.cmo \
+    src/Eclat/compile/middle_end/normalize/lustre_scheduling.cmo \
     src/Eclat/compile/middle_end/transform/lambda_lifting.cmo \
     src/Eclat/compile/middle_end/normalize/instantiate.cmo \
     src/Eclat/compile/middle_end/transform/insert_bound_checking.cmo \
@@ -137,6 +136,7 @@ src/Eclat/compile/middle_end/middle_end.cmx : \
     src/Eclat/compile/middle_end/normalize/move_down_gfun_under_exec_and_par.cmx \
     src/Eclat/compile/middle_end/monomorphize.cmx \
     src/Eclat/compile/middle_end/transform/matching.cmx \
+    src/Eclat/compile/middle_end/normalize/lustre_scheduling.cmx \
     src/Eclat/compile/middle_end/transform/lambda_lifting.cmx \
     src/Eclat/compile/middle_end/normalize/instantiate.cmx \
     src/Eclat/compile/middle_end/transform/insert_bound_checking.cmx \
@@ -219,6 +219,16 @@ src/Eclat/compile/middle_end/normalize/let_floating.cmx : \
     src/Eclat/syntax/pattern.cmx \
     src/Eclat/syntax/ast_undecorated.cmx \
     src/Eclat/syntax/ast_subst.cmx \
+    src/Eclat/syntax/ast.cmx
+src/Eclat/compile/middle_end/normalize/lustre_scheduling.cmo : \
+    src/Eclat/syntax/pattern.cmo \
+    src/Eclat/syntax/free_vars.cmo \
+    src/Eclat/syntax/ast_mapper.cmo \
+    src/Eclat/syntax/ast.cmo
+src/Eclat/compile/middle_end/normalize/lustre_scheduling.cmx : \
+    src/Eclat/syntax/pattern.cmx \
+    src/Eclat/syntax/free_vars.cmx \
+    src/Eclat/syntax/ast_mapper.cmx \
     src/Eclat/syntax/ast.cmx
 src/Eclat/compile/middle_end/normalize/move_down_gfun_under_exec_and_par.cmo : \
     src/Eclat/typing/types.cmo \
@@ -407,6 +417,7 @@ src/Eclat/frontend/frontend.cmx : \
 src/Eclat/frontend/parser.cmo : \
     src/Eclat/typing/types.cmo \
     src/prelude.cmo \
+    src/Eclat/syntax/pattern.cmo \
     src/operators.cmo \
     src/Eclat/frontend/current_filename.cmo \
     src/Eclat/syntax/ast_undecorated.cmo \
@@ -417,6 +428,7 @@ src/Eclat/frontend/parser.cmo : \
 src/Eclat/frontend/parser.cmx : \
     src/Eclat/typing/types.cmx \
     src/prelude.cmx \
+    src/Eclat/syntax/pattern.cmx \
     src/operators.cmx \
     src/Eclat/frontend/current_filename.cmx \
     src/Eclat/syntax/ast_undecorated.cmx \

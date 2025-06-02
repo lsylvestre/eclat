@@ -59,6 +59,7 @@ OBJS= $(SRC_DIR)/prelude.cmx \
       \
       $(SRC_DIR)/Eclat/compile/middle_end/normalize/anf.cmx \
       $(SRC_DIR)/Eclat/compile/middle_end/normalize/let_floating.cmx \
+      $(SRC_DIR)/Eclat/compile/middle_end/normalize/lustre_scheduling.cmx \
       $(SRC_DIR)/Eclat/compile/middle_end/transform/insert_bound_checking.cmx \
       $(SRC_DIR)/Eclat/compile/middle_end/transform/globalize_arrays.cmx \
       $(SRC_DIR)/Eclat/compile/middle_end/transform/inline.cmx \

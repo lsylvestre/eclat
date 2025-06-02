@@ -600,7 +600,83 @@ let rec to_s ~statics ~externals ~sums gs e x k =
       let w1,ts1,s1 = to_s ~statics ~externals ~sums gs e1 x (S_continue q) in
       (w1, SMap.add q k ts1, s1)
   | E_equations(p,eqs) ->
-      let p_tuple = Ast.P_tuple (List.map fst eqs) in
+      let acc = ref [] in
+      let rec compile_le clks p x le =
+        let rec aux p ax = 
+          match p with
+          | Ast.P_var z -> set_ z ax
+          | P_tuple ps -> 
+              let n = List.length ps in
+              seq_list_ @@ List.mapi (fun i p -> aux p (A_call(GetTuple (i,n,new_tvar()), ax))) ps
+          | P_unit -> S_skip
+        in 
+        match le with
+        | Ast.Exp e1 -> let w1,ts1,s1 = to_s ~statics ~externals ~sums [] e1 x (aux p (A_var x)) in
+                    assert (SMap.is_empty w1);            
+                    assert (SMap.is_empty ts1);
+                    s1
+        | Fby(le1, le2) -> let x_init = Ast.gensym ~prefix:(x^"init") () in
+                           let x_mem = Ast.gensym ~prefix:(x^"mem") () in
+                           let s1 = compile_le clks p x le1 in
+                           let s2 = compile_le clks p x_mem le2 in
+                           acc := (clks,s2)::!acc;
+                           S_if(x_init, S_skip, (* (aux p (A_var x_mem)),*)
+                                     Some(seq_ (set_ x_init (A_const (Bool true))) @@ s1))
+        | When(le1, e2) -> let_plug_s (to_a ~externals ~sums e2) @@ fun z -> 
+                            let s1 = compile_le (z::clks) p x le1 in
+                            S_if(z,s1,None)
+        | Merge(le1, le2, e3) -> let s1 = compile_le clks p x le1 in
+                                 let s2 = compile_le clks p x le2 in
+                                 let_plug_s (to_a ~externals ~sums e3) @@ fun z ->
+                                 seq_ (S_if(z,s1,Some(s2))) (aux p (A_var x))
+      in
+      let ss = List.map (fun (p,le) ->
+                  let y = Ast.gensym () in
+                  compile_le [] p y le
+                  ) eqs
+      in SMap.empty,SMap.empty, seq_ (seq_list_ ss) (seq_ (set_ x (to_a ~externals ~sums  (Pattern.pat2exp p))) @@ 
+      seq_ (seq_list_  
+      (List.map (fun (clks,s) -> 
+            let_plug_s (conjonction_atoms (List.map (fun clk -> A_var clk) clks))
+            @@ fun z -> S_if(z,s,None)) !acc)) k)
+      (* let p_tuple = Ast.P_tuple (List.map fst eqs) in
+      let eqs' = eqs (* List.map (fun (p,e) -> let p' = Ast_rename.rename_pat ~statics:(List.map fst statics) p in p',e) eqs*) in
+      let rec aux p1 p2 = 
+        match p1,p2 with
+        | Ast.P_var x1, Ast.P_var x2 -> set_ x1 (A_var x2)
+        | P_tuple ps1, P_tuple ps2 -> seq_list_ @@ List.map2 aux ps1 ps2
+        | P_unit,P_unit -> S_skip
+        | _ -> assert false
+      in
+      (* let s_init = aux p_tuple_pre p_tuple in *)
+      let rec assign_p_p' p p' = match p,p' with 
+      | Ast.P_var z1,Ast.P_var z2 -> set_ z1 (A_var z2)
+      | Ast.P_tuple ps', Ast.P_var z2 -> 
+          let n = List.length ps' in 
+          seq_list_ (List.mapi (fun i p -> 
+              (* assume p is a variable *)
+              match p with
+              | Ast.P_var zp ->
+                 set_ zp (to_a ~externals ~sums @@ Matching.get_tuple i n (E_var z2))) ps')
+      | Ast.P_tuple ps, Ast.P_tuple ps' -> seq_list_ (List.map2 assign_p_p' ps ps')
+      | Ast.P_unit,Ast.P_unit -> S_skip
+      | _ -> assert false in
+      let s' = List.fold_right  (fun (pi,ei) s ->
+        let z' = Ast.gensym () in
+        let _w,_ts,s' = to_s ~statics ~externals ~sums [] ei (* (Ast_subst.subst_p_e p_tuple (Pattern.pat2exp p_tuple_pre) ei) *) z' S_skip in
+        assert (SMap.is_empty _w);
+        assert (SMap.is_empty _ts);
+        seq_ s' @@
+        seq_ (assign_p_p' pi (P_var z')) s) eqs' (seq_list_ (List.map2 (fun (p,_) (p',_) -> 
+            assign_p_p' p p'
+          ) eqs eqs')) in
+      SMap.empty,SMap.empty,seq_ (seq_ S_skip (seq_ s' (set_ x (to_a ~externals ~sums @@ Pattern.pat2exp p))))
+                                 k 
+                                 *)
+                                 
+                                 (* (aux p_tuple p_tuple_pre)*)
+
+    (*let p_tuple = Ast.P_tuple (List.map fst eqs) in
       let p_tuple_pre = Ast_rename.rename_pat ~statics:(List.map fst statics) p_tuple in
       let rec aux p1 p2 = 
         match p1,p2 with
@@ -619,7 +695,7 @@ let rec to_s ~statics ~externals ~sums gs e x k =
             seq_ s' s) eqs S_skip in
       SMap.empty,SMap.empty,seq_ (seq_ S_skip (seq_ s' (set_ x (to_a ~externals ~sums @@ Pattern.pat2exp p))))
                                  k (* (aux p_tuple p_tuple_pre)*)
-
+*)
   | e -> Ast_pprint.pp_exp Format.std_formatter e; assert false (* todo *)
 
 (* takes a program and translates it into an FSM *)

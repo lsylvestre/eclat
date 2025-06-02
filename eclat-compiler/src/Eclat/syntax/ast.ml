@@ -69,8 +69,16 @@ type e =                      (** expression     [e]                       *)
   | E_for of x * e_static * e_static * e * deco
   | E_run of x * e       (* [f e] call external function [f] with argument [e] *)
   | E_pause of e         (* [pause e] starts [e] after one cycle *)
-  | E_equations of p * (p * e) list
+  | E_equations of p * (p * le) list
+
 and e_static = e
+
+and le = (* Lustre expression *)
+  | Exp of e
+  | Fby of le * le
+  | When of le * e
+  | Merge of le * le * e
+  
 
 type static =                         (** static toplevel data *)
   | Static_array_of of (ty * deco) (** [let static x : ty array<n> ;;] *)

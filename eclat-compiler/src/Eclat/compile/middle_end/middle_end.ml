@@ -35,6 +35,9 @@ let compile ?globalize
             ty0
             (pi:pi) : pi =
 
+            
+  let pi = Lustre_scheduling.schedule_pi pi in
+    
   let pi = Ast_rename.rename_pi pi in
   (* todo: should works without renaming,
      but failed on a large example (the OCaml VM written in Eclat)
