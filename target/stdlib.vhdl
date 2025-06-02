@@ -103,6 +103,23 @@ package body Print is
     end;
 end Print;
 
+
+library ieee; 
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+package default is
+  alias t is std_logic_vector;
+  function create (sa,sr: integer;arg:t) return t;
+end package;
+
+package body default is
+  function create (sa,sr: integer;arg:t) return t is
+  variable r : t(0 to sr - 1) := (others => 'U');
+  begin return r; end;
+end default;
+
+
 library ieee; 
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
