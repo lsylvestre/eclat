@@ -38,7 +38,7 @@ let eval_static_exp_int ~loc ~statics e =
 
 let subst_ty ty e =
   let open Types in
-  let vs = free_vars_of_type (Vs.empty,ty) in
+  let vs = free_vars_of_type (Vs.empty,(ty,CTrue)) in
   let unknowns = Hashtbl.create (Vs.cardinal vs) in
   Vs.iter (fun n -> Hashtbl.add unknowns n (new_unknown_generic())) vs;
   let rec ss e =

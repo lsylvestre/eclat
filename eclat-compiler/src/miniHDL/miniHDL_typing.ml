@@ -201,7 +201,7 @@ let rec typing_op ~externals h t op =
   | Runtime (External_fun (x,tyy)) ->
       (match List.assoc_opt x (snd externals) with
        | Some (ty,_) -> 
-          let ty = Types.(instance (generalize [] ty)) in
+          let ty = Types.(fst @@ instance (fst @@ generalize [] CTrue ty)) in
           Typing.unify_ty ~loc:Prelude.dloc ty tyy;
           (match Types.canon_ty ty with
            | Types.Ty_fun(arg,_,ret) ->

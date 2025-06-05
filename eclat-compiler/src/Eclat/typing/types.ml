@@ -25,6 +25,8 @@ and 'a var_content = Unknown of int
 
 type size = Sz_var of size var
           | Sz_lit of int
+          | Sz_add of size * size
+          | Sz_mult of size * size
 
 type tyB = TyB_var of tyB var
          | TyB_int of size
@@ -43,6 +45,11 @@ type dur = Dur_var of dur var
         | Dur_one
         | Dur_max of dur * dur
 
+type tconstraint =
+| CTrue | CFalse
+| CAnd of tconstraint * tconstraint
+| CEq of size * size
+
 type ty = Ty_var of ty var
         | Ty_base of tyB
         | Ty_tuple of ty list
@@ -59,6 +66,8 @@ let rec canon_size = function
   v := Is sz'; sz'
 | Sz_var {contents=Unknown _} as sz -> sz
 | Sz_lit _ as n -> n
+| Sz_add (sz1,sz2) -> Sz_add (canon_size sz1, canon_size sz2)
+| Sz_mult (sz1,sz2) -> Sz_mult (canon_size sz1, canon_size sz2)
 
 let rec canon_tyB = function
 | TyB_var ({contents=Is tyB} as v) ->
@@ -109,6 +118,11 @@ let rec canon_dur = function
      | _ -> Dur_max(d1,d2)
    )
 
+let rec canon_tconstraint = function
+| CTrue | CFalse as c -> c
+| CAnd(cstr1,cstr2) -> CAnd(canon_tconstraint cstr1,canon_tconstraint cstr2)
+| CEq(stc1,stc2) -> CEq(canon_size stc1,canon_size stc2)
+
 let rec canon_ty = function
 | Ty_var ({contents=Is ty} as v) ->
     let ty' = canon_ty ty in
@@ -116,27 +130,26 @@ let rec canon_ty = function
     | Ty_base(TyB_var{contents=Unknown n}) ->
       v := Unknown n; ty'
     | _ ->
-*) v := Is ty'; ty'
-| Ty_var {contents=Unknown _} as ty -> ty
-| Ty_base tyB -> Ty_base(canon_tyB tyB)
-| Ty_tuple ty_list ->
-    (let exception E in
-    let ty_list_candidates = List.map canon_ty ty_list in
-    try
-      Ty_base (TyB_tuple (List.map (function
-                                 | Ty_base tyB -> tyB
-                                 | _ -> raise E) ty_list_candidates))
-    with E ->
-      Ty_tuple (ty_list_candidates))
-| Ty_fun(ty,dur,tyB) ->
-    Ty_fun(canon_ty ty,
-           canon_dur dur,
-           canon_tyB tyB)
-| Ty_ref(tyB) ->
-    Ty_ref(canon_tyB tyB)
-| Ty_array(sz,tyB) ->
-    Ty_array(canon_size sz, canon_tyB tyB)
-
+    *) v := Is ty'; ty'
+    | Ty_var {contents=Unknown _} as ty -> ty
+    | Ty_base tyB -> Ty_base(canon_tyB tyB)
+    | Ty_tuple ty_list ->
+        (let exception E in
+        let ty_list_candidates = List.map canon_ty ty_list in
+        try
+        Ty_base (TyB_tuple (List.map (function
+                                    | Ty_base tyB -> tyB
+                                    | _ -> raise E) ty_list_candidates))
+        with E ->
+        Ty_tuple (ty_list_candidates))
+    | Ty_fun(ty,dur,tyB) ->
+        Ty_fun(canon_ty ty,
+            canon_dur dur,
+            canon_tyB tyB)
+    | Ty_ref(tyB) ->
+        Ty_ref(canon_tyB tyB)
+    | Ty_array(sz,tyB) ->
+        Ty_array(canon_size sz, canon_tyB tyB)
 
 let pp_dur fmt (d:dur) : unit =
   let open Format in
@@ -154,9 +167,11 @@ let pp_size fmt (sz:size) : unit =
   let open Format in
   let rec pp fmt sz =
   match canon_size sz with
-  | Sz_var{contents=Unknown n} -> fprintf fmt "~z%d" n
+  | Sz_var({contents=Unknown n} as l) -> fprintf fmt "~z%d" n (* fprintf fmt "~z%d[%d]" n (Obj.magic l) *)
   | Sz_var{contents=Is sz} -> pp fmt sz
   | Sz_lit k -> fprintf fmt "%d" k
+  | Sz_add(sz1,sz2) -> fprintf fmt "(%a + %a)" pp sz1 pp sz2
+  | Sz_mult(sz1,sz2) -> fprintf fmt "(%a * %a)" pp sz1 pp sz2
   in pp fmt sz
 
 let pp_tuple fmt pp vs =
@@ -199,6 +214,14 @@ let pp_tyB fmt (tyB:tyB) : unit =
            ~pp_sep:(fun fmt () -> fprintf fmt ", ") pp_size fmt szs;
          fprintf fmt ">")
  in pp fmt tyB
+
+let rec pp_tconstraint fmt constr =
+  let open Format in 
+  match constr with
+  | CTrue -> fprintf fmt "true"
+  | CFalse -> fprintf fmt "false"
+  | CAnd(c1,c2) -> fprintf fmt "%a && %a" pp_tconstraint c1 pp_tconstraint c2
+  | CEq(en1,en2) -> fprintf fmt "%a = %a" pp_size en1 pp_size en2
 
 let pp_ty fmt (ty:ty) : unit =
   let open Format in
@@ -244,6 +267,7 @@ Ty_var (ref (Unknown (new_unknown ())))
 
 
 module Vs = Set.Make(Int)
+
 type scheme = Forall of (Vs.t * ty)
 
 exception Found
@@ -254,6 +278,7 @@ let rec occ = function
     if v = v' then raise Found
 | Sz_var {contents=Is sz} -> occ sz
 | Sz_lit _ -> ()
+| Sz_add(sz1,sz2) | Sz_mult(sz1,sz2) -> occ sz1; occ sz2
 in occ sz
 
 let rec occur_dur v d =
@@ -281,6 +306,15 @@ let rec occ = function
 | TyB_abstract(_,szs,tyB_list) ->
     List.iter (occur_size v) szs; List.iter occ tyB_list
 in occ tyB
+
+let rec occur_tconstraint v constr =
+  let open Format in 
+  match constr with
+  | CTrue
+  | CFalse -> ()
+  | CAnd(c1,c2) -> occur_tconstraint v c1; occur_tconstraint  v c2
+  | CEq(en1,en2) -> occur_size v en1; occur_size v en2
+
 
 let rec occur_ty v ty =
 let rec occ = function
@@ -310,6 +344,8 @@ let rec vars s = function
   | Sz_var {contents=Unknown n} -> Vs.add n s
   | Sz_var {contents=Is sz} -> vars s sz
   | Sz_lit _ -> s
+  | Sz_add(sz1,sz2)
+  | Sz_mult(sz1,sz2) -> vars (vars s sz1) sz2
 in vars s sz
 
 let vars_of_dur ?(s=Vs.empty) d =
@@ -338,6 +374,13 @@ let rec vars s = function
 in
 vars s tyB
 
+let vars_of_tconstraint ?(s=Vs.empty) constr =
+  let rec vars s = function
+  | CTrue | CFalse -> s
+  | CAnd(c1,c2) -> vars (vars s c1) c2
+  | CEq(sz1,sz2) -> vars_of_size ~s:(vars_of_size ~s sz1) sz2
+  in vars s constr
+
 let vars_of_ty ?(s=Vs.empty) ty =
 let rec vars s = function
 | Ty_var {contents=Unknown n} -> Vs.add n s
@@ -355,11 +398,12 @@ let rec vars s = function
     vars_of_tyB ~s:s1 tyB
 in vars s ty
 
-let free_vars_of_type (bv,t) =
-  Vs.diff (vars_of_ty t) bv
+let free_vars_of_type (bv,(t,constr)) =
+  let m = Vs.diff (Vs.union (vars_of_ty t) (vars_of_tconstraint constr)) bv in
+  (* Printf.printf "foo:\n"; Vs.iter (fun v -> Printf.printf "====>%d\n" v) m; *)
+  m
 
-
-let instance (Forall(vs,ty)) =
+let instance ?(constr=CTrue) (Forall(vs,ty)) =
   let unknowns = Hashtbl.create (Vs.cardinal vs) in
   Vs.iter (fun n -> Hashtbl.add unknowns n (new_unknown_generic())) vs;
   let rec inst_size = function
@@ -368,7 +412,11 @@ let instance (Forall(vs,ty)) =
            with Not_found -> sz)
   | Sz_var {contents=Is sz} ->
       inst_size sz
-  | Sz_lit _ as k -> k in
+  | Sz_lit _ as k -> k
+  | Sz_add(sz1,sz2) ->
+      Sz_add(inst_size sz1, inst_size sz2)
+  | Sz_mult(sz1,sz2) ->
+      Sz_mult(inst_size sz1, inst_size sz2) in
 
   let rec inst_dur = function
   | Dur_var {contents=Unknown n} as d ->
@@ -398,6 +446,14 @@ let instance (Forall(vs,ty)) =
       TyB_abstract (x,List.map inst_size szs,List.map inst_tyB tyB_list)
   in
 
+  let rec inst_tconstraint constr =
+  let open Format in 
+  match constr with
+  | CTrue
+  | CFalse -> constr
+  | CAnd(c1,c2) -> CAnd(inst_tconstraint c1, inst_tconstraint c2)
+  | CEq(en1,en2) -> CEq(inst_size en1, inst_size en2) in
+
   let rec inst_ty = function
   | Ty_var {contents=Unknown n} as ty ->
           (try Ty_var(Obj.magic @@ Hashtbl.find unknowns n)
@@ -415,25 +471,25 @@ let instance (Forall(vs,ty)) =
   | Ty_array(sz,tyB) ->
       Ty_array(inst_size sz, inst_tyB tyB)
   in
-  inst_ty ty
+  (inst_ty ty, inst_tconstraint constr)
 
   let free_vars_of_type_env l =
-    List.fold_left (fun vs (x,(Forall (v,t))) ->
-                  Vs.union vs (free_vars_of_type (v,t)) )
+    List.fold_left (fun vs (x,((Forall (v,t)),constr)) ->
+                  Vs.union vs (free_vars_of_type (v,(t,constr))) )
      Vs.empty l
 
-let generalize r ty =
+let generalize r constr ty =
   let ty = canon_ty ty in
   match ty with
   | Ty_var{contents=Is (Ty_fun _)} | Ty_fun _ ->
       let fvg = free_vars_of_type_env r in
-      let vs = free_vars_of_type (fvg,ty) in
+      let vs = free_vars_of_type (fvg,(ty,constr)) in
       (* Format.fprintf Format.std_formatter
                    "@[<v>gives: %a @]"
                    Prelude.Errors.(emph_pp green pp_ty) ty; *)
       (* Vs.iter (fun n -> Printf.printf "           ??===> %d\n" n) vs; *)
-      Forall(vs,ty)
-  | ty -> Forall(Vs.empty,ty)
+      (Forall(vs,ty),canon_tconstraint constr)
+  | ty -> Forall(Vs.empty,ty),canon_tconstraint constr
 
 
 let rec as_tyB ~loc ty = 

@@ -388,10 +388,13 @@ ty_next:
 | LPAREN ty=ty RPAREN { ty }
 
 size:
+| LPAREN sz=size RPAREN { sz }
 | n=INT_LIT { Sz_lit n }
 | x=TVAR_IDENT {
     decl_size_var x
   }
+| sz1=size PLUS sz2=size { Sz_add(sz1,sz2) }
+| sz1=size TIMES sz2=size { Sz_mult(sz1,sz2) }
 
 aty:
 ty=ty { ty } 
@@ -571,7 +574,7 @@ app_exp_desc:
                       | E_var _ | E_const _ | E_fun _ -> 
                         E_app(e1,e2)
                       | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
-                   ~msg:"expression in functional position should be a variable or a constante" ())
+                   ~msg:"expression in functional position should be a variable or a constant" ())
         | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
                    ~msg:"All functions and primitives should be unary. Hints: use a tuple as argument" () }
 | MINUS e1=aexp %prec prec_unary_minus { E_app(E_const(Op(Runtime(External_fun("Int.neg",new_ty_unknown ())))),e1) }
