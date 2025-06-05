@@ -612,7 +612,7 @@ let rec to_s ~statics ~externals ~sums gs e x k =
         in 
         match le with
         | Ast.Exp e1 -> let w1,ts1,s1 = to_s ~statics ~externals ~sums [] e1 x (aux p (A_var x)) in
-                    assert (SMap.is_empty w1);            
+                    assert (SMap.is_empty w1);    
                     assert (SMap.is_empty ts1);
                     s1
         | Fby(le1, le2) -> let x_init = Ast.gensym ~prefix:(x^"init") () in

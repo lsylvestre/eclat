@@ -554,14 +554,14 @@ let rec typ_exp ?(collect_sig=false) ~statics ~externals ~sums ?(toplevel=false)
     let ty1,d = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g e1 in
     let tyB = new_tyB_unknown () in
     unify_ty ~loc:(loc_of e1) (Ty_ref tyB) ty1;
-    (Ty_base tyB, d)
+    (Ty_base tyB, Dur_max(d,Dur_one))
   | E_set (e1,e2) ->
     let ty1,d1 = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g e1 in
     let ty2,d2 = typ_exp ~collect_sig ~statics ~externals ~sums ~toplevel:false ~loc g e2 in
     let tyB = new_tyB_unknown () in
     unify_ty ~loc:(loc_of e1) (Ty_ref tyB) ty1;
     unify_ty ~loc:(loc_of e2) (Ty_base tyB) ty2;
-    (Ty_base TyB_unit, Dur_max(d1,d2))
+    (Ty_base TyB_unit, Dur_max(Dur_max(d1,d2),Dur_one))
 
   (* *************************************************** *)
 
