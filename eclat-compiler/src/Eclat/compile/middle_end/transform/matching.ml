@@ -11,8 +11,9 @@ open Ast_subst
 *)
 
 
-let get_tuple pos arity e =
-   E_app(E_const (Op (GetTuple {pos;arity})),e)
+let get_tuple pos e tyBs =
+   let open Operators in
+   E_app(E_const (Op (Runtime(Get_tuple {field=pos;tyBs}))),e)
 
 (** [matching e] translate expression [e] in an expression where all
    let-bindings are of the form [let x = e1 in e2]. *)
@@ -22,7 +23,7 @@ let rec matching e =
       (match p with
        | P_unit ->
           let z = gensym () in
-          matching @@ E_letIn(P_var z,ty,e1,e2)
+          E_letIn(P_unit,ty,matching e1,matching e2)
        | P_var z ->
           (* == Var case == *)
           (* if to_propagate e1 then
@@ -35,15 +36,22 @@ let rec matching e =
               assert (List.compare_lengths ps es = 0); (* by static typing *)
               matching @@
               List.fold_right2 (fun p e acc -> E_letIn(p,Types.new_ty_unknown(),e,acc)) ps es e2
-           | _ ->
+           | _ -> E_letIn(p,ty,matching e1,matching e2))) (*
+               let tyb_list = match Types.canon_ty ty with
+                              | Types.Ty_base (TyB_tuple tyBs) -> tyBs
+                              | Ty_tuple ts -> List.map (function 
+                                                         | Types.Ty_base tyB -> tyB 
+                                                         | _ -> Types.new_tyB_unknown ()) ts 
+                              | _ -> List.map (fun _ -> Types.new_tyB_unknown ()) ps in
                matching @@
-                  let arity = List.length ps in
                   let x = gensym () in
                   let var_x = E_var x in
-                    E_letIn(P_var x,Types.new_ty_unknown(), e1,
+                    E_letIn(P_var x,ty, e1,
                     let rec loop i = function
                     | [] -> e2
-                    | p::ps' -> E_letIn(p,Types.new_ty_unknown(),get_tuple i arity var_x, (loop (i+1) ps')) in loop 0 ps)))
+                    | p::ps' -> E_letIn(p,Types.new_ty_unknown(),
+                                       get_tuple i var_x tyb_list, (loop (i+1) ps')) 
+                  in loop 0 ps))) *)
   | E_fun(P_var x,tysig,e) ->
       E_fun(P_var x,tysig,matching e)
   | E_fun(p,(ty,tyB),e) ->
@@ -60,8 +68,10 @@ let rec matching e =
         | P_var _ -> x,(p,matching ei)
         | _ -> let y = gensym () in
                x,(P_var y,matching @@ E_letIn(p,Types.new_ty_unknown(),E_var y,ei))) hs,Option.map matching eo)
+  | E_reg((P_var x,tyB,e1),e0,l) ->
+     E_reg((P_var x,tyB,matching e1),matching e0,l)
   | E_reg((p,tyB,e1),e0,l) ->
-     let x = gensym () in
+     let x = gensym ~prefix:"temp" () in
      E_reg((P_var x,tyB,matching @@ E_letIn(p,Ty_base tyB,E_var x,e1)),matching e0,l)
   (*| E_equations(p,eqs) ->
       let x = gensym () in

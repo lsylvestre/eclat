@@ -96,7 +96,7 @@ let fv ?(get_arrays=true) ?(xs=SMap.empty) e =
       let ys = vars_of_p p in
       let xs' = xs++ys in
       aux xs' e1 ++ aux xs e2
-  | E_run(_x,e) -> aux xs e (* what about _x ? *)
+  | E_run(_x,e,_) -> aux xs e (* what about _x ? *)
   | E_pause e -> aux xs e
   | E_equations(p,eqs) ->
       let ys = vars_of_p (P_tuple (p::List.map fst eqs)) in
@@ -202,7 +202,7 @@ let fv_arrays ?(xs=SMap.empty) e =
       let ys = vars_of_p p in
       let xs' = xs++ys in
       aux xs' e1 ++ aux xs e2
-  | E_run(_x,e1) -> (* what about _x ? *)
+  | E_run(_x,e1,_) -> (* what about _x ? *)
       aux xs e1
   | E_pause e -> aux xs e
   | E_equations(p,eqs) ->

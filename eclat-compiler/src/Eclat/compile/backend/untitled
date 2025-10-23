@@ -1,0 +1,38 @@
+
+>  let main () =
+  (42|| 2);;
+val f : forall '139  . (int<~z139> -{1}-> int<~z139>) | 0
+
+> let main () =
+    let y = f 42 in
+    let z = f y in print_int (f(z + y));;
+val main : (unit -{1}-> unit) | 0
+
+
+
+let rec f x = 
+  x + 1;;
+
+
+let main () =
+    let y = f 42 in
+    let z = f y in print_int (f(z + y));;
+
+
+let main () =
+(42|| 2);;
+
+
+
+(***********************************)
+let rec g () = 
+  () ;;
+
+let rec f x = 
+  g(); u * 2;;
+
+
+let main () =
+    let y = f 42 in
+    let z = f y in print_int (f(z + y));;
+(***********************************)

@@ -23,7 +23,7 @@ let eval_static_exp_int ~loc ~statics e =
          | _ -> raise Cannot)
     | E_array_length(x) ->
        (match List.assoc_opt x statics with
-       | Some (Static_array(_,n)) -> (n,Types.new_size_unknown())
+       | Some ((Static_array(_,n)),_) -> (n,Types.new_size_unknown())
        | _ -> Ast_pprint.pp_exp Format.std_formatter e; assert false (* ill-typed *) ) 
     | _ -> raise Cannot
   in 

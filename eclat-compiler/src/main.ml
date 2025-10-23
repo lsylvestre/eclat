@@ -162,7 +162,7 @@ let () =
     ("-keep-ty", Arg.Set Ast_undecorated.keep_ty_flag,
                 "keep type annotation");
     ("-ram-init", Arg.String (fun s -> 
-                     Gen_vhdl_aux.has_init_file_ram := s::!Gen_vhdl_aux.has_init_file_ram),
+                     Gen_vhdl2.has_init_file_ram := s::!Gen_vhdl2.has_init_file_ram),
                  "add initialization file for the given static array");
     ("-nonormalization", Arg.Set Compile.nonormalization,
                          "[experimental] inline only, assume the source program is already normalized");
@@ -233,10 +233,9 @@ let main () : unit =
   let oc_tb = open_out (!Compile.target^"/tb_"^name^".vhdl") in
   let fmt_vhdl = Format.formatter_of_out_channel oc_vhdl in
   let fmt_tb = Format.formatter_of_out_channel oc_tb in
-  let (argument,result,typing_env) = Compile.compile ~vhdl_comment ~prop_fsm:!prop_fsm_flag arg_list name ty fmt_vhdl pi in
-  let args = List.map (Gen_miniHDL.to_a ~externals:pi.externals ~sums:pi.sums) arg_list in
+  let (argument,result) = Compile.compile ~vhdl_comment ~prop_fsm:!prop_fsm_flag arg_list name ty fmt_vhdl pi in
 
-  Gen_testbench.gen_testbench fmt_tb ~vhdl_comment ~externals:pi.externals typing_env name ty (argument,result) args;
+  Gen_testbench2.gen_testbench fmt_tb ~vhdl_comment ~externals:pi.externals name ty "result" "argument" (argument,result) arg_list;
 
   Format.fprintf Format.std_formatter
       "\nvhdl code generated in %s/%s.vhdl\
@@ -245,13 +244,13 @@ let main () : unit =
         !Compile.target name;
 
   close_out oc_vhdl;
-  close_out oc_tb ;
+  close_out oc_tb;
 
   if !top_wrapper <> "" then (
     Gen_top.gen_wrapper ~name
                         ~vhdl_comment
-                        ~argument
-                        ~result
+                        ~argument:("argument",Some argument)
+                        ~result:("result",Some result)
                         ~clock:!clock_top
                         ~dst:(!Compile.target^"/top.vhdl") !top_wrapper
   )

@@ -136,7 +136,8 @@ exception Error
 
 val pi: (Lexing.lexbuf -> token) -> Lexing.lexbuf -> (((Ast.x * (Types.ty * bool)) list *
    (Ast.x * (Types.ty * (bool * int * bool))) list) *
-  (Ast.x * Ast.static) list * (Ast.x * (Ast.x * Types.tyB) list) list *
+  (Ast.x * (Ast.static * Types.ty)) list *
+  (Ast.x * (Ast.x * Types.tyB) list) list *
   ((Ast.p * Ast.e_static) * Prelude.loc) list)
 
 val exp_eof: (Lexing.lexbuf -> token) -> Lexing.lexbuf -> (Ast.e_static)

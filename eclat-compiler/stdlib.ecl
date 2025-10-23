@@ -38,7 +38,7 @@ operator Int.land :   (int<'N> * int<'N>) => int<'N> ;;
 operator Int.lsl :    (int<'N> * int<'OFFSET>) => int<'N> ;;
 operator Int.lsr :    (int<'N> * int<'OFFSET>) => int<'N> ;;
 operator Int.asr :    (int<'N> * int<'OFFSET>) => int<'N> ;;
-
+(*!!!!!!!!!!!!!!!!!!!!!!!!!!!
 let abs x = 
   if x < 0 then - x else x ;;
 
@@ -139,6 +139,6 @@ let print_fixed_point (f) =
   Uint.print x; print_string " * 2^{"; 
   Uint.print y; print_string "}" ;; 
 *)
-
+!!!!!!!!!!!!!!!!!!!!!!!!*)
 operator%with_sizes Default.create : unit => 'a ;; (* unsafe *)
 

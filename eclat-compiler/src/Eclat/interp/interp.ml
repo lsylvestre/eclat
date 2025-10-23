@@ -484,11 +484,11 @@ let eval n mu main vs ty =
     )) in 
     eval_aux 0 n mu (* (Ast_undecorated.remove_deco*) main vs
 
-let prepare_statics (statics: (x * static) list) : c array SMap.t =
+let prepare_statics (statics: (x * (static * _)) list) : c array SMap.t =
   smap_of_list statics |>
   SMap.map (function 
-            | Static_array(c,n) -> Array.make n c
-            | Static_const c -> Array.make 1 c)
+            | (Static_array(c,n),_) -> Array.make n c
+            | (Static_const c,_) -> Array.make 1 c)
 
 let interp_pi ~nb_iterations (pi : pi) (value_list : e list) ty : (e * r) =
   let r = { r_init with statics = prepare_statics pi.statics } in

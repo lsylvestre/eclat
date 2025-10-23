@@ -294,9 +294,9 @@ let globalize_e (e:e) : ((x * _ * e) list * e) =
       let ds1,e1' = glob e1 in
       let ds2,e2' = glob e2 in
       ds2,E_vector_mapi(is_par,(p,tyB,declare ds1 e1'),e2',ty)
-    | E_run(x,e) ->
+    | E_run(x,e,l) ->
       let ds,e' = glob e in
-      ds,E_run(x,e')
+      ds,E_run(x,e',l)
     | E_pause e ->
       let ds,e' = glob e in
       ds,E_pause e'

@@ -67,7 +67,7 @@ type e =                      (** expression     [e]                       *)
 
   | E_generate of (p * (ty * tyB) * e) * e * e_static * deco
   | E_for of x * e_static * e_static * e * deco
-  | E_run of x * e       (* [f e] call external function [f] with argument [e] *)
+  | E_run of x * e * l   (* [f e] call external function [f] with argument [e] *)
   | E_pause of e         (* [pause e] starts [e] after one cycle *)
   | E_equations of p * (p * le) list
 
@@ -89,7 +89,7 @@ type static =                         (** static toplevel data *)
     and functions) coupled with an entry point, e.g. the variable [main]
     referting to one of those definitions *)
 type pi = {
-  statics : (x * static) list ;         (** static global arrays *)
+  statics : (x * (static * ty)) list ;         (** static global arrays *)
  externals : (x * (ty * bool)) list * (x * (ty * (bool * int * bool))) list ; (* circuits - functions *)
   sums : (x * (x * tyB) list) list ;    (** sum types *)
   main : e                              (** body *)

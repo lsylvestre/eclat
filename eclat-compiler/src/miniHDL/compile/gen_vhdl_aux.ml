@@ -91,7 +91,7 @@ let int2bin ~int_size =
     Bytes.to_string buf
 
 (* lock-based support for concurrent memory accesses *)
-let ptr_taken x = "$"^x^"_lock" 
+let ptr_taken x = "$"^x^"_lock"
 
 let decl_locks ?(init=false) fmt x =
   (* if !single_read_write_lock_flag then *)
@@ -212,6 +212,7 @@ and pp_call externals fmt (op,a) =
       let annot_with_sizes,arity = match List.assoc_opt x (snd externals) with
                                    | Some (_,(b,n,_)) -> (b,n)
                                    | None -> false,1 in
+
       (* let rec extract_tyB tyB =
         match Types.canon_tyB tyB with
         | TyB_abstract(_,_sz,tyB_list) ->
@@ -233,6 +234,7 @@ and pp_call externals fmt (op,a) =
             (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt ", ") (pp_a externals)) aa
       | _ -> fprintf fmt "@[%a)@]" (pp_a externals) a);
       fprintf fmt "@]"
+  | Runtime (Default tyB) -> fprintf fmt "@[\"%s\"@]" (String.make (size_ty (MiniHDL_typing.translate_tyB tyB))  '0')
   | Runtime p -> Operators.gen_op fmt p (pp_a externals) a
   | _ -> fprintf fmt "@[%a(%a)@]" pp_op op (pp_a externals) a
 

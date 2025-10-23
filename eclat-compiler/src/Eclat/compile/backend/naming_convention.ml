@@ -7,6 +7,16 @@ let formal_param_of_fun f =
 let instance_id_of_fun f =
   f^"_id"
 
+let is_instance_id_of_fun f =
+  let n = String.length f in
+  n > 3 &&
+  String.sub f (n-3) 3 = "_id"
+
+let from_instance_id_of_fun x =
+  let n = String.length x in
+  assert (n > 3);
+  let f = String.sub x 0 (n-3) in f
+
 (* name refering to the result of function [f] *)
 let result_of_fun f =
   f^"_result"

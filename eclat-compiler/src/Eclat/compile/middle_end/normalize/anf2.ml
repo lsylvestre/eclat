@@ -39,21 +39,27 @@ open Pattern
       | x.size
       | fst x | snd x | ...
 *)
+let rec is_var (e:e) : bool =
+  match un_deco e with
+  | E_var _ -> true | _ -> false
 
 let rec is_xc (e:e) : bool =
   match un_deco e with
   | E_deco(e,_) -> is_xc e
   | E_var _ | E_const _ -> true
   | E_tuple(es) -> List.for_all is_xc es
-  | E_app(E_const(Op(GetTuple _)),e) -> is_xc e
+  | E_app(E_const(Op(Runtime(op))),e) -> 
+     (try Operators.combinational ~externals:("",[]) op && is_xc e 
+     with _ -> false)
+  | E_app(E_const(Op _),e) -> is_xc e
   | E_array_length _ -> true
   | _ -> false
 
 (** [plug e ctx] plugs expression [e] into context [ctx], i.e., returns
-   [ctx e] if [is_xc e] is true, otherwise [let y = e in ctx y]
+   [ctx e] if [criterion e] is true, otherwise [let y = e in ctx y]
    with [y] a fresh name. *)
-let plug (e:e) (context: e -> e) : e =
-  if is_xc e then context e else
+let plug ?(criterion=is_xc) (e:e) (context: e -> e) : e =
+  if criterion e then context e else
   let x = gensym () in
   E_letIn(P_var x, Types.new_ty_unknown(), e,context (E_var x))
 
@@ -75,80 +81,49 @@ let rec anf (e:e) : e =
       Ast_undecorated.still_decorated e
   | E_var _ | E_const _ -> e
   | E_fun(p,ty,e1) ->
-      E_fun(p,ty,anf e1)
+      E_fun(p,ty,glob e1)
   | E_fix(f,(p,ty,e1)) ->
-      E_fix(f,(p,ty,anf e1))
+      E_fix(f,(p,ty,glob e1))
   | E_if(e1,e2,e3) ->
-      let e1' = glob e1 in
-      plug e1' @@ fun xc1 ->
-      E_if(xc1,anf e2, anf e3)
+      plug ~criterion:is_var (glob e1) @@ fun x1 ->
+      E_if(x1,glob e2, glob e3)
   | E_case(e1,hs,e_els) ->
-      let e1' = glob e1 in
-      plug e1' @@ fun xc ->
-      E_case(xc,List.map (fun (c,e) -> c,anf e) hs, anf e_els)
+      plug ~criterion:is_var (glob e1) @@ fun xc1 ->
+      E_case(xc1,List.map (fun (c,e) -> c,glob e) hs, glob e_els)
   | E_match(e1,hs,eo) ->
-      let e1' = glob e1 in
-      plug (anf e1') @@ fun xc ->
-      E_match(xc,List.map (fun (x,(p,e)) -> x,(p,anf e)) hs,Option.map anf eo)
- (* | E_letIn(P_var f,(E_fix(g,(p,e1))),e2) when f <> g ->
-      assert (not (pat_mem f p) && not (pat_mem g p));
-      anf @@ E_letIn(P_var f,E_fix(f,(p,subst_e g (E_var f) e1)),e2)*)
-  | E_letIn(P_tuple ps,ty,E_tuple es,e2) ->
-      let ts = match Types.canon_ty ty with 
-               | Ty_tuple ts -> ts 
-               | _ -> let ts = List.map (fun _ -> Types.new_ty_unknown()) ps in
-                      Typing.unify_ty ~loc:Prelude.dloc ty (Ty_tuple ts);
-                      ts
-      in
-      glob (List.fold_right2 (fun (p,t) e acc -> E_letIn(p,t,e,acc)) (List.combine ps ts) es e2)
+       plug ~criterion:is_var (glob e1) @@ fun xc1 ->
+      E_match(xc1,List.map (fun (x,(p,e)) -> x,(p,glob e)) hs,Option.map glob eo)
   | E_letIn(p,ty,e1,e2) ->
-      let e1' = glob e1 in
-      let e' = anf e2 in
-      (*match p,e1' with 
-           | P_unit,E_const Unit -> e'
-           | _ -> if is_xc e1' then subst_p_e p e1' e' else*)   (* bug subst_p_e ici ! *)
-      E_letIn(p,ty,e1',e')
+       E_letIn(p,ty,glob e1,glob e2)
   | E_tuple(es) ->
-      let es' = List.map glob es in
-      plug_n es' @@ fun xs -> E_tuple(xs)
-  | E_app(E_const _ as ec,e2) ->
-      let e2' = glob e2 in
-      plug e2' @@ fun x2 ->
-      E_app(ec,x2)
-  | E_app(e1,e2) ->
-      let e1' = glob e1 in
-      let e2' = glob e2 in
-      plug e1' @@ fun xc1 ->
-      plug e2' @@ fun xc2 ->
-      E_app(xc1,xc2)
+      plug_n (List.map glob es) @@ fun xs -> E_tuple(xs)
+  | E_app(E_const(Op(Runtime(Get_tuple _))) as e1,e2) ->
+     plug ~criterion:is_var (glob e2) @@ fun x2 -> E_app(e1,x2)
+  | E_app(E_const(Op(Runtime(Start_read _ | Start_write _))) as e1,e2) ->
+        (match e2 with
+        | E_tuple es -> 
+           plug_n (List.map glob es) @@ fun xs ->
+              E_app(e1,E_tuple xs)
+        | _ -> assert false)
+  | E_app(E_const(Op(Runtime(_))) as e1,e2) ->
+        (match e2 with
+        | E_tuple es -> 
+           plug_n (List.map glob es) @@ fun xs ->
+              E_app(e1,E_tuple xs)
+        | _ -> plug (glob e2) @@ fun xc2 ->
+                  E_app(e1,xc2))
+  | E_app(ec,e2) ->
+      plug (glob e2) @@ fun xc2 ->
+      E_app(ec,xc2)
+
+  (* | (E_app _ as ee) ->  (* assume argument is already atomic *) 
+      ee*)
   | E_reg((p,tyB,e1),e0,l) ->
-      let e0' = glob e0 in
-      plug e0' @@ fun xc0 ->
-      E_reg((p,tyB,anf e1),xc0,l)
-  | E_exec(e1,e0,eo,l) ->
-      let e0' = glob e0 in
-      let eo' = match eo with 
-                | None -> eo 
-                | Some e3 -> Some (glob e3)
-      in
-      plug e0' @@ fun xc0 ->
-      (match eo' with
-       | None -> E_exec(anf e1,xc0,None,l)
-       | Some e3' -> plug e3' @@ fun xc3 -> E_exec(anf e1,xc0,Some xc3,l))
-  | E_ref(e1) ->
-      let e1' = glob e1 in
-      plug e1' @@ fun xc1 ->
-      E_ref(xc1)
-  | E_get(e1) ->
-      let e1' = glob e1 in
-      plug e1' @@ fun xc1 ->
-      E_get(xc1)
-  | E_set(e1,e2) ->
-      let e1' = glob e1 in
-      let e2' = glob e2 in
-      plug e1' @@ fun xc1 ->
-      plug e2' @@ fun xc2 ->
-      E_set(xc1,xc2)
+      E_reg((p,tyB,glob e1),glob e0,l)
+  | E_exec _ 
+  | E_ref _
+  | E_get _ 
+  | E_set _ -> e
   | E_array_length _ ->
       e
   | E_array_make(sz,e1,loc) ->
@@ -189,7 +164,7 @@ let rec anf (e:e) : e =
   | E_run(i,e,l) ->
       plug (anf e) @@ fun xc ->
       E_run(i,xc,l) 
-  | E_pause e -> E_pause (anf e)
+  | E_pause e -> E_pause (glob e)
   | E_equations(p,eqs) ->
       let rec anf_le le =
         match le with

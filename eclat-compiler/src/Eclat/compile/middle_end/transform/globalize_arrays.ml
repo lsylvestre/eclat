@@ -47,9 +47,9 @@ let globalize_arrays pi =
   |d::ds -> let d' = 
              (match d with 
              | (x,(ty,E_array_create(sz,loc))) ->
-                  x,Static_array_of(ty,loc)
+                  x,(Static_array_of(ty,loc),Types.new_ty_unknown())
              | (x,(ty,E_array_make(sz,e1,loc))) ->
-                  x,Static_array_of(ty,loc)
+                  x,(Static_array_of(ty,loc),Types.new_ty_unknown())
                  (*  let c = try e2c e1 with Not_a_constant ->
                     Prelude.Errors.error ~loc (fun fmt ->
                       Format.fprintf fmt "the default element %a of this local array cannot be resolved." Ast_pprint.pp_exp e1) in

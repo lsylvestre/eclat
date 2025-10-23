@@ -33,7 +33,7 @@ let rec size_ty =
           let open Prelude.Errors in
           if !emit_warning_flag then warning (fun fmt -> 
             Format.fprintf fmt "Unknown value size in the generated code replaced by a %d bits range size.\n" when_tvar);
-        
+
           when_tvar
     | TString tz -> (size_ty tz * 8)
     | TStatic{elem;size} | TVector{elem;size} -> size_ty elem * size_ty size
@@ -112,11 +112,9 @@ let rec unify t1 t2 =
 let add_typing_env h (x:string) (t:ty) =
   (match Hashtbl.find_opt h x with
    | None -> Hashtbl.add h x (canon t)
-   | Some t' -> unify t t'; Hashtbl.replace h x (canon t'))
+   | Some t' -> unify t t'; (try Hashtbl.replace h x (canon t') with _ -> assert false))
 
-let compute_tag_size cs =
-  let n = int_of_float @@ Float.ceil @@ Float.log2 @@ float @@ List.length cs in
-  max 4 n
+let compute_tag_size = Types.compute_tag_size
 
 
 let rec translate_tyB =
@@ -128,7 +126,8 @@ let rec translate_tyB =
   | TyB_unit -> TUnit
   | TyB_tuple tyBs -> TTuple (List.map translate_tyB tyBs)
   | TyB_var r -> 
-     if Hashtbl.mem hvar r then Hashtbl.find hvar r else
+     if Hashtbl.mem hvar r then 
+       Hashtbl.find hvar r else
       (let t = TVar(ref @@ match !r with
                    | Unknown n -> V (string_of_int n)
                    | Is t -> T (translate_tyB t)) in
@@ -193,7 +192,8 @@ let rec typing_c = function
   |  (String s) -> TString (TSize(String.length s))
   |  (CSize n) -> TSize n
   | C_encode(c,n) ->
-      let _ = typing_c c in
+      let ty = typing_c c in
+      assert (size_ty ty <= n);
       TVect n
 
 let rec typing_op ~externals h t op =

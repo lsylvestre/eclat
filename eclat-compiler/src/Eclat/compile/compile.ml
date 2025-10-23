@@ -19,13 +19,91 @@ let compile ?(vhdl_comment="") ?(prop_fsm=true) arg_list name ty fmt pi =
   let pi = if !nonormalization then Inline.inl_pi pi 
            else Middle_end.compile ~globalize:!globalize_flag arg_list ty pi 
   in
+  (* let pi = Rename_main_arg.rename_main_arg_pi pi in
+  let tyB_result = match Types.canon_ty ty with
+                  | Ty_fun(_,_,tyB_result) -> tyB_result
+                  | _ -> assert false in*)
+  (*let _ = Typing.typing_with_argument pi arg_list in
+  let pi = {pi with main = Ast.un_annot pi.main } in 
+    let pi = Fun_assign_name.name_pi pi in
+   let pi = Ast_rename.rename_pi pi in
+    let pi = Lambda_lifting.lambda_lifting_pi ~globalize:false pi in
+  let pi = Inline.inl_pi pi in
+  (* let pi = Monomorphize.monomorphize pi in*)
+  let pi = Anf.anf_pi pi in 
+let pi = Matching.matching_pi pi in
+   let pi = Ast_rename.rename_pi pi in
+  let pi = Globalize_arrays.globalize_arrays pi in
+    let pi = Move_down_gfun_under_exec_and_par.move_down_gfun_under_exec_and_par_pi pi in
+          let pi = Ast_rename.rename_pi pi in
+  
+  let _ = Typing.typing_with_argument pi arg_list in
+          D.display_pi D.MiddleEnd pi;
+         let pi = Propagation.propagation_pi pi in 
+        *) 
+          (* D.display_pi D.MiddleEnd pi;*)
+ 
+  (* let pi2 = Compilation2.compile_pi pi in
+
+           D.display_pi D.MiddleEnd pi2;
+                   let _ = Typing.typing_with_argument ~foo:true pi2 arg_list in
+   let pi = Compilation3.compile_pi pi2 in
+   D.display_pi D.MiddleEnd pi;*)
+
+    let pi = Instantiate.instantiate_pi pi in
+    let pi = Compilation.compile_pi pi in
+    let pi = Matching.matching_pi pi in
+    let pi = Let_floating.float_pi pi in 
+    
+    let pi = Propagation.propagation_pi pi in
+  
+(****************************)
+  let pi = Ast_rename.rename_pi pi in
+  let pi = Anf2.anf_pi pi in
+
+      let _ = Typing.typing_with_argument ~foo:true pi arg_list in
+    
+    let tyB_argument,tyB_result = match Types.canon_ty ty with
+                  | Ty_fun(Ty_base ty_argument,_,tyB_result) -> ty_argument,tyB_result
+                  | _ -> assert false in
+
+    let pi = Rename_main_arg.rename_main_arg_pi pi in
+
+
+    D.display_pi D.MiddleEnd pi;
+  
+  Gen_vhdl2.pp_pi ~name tyB_argument tyB_result fmt pi;
+
+  (tyB_argument,tyB_result) 
+
+
+
+   (*
+
+               assert false;
+(****************************)
+
+
+  (* let pi = Inline.inl_pi pi in *)
+
+  let pi = Anf2.anf_pi pi in
+
+  let pi = Matching.matching_pi pi in
+   let pi = Let_floating.float_pi pi in
+   let pi = Propagation.propagation_pi pi in
+
+
+ 
+
+  (* let (ty,_) = Typing.typing_with_argument pi arg_list in*)
+let _ = Typing.typing_with_argument ~foo:true pi arg_list in
+  let pi = Rename_main_arg.rename_main_arg_pi pi in
+  
+
 
   D.display_pi D.MiddleEnd pi;
-
-  let pi = Rename_main_arg.rename_main_arg_pi pi in
-
   let (rdy,result,idle,fsm) = Gen_miniHDL.compile pi in
-
+(*assert false;*)
   Count_externals.count_externals_fsm fsm;
 
   let statics = pi.statics |> List.filter (function 
@@ -78,5 +156,6 @@ let compile ?(vhdl_comment="") ?(prop_fsm=true) arg_list name ty fmt pi =
       "ocaml code generated in %s/ml/%s_step.ml"
         !target name;
   );
+    (argument,result,typing_env)
+*)
 
-  (argument,result,typing_env)

@@ -19,6 +19,7 @@ INCLUDES=-I $(SRC_DIR) -I $(SRC_DIR)/Eclat/ \
          -I $(SRC_DIR)/Eclat/compile/middle_end/normalize \
          -I $(SRC_DIR)/Eclat/compile/inspect \
          -I $(SRC_DIR)/Eclat/compile/backend \
+         -I $(SRC_DIR)/Eclat/compile/backend/other-compiler \
          -I $(SRC_DIR)/miniHDL \
          -I $(SRC_DIR)/miniHDL/optim \
          -I $(SRC_DIR)/miniHDL/compile/ \
@@ -58,6 +59,7 @@ OBJS= $(SRC_DIR)/prelude.cmx \
       $(SRC_DIR)/Eclat/compile/middle_end/normalize/propagation.cmx \
       \
       $(SRC_DIR)/Eclat/compile/middle_end/normalize/anf.cmx \
+      $(SRC_DIR)/Eclat/compile/middle_end/normalize/anf2.cmx \
       $(SRC_DIR)/Eclat/compile/middle_end/normalize/let_floating.cmx \
       $(SRC_DIR)/Eclat/compile/middle_end/normalize/lustre_scheduling.cmx \
       $(SRC_DIR)/Eclat/compile/middle_end/transform/insert_bound_checking.cmx \
@@ -84,6 +86,8 @@ OBJS= $(SRC_DIR)/prelude.cmx \
       $(SRC_DIR)/Eclat/compile/inspect/display_target.cmx \
       $(SRC_DIR)/miniHDL/miniHDL_typing.cmx \
       $(SRC_DIR)/Eclat/compile/backend/gen_miniHDL.cmx \
+      $(SRC_DIR)/Eclat/compile/backend/other-compiler/compilation.cmx \
+      $(SRC_DIR)/Eclat/compile/backend/other-compiler/gen_vhdl2.cmx \
       $(SRC_DIR)/miniHDL/count_externals.cmx \
       \
       $(SRC_DIR)/miniHDL/compile/flat_let_atom.cmx \
@@ -99,6 +103,7 @@ OBJS= $(SRC_DIR)/prelude.cmx \
       $(SRC_DIR)/miniHDL/simul/gen_ocaml.cmx \
       \
       $(SRC_DIR)/Eclat/compile/compile.cmx \
+      $(SRC_DIR)/Eclat/compile/backend/other-compiler/gen_testbench2.cmx\
       $(SRC_DIR)/miniHDL/simul/gen_testbench.cmx\
       \
       $(SRC_DIR)/Eclat/interp/special_subst.cmx \

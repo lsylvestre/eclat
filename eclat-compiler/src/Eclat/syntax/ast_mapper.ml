@@ -82,8 +82,8 @@ let rec map f e =
       let e1' = f e1 in
       let e2' = f e2 in
       E_vector_mapi (is_par, (p, typ, e1'), e2', ty)
-  | E_run(i,e) ->
-      E_run(i, f e)
+  | E_run(i,e,l) ->
+      E_run(i, f e,l)
   | E_for(x,e_st1,e_st2,e,loc) ->
       E_for(x,f e_st1,f e_st2,f e,loc)
   | E_generate((p, ty, e1), e2, e_st1, loc) ->
@@ -162,7 +162,7 @@ let rec iter f (e:e) : unit =
       List.iter f es
   | E_vector_mapi(_,(_,_,e1),e2,_) ->
       f e1; f e2
-  | E_run(_,e1) ->
+  | E_run(_,e1,_) ->
       f e1
   | E_pause e1 -> f e1
   | E_equations(_,eqs) ->
@@ -296,9 +296,9 @@ let accum f (e:e) =   (* : ((x * ty * e) list * e)*)
             let ds1,e1' = aux e1 in
             let ds2,e2' = aux e2 in
             ds1@ds2,E_vector_mapi(is_par,(p,typ,e1'),e2',ty)
-        | E_run(x,e1) ->
+        | E_run(x,e1,l) ->
             let ds1,e1' = aux e1 in
-            ds1,E_run(x,e1')
+            ds1,E_run(x,e1',l)
         | E_pause e1 -> 
             let ds1,e1' = aux e1 in
             [],E_pause (declare' ds1 e1')

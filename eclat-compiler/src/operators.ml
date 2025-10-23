@@ -29,9 +29,25 @@ type op =
   | Int_of_bvect
 
   | External_fun of string * Types.ty
+(* internal use *)
+  | Acquire
+  | Release
+  | Locked
+  | Start_read of Types.size
+  | End_read
+  | Start_write of Types.size
+  | End_write
+  | Default of Types.tyB
+  | Get_tuple of {field:int; tyBs: Types.tyB list}
 
 let combinational ~externals p =
   match p with
+  | Acquire
+  | Release
+  | Start_read _
+  | End_read
+  | Start_write _
+  | End_write
   | Print | Print_string | Print_int | Print_newline | Assert -> false
   | External_fun (x,_) -> (match List.assoc_opt x (snd externals) with
                            | Some (_,(_,_,b)) -> not(b)
@@ -115,6 +131,36 @@ let ty_op ~externals op =
     | Some (t,_) -> t
     | None -> Prelude.Errors.raise_error ~msg:("unbound operator "^x) ())
 
+  | Acquire
+  | Release ->
+     let tyB = new_tyB_unknown() in
+     let sz = new_size_unknown () in
+     Ty_fun(Ty_array (sz,tyB),Dur_zero,TyB_unit)
+  | Locked ->
+     let tyB = new_tyB_unknown() in
+     let sz = new_size_unknown () in
+     Ty_fun(Ty_array (sz,tyB),Dur_zero,TyB_bool)
+  | Start_read sz ->
+     let tyB = new_tyB_unknown() in
+     Ty_fun(Ty_tuple[Ty_array (sz,tyB);Ty_base(TyB_int (new_size_unknown ()))],Dur_zero,TyB_unit)
+  | End_read -> 
+     let tyB = new_tyB_unknown() in
+     let sz = new_size_unknown () in
+     Ty_fun(Ty_array (sz,tyB),Dur_zero,tyB)
+  | Start_write sz ->
+     let tyB = new_tyB_unknown() in
+     Ty_fun(Ty_tuple[Ty_array (sz,tyB);Ty_base(TyB_int (new_size_unknown ()));Ty_base tyB],Dur_zero,TyB_unit)
+  | End_write -> 
+     let tyB = new_tyB_unknown() in
+     let sz = new_size_unknown () in
+     Ty_fun(Ty_array (sz,tyB),Dur_zero,TyB_unit)
+  | Default tyB ->
+      Ty_fun(Ty_base TyB_unit,Dur_zero,tyB)
+  | Get_tuple {field=i; tyBs} ->
+      let field_tyB = List.nth tyBs i in
+      Ty_fun(Ty_base (TyB_tuple (tyBs)),Dur_zero,field_tyB)
+
+
 (** pretty printer for operators *)
 let pp_op fmt (op:op) : unit =
   match op with
@@ -138,13 +184,23 @@ let pp_op fmt (op:op) : unit =
   | Bvect_of_int -> Format.fprintf fmt "%s" @@ "Bvect_of_int"
   | Int_of_bvect -> Format.fprintf fmt "%s" @@ "int_of_bvect"
   | External_fun (x,_) -> Format.fprintf fmt "%s" @@ x
-
+  | Acquire -> Format.fprintf fmt "%s" @@ "acquire"
+  | Release -> Format.fprintf fmt "%s" @@ "release"
+  | Locked -> Format.fprintf fmt "%s" @@ "locked"
+  | Start_read _ -> Format.fprintf fmt "%s" @@ "start_read"
+  | End_read -> Format.fprintf fmt "%s" @@ "end_read"
+  | Start_write _ -> Format.fprintf fmt "%s" @@ "start_write"
+  | End_write -> Format.fprintf fmt "%s" @@ "end_write"
+  | Default tyB -> Format.fprintf fmt "default<%a>" Types.pp_tyB tyB
+  | Get_tuple {field=i; tyBs} -> Format.fprintf fmt "Get_tuple<%d>" i
 
 (** code generator for operators *)
 let gen_op fmt (op:op) pp a : unit =
   let open Format in
   let funcall fmt s = fprintf fmt "%s(%a)" s pp a in
-  let procall fmt s = fprintf fmt "%s(clk,%a)" s pp a in
+  let procall fmt s = fprintf fmt "%s(%a)" s pp a in
+  let procall_n fmt s = procall fmt s in
+  let procall_with_clock fmt s = fprintf fmt "%s(clk,%a)" s pp a in
   let skip_when b fmt f s =
     if b then fprintf fmt "eclat_skip(eclat_unit)"
     else f fmt s 
@@ -172,13 +228,13 @@ let gen_op fmt (op:op) pp a : unit =
   | Size_of_val _ ->
       assert false (* special case *)
   | Print ->
-      skip_when !flag_no_print fmt procall "work.Print.print_value"
+      skip_when !flag_no_print fmt procall_with_clock "work.Print.print_value"
   | Print_string ->
-      skip_when !flag_no_print fmt procall "work.Print.print_string"
+      skip_when !flag_no_print fmt procall_with_clock "work.Print.print_string"
   | Print_int ->
-      skip_when !flag_no_print fmt procall "work.Int.print"
+      skip_when !flag_no_print fmt procall_with_clock "work.Int.print"
   | Print_newline ->
-      skip_when !flag_no_print fmt procall "work.Print.print_newline"
+      skip_when !flag_no_print fmt procall_with_clock "work.Print.print_newline"
   | Assert ->
       skip_when !flag_no_assert fmt funcall "work.Assertion.ok"
   | String_length ->
@@ -186,3 +242,20 @@ let gen_op fmt (op:op) pp a : unit =
   | Bvect_of_int -> funcall fmt "eclat_bvect_of_int"
   | Int_of_bvect -> funcall fmt "eclat_int_of_bvect"
   | External_fun (x,_) -> funcall fmt (Printf.sprintf "work.%s" x)
+  | Acquire -> procall fmt "work.Lock.acquire"
+  | Release -> procall fmt "work.Lock.release"
+  | Locked -> funcall fmt "work.Lock.locked"
+  | Start_read _ -> procall_n fmt "work.Ram.start_read"
+  | End_read -> assert false
+  | Start_write _ -> procall_n fmt "work.Ram.start_write"
+  | End_write -> procall fmt "work.Ram.end_write"
+  | Default _ -> assert false
+  | Get_tuple {field;tyBs} -> 
+      (* assume [a] is a variable *)
+      let pp_slice i sz = fprintf fmt "%a(%d to %d)" pp a i (i+sz-1) in
+      let rec loop i j = function
+      | [] -> ()
+      | tyB::tyBs -> let sz = Types.size_tyB tyB in
+                     if j = field then pp_slice i sz else
+                     loop (i+sz) (j+1) tyBs
+      in loop 0 0 tyBs

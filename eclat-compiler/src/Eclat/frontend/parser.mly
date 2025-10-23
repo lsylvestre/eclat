@@ -125,7 +125,7 @@
 %nonassoc BOOL_LIT IDENT LPAREN
 
 %start <((x * (ty * bool)) list * (x * (ty * (bool * int * bool))) list) 
-          * (x * static) list * (x * (x * tyB) list) list * ((p*e)*Prelude.loc) list> pi
+          * (x * (static * ty)) list * (x * (x * tyB) list) list * ((p*e)*Prelude.loc) list> pi
 %start <e> exp_eof
 
 %%
@@ -136,7 +136,7 @@ pi:
                         let f = String.capitalize_ascii x in
                         let arg = gensym ~prefix:"arg" () in
                         let v = E_fun(P_var arg,(Types.new_ty_unknown(),Types.new_tyB_unknown()), 
-                             E_run(f,E_var arg)) in
+                             E_run(f,E_var arg, gensym ~prefix:"inst" ())) in
                         (((f,t)::ecs,efs), gs,    ts,    (((P_var x,v),with_file $loc)::ds)) }
 | ef=ext_fun pi=pi    { let (ecs,efs),gs,ts,ds = pi in ((ecs,ef::efs), gs,    ts,    ds   ) }
 | g=static pi=pi      { let (ecs,efs),gs,ts,ds = pi in ((ecs,    efs), g::gs, ts,    ds   ) }
@@ -174,7 +174,7 @@ static: /* todo: add loc and type annotation [tyopt] */
         | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
                           ~msg:("dimension for "^x^" should be an integer") ()
       in
-      x,Static_array(e2c ec,to_int e)
+      x,(Static_array(e2c ec,to_int e), new_ty_unknown())
   }
 
 | LET STATIC x=IDENT COL ty=ty SEMI_SEMI
@@ -184,7 +184,7 @@ static: /* todo: add loc and type annotation [tyopt] */
          Prelude.Errors.raise_error ~loc
            ~msg:"this type annotation should not contain type unknowns"
       ) ();
-      x,Static_array_of (ty,loc)
+      x,(Static_array_of (ty,loc), new_ty_unknown())
     }
 
 
@@ -634,7 +634,7 @@ app_exp_desc:
     }*/
 
 | RUN i=UP_IDENT e=aexp 
-     { E_run(i, e) }
+     { E_run(i, e, gensym ~prefix:"inst" ()) }
 
 | e1=app_exp x=WHEN e2=aexp { E_if(e2,e1,E_app(E_const (Op(Runtime(External_fun("Default.create",new_ty_unknown ())))),E_const(Unit))) }
 | e1=aexp RIGHT_ARROW e2=app_exp { E_app(E_var "arrow", E_tuple[e1;e2]) }

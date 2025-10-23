@@ -80,7 +80,7 @@ let rec pp_const (fmt:fmt) (c:c) : unit =
       pp_vector fmt pp_const cs
   | C_size n -> fprintf fmt "size<%d>" n
   | Inj x ->
-      fprintf fmt "%s" x
+      fprintf fmt "`%s" x
   | C_appInj(x,c,_) ->
       fprintf fmt "%s(%a)" x pp_const c
 (** pretty printer for patterns *)
@@ -138,7 +138,7 @@ let pp_exp (fmt:fmt) (e:e) : unit =
       fprintf fmt "(@[<v>match %a with@,%a%a@])"
         (pp_e ~paren:true) e
         (pp_print_list
-            (fun fmt (x,(p,e)) -> fprintf fmt "| %s %a -> %a" x pp_pat p (pp_e ~paren:false) e))
+            (fun fmt (x,(p,e)) -> fprintf fmt "@[<v 4>| %s %a ->@,%a@]" x pp_pat p (pp_e ~paren:false) e))
          hs
         (fun fmt eo ->
             match eo with
@@ -160,7 +160,7 @@ let pp_exp (fmt:fmt) (e:e) : unit =
         pp_tuple fmt (pp_e ~paren:false) es
   | E_reg((p,tyB,e1), e0,l) ->
       parenthesize ~paren (fun fmt () ->
-        fprintf fmt "@[<v>reg[%s] (fun %a : %a -> %a) last %a@]" l
+        fprintf fmt "@[<v>reg[%s] (fun %a : %a -> %a) init %a@]" l
           pp_pat p
           Types.pp_tyB tyB
           (pp_e ~paren:false) e1 (pp_e ~paren:false) e0) fmt ()
@@ -221,8 +221,8 @@ let pp_exp (fmt:fmt) (e:e) : unit =
       fprintf fmt "%a %a" (pp_e ~paren:true) 
                             (E_fun(p,(Types.Ty_base tyB1,tyB2),e1))
                           (pp_e ~paren:true) e2
-  | E_run(i,e) ->
-      fprintf fmt "run %s(%a)" i (pp_e ~paren:false) e
+  | E_run(f,e,l) ->
+      fprintf fmt "run %s[%s](%a)" f l (pp_e ~paren:false) e
   | E_pause e -> fprintf fmt "pause %a"  (pp_e ~paren:true) e
   | E_equations(p,eqs) ->
       let rec pp_le ~paren fmt le =
@@ -263,5 +263,5 @@ let pp_static (fmt:fmt) (g:static) : unit =
 let pp_pi (fmt:fmt) (pi:pi) : unit =
   let {statics;main} = pi in
   fprintf fmt "@[<v>";
-  List.iter (fun (x,g) -> fprintf fmt "let %s = %a;;@," x pp_static g) statics;
+  List.iter (fun (x,(g,_)) -> fprintf fmt "let %s = %a;;@," x pp_static g) statics;
   fprintf fmt "%a@]" pp_exp main

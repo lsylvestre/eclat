@@ -110,9 +110,9 @@ let rec lfloat (e:e) : e =
   | E_vector_mapi(is_par,(p,typ,e1),e2,ty) ->
       let ds2,e2' = glob e2 in
       ds2,E_vector_mapi(is_par,(p,typ,lfloat e1),e2',ty) 
-  | E_run(i,e) ->
+  | E_run(i,e,l) ->
       let ds,e' = glob e in
-      ds,E_run(i,e)
+      ds,E_run(i,e,l)
   | E_pause e -> 
       let ds,e' = glob e in
       ds,E_pause e'

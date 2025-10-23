@@ -98,14 +98,14 @@ let pp_top ?(top="top") ~vhdl_comment ~argument:(_,ta) ~result:(_,tr) ?(clock="c
 
   if match ta with
      | None -> false
-     | Some t -> argument_size <> MiniHDL_typing.size_ty t
+     | Some t -> argument_size <> Types.size_tyB t
   then
     Prelude.Errors.error (fun fmt ->
         fprintf fmt "bad format for top module I/Os -- expect an argument of size %d" argument_size);
 
   if match tr with
      | None -> false
-     | Some t -> result_size <> MiniHDL_typing.size_ty t
+     | Some t -> result_size <> Types.size_tyB t
   then
     Prelude.Errors.error (fun fmt ->
         fprintf fmt "bad format for top module I/Os -- expect a result of size %d" result_size);
