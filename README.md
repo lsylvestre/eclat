@@ -1,3 +1,8 @@
+```
+$ cd ocaml-vm/generated-bytecode ; make BCOPT="-load-data -load-code"
+$ cd ocaml-vm ; make synth ECLAT_FLAGS="-one-hot -intel-max10"
+```
+
 
 ## Eclat
 

@@ -7,6 +7,7 @@ all: vm
 
 
 ECLAT_COMPILER=../eclat-compiler
+ECLAT_FLAGS=
 OCAML_VM=ocaml-vm
 VM_FROM_ECLAT_COMPILER=../$(OCAML_VM)
 TARGET_DIR=../target
@@ -26,7 +27,7 @@ BOARD=intel-max10
 CLK=clk
 
 vm: $(ECLAT_COMPILER)/eclat
-	(cd $(ECLAT_COMPILER); ./eclat \
+	(cd $(ECLAT_COMPILER); ./eclat $(ECLAT_FLAGS) \
 		    $(FLAGS) -arg="((true, true, true, true, true, true, true, true, true, true),(true,true))" \
 	        $(VM_FROM_ECLAT_COMPILER)/vm/int.ecl \
 	        $(VM_FROM_ECLAT_COMPILER)/vm/static.ecl \
