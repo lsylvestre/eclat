@@ -2,6 +2,26 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+package values is
+  alias t is std_logic_vector;
+  constant val_true : t(0 to 0) := "1";
+  constant val_false : t(0 to 0) := "0";
+  constant val_unit : t(0 to 0)  := "1";
+  function val_int(arg: t) return t;
+  function last_bit(arg:t) return std_logic;
+end package;
+
+package body values is
+  function val_int(arg: t) return t is
+    begin return arg; end;
+   function last_bit(arg:t) return std_logic is
+      begin return arg(arg'length - 1); end;
+end;
+
+library ieee; 
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
 package util is
   procedure echo (arg : in string);
   function val_of_bool (b:boolean) return std_logic_vector;
@@ -26,13 +46,12 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 package Assertion is
-  function ok (b:std_logic_vector) return std_logic_vector;
+  procedure ok (b: in std_logic_vector);
 end Assertion;
 package body Assertion is
-  function ok (b:std_logic_vector) return std_logic_vector is
+  procedure ok (b:in std_logic_vector) is
     begin
       assert b = "1" report "assertion failed" severity error;
-      return "0";
     end;
 end Assertion;
 
@@ -43,9 +62,10 @@ use ieee.numeric_std.all;
 package Print is
   alias t is std_logic_vector;
   function to_string (a: std_logic_vector) return string;
-  impure function print_value (signal clk:std_logic;arg:t) return t;
-  impure function print_string (signal clk:std_logic;arg:t) return t;
-  impure function print_newline (signal clk:std_logic;arg:t) return t;
+  function of_string   (s: string)   return t; 
+  procedure print_value (signal clk:in std_logic;arg:in t);
+  procedure print_string (signal clk:in std_logic;arg:in t);
+  procedure print_newline (signal clk: in std_logic;arg: in t);
 end package;
 package body Print is
   
@@ -58,20 +78,34 @@ package body Print is
         stri := stri+1;
         end loop;
     return b;
-    end function;
+  end function;
 
-  impure function print_value (signal clk:std_logic;arg:t) return t is
+  function of_string(s: string) return t is 
+        constant ss: string(1 to s'length) := s; 
+        variable answer: std_logic_vector(0 to 8 * s'length - 1); 
+        variable p: integer; 
+        variable c: integer; 
+    begin 
+        for i in ss'range loop
+            p := 8 * i;
+            c := character'pos(ss(i));
+            answer(p - 8 to p-1) := std_logic_vector(to_unsigned(c,8)); 
+        end loop; 
+        return answer;
+    end; 
+
+  procedure print_value (signal clk:in std_logic;arg:in t) is
     begin
-      work.Util.echo(to_string(arg));
-      return "0";
-    end function;
+      if rising_edge(clk) then
+        work.Util.echo(to_string(arg));
+      end if;
+    end;
 
-  impure function print_newline (signal clk:std_logic;arg:t) return t is
+  procedure print_newline (signal clk: in std_logic;arg: in t) is
     begin
       if rising_edge(clk) then
         work.Util.echo(" " &LF);
       end if;
-      return "0";
     end;
 
   function char_of_value(arg : std_logic_vector(0 to 7)) return character is
@@ -88,9 +122,9 @@ package body Print is
       end case;
     end loop;
     return character'val(temp);
-  end function;
+  end;
 
-  impure function print_string (signal clk:std_logic ; arg:t) return t is
+  procedure print_string (signal clk: in std_logic ; arg: in t) is
     variable s : string (0 to arg'length / 8);
     begin
       if rising_edge(clk) then
@@ -99,7 +133,6 @@ package body Print is
         end loop;
         work.Util.echo(s);
       end if;
-      return "0";
     end;
 end Print;
 
@@ -119,6 +152,19 @@ package body default is
   begin return r; end;
 end default;
 
+library ieee; 
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+package consult is -- for efficiently checking first constructor parameter
+  alias t is std_logic_vector;
+  function consult_signal (a,b: integer;arg:t) return t;
+end package;
+
+package body consult is
+  function consult_signal (a,b: integer;arg:t) return t is
+  begin return arg(a to b - 1) & arg(0); end;
+end consult;
 
 library ieee; 
 use ieee.std_logic_1164.all;
@@ -126,7 +172,8 @@ use ieee.numeric_std.all;
 
 package bool is
   alias t is std_logic_vector;
-  impure function print (signal clk:std_logic;arg: t) return t;
+  procedure print (signal clk:in std_logic;arg: in t);
+  function is_true (arg: t) return boolean;
   function lnot (arg: t) return t;
   function lor  (arg1: t;arg2: t) return t;
   function land (arg1: t;arg2: t) return t;
@@ -135,7 +182,7 @@ end package;
 
 package body bool is
 
-  impure function print(signal clk:std_logic;arg:t) return t is
+  procedure print(signal clk: in std_logic; arg: in t) is
     begin
       if rising_edge(clk) then
         if arg(0) = '1' then
@@ -144,8 +191,15 @@ package body bool is
           work.Util.echo("false");
         end if;
       end if;
-      return "0";
-    end function;
+    end procedure;
+  function is_true (arg: t) return boolean is
+    begin
+      if arg(0) = '1' then
+        return true;
+      else
+        return false; 
+      end if;
+    end;
   function lnot (arg: t) return t is
     begin
       return work.util.val_of_bool(arg(0) = '0');
@@ -170,7 +224,8 @@ use ieee.numeric_std.all;
 
 package int is
   alias t is std_logic_vector;
-  impure function print(signal clk:std_logic;arg:t) return t;
+  procedure print(signal clk: in std_logic; arg: in t);
+  function resize(arg:t; k:integer) return t;
   function absv   (arg1: t) return t;
   function add    (arg1: t;arg2: t) return t;
   function sub    (arg1: t;arg2: t) return t;
@@ -194,7 +249,7 @@ end package;
 
 package body int is -- signed int
 
-  impure function print(signal clk:std_logic;arg:t) return t is
+  procedure print(signal clk:in std_logic;arg:in t) is
     begin
       if rising_edge(clk) then
         if arg'length <= 63 then
@@ -204,8 +259,12 @@ package body int is -- signed int
           work.Util.echo(integer'image(to_integer(resize(unsigned(arg),63))));
         end if;
       end if;
-      return "0";
-    end function;
+    end procedure;
+
+  function resize(arg:t; k:integer) return t is
+    begin
+       return std_logic_vector(resize(unsigned(arg),k));
+    end;
 
   function absv (arg1: t) return t is
     begin
@@ -605,4 +664,66 @@ package body FixedPoint is
       return t(unsigned(arg1) - unsigned(arg2));
     end;
 end FixedPoint;
+
+
+
+
+library ieee; 
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+package Lock is
+  alias t is std_logic_vector;
+  function locked (arg: t) return t;
+  procedure acquire (variable arg: out t);
+  procedure release (variable arg: out t);
+end package;
+
+package body Lock is
+  function locked (arg: t) return t is
+    begin return arg(0) & ""; end;
+  procedure acquire (variable arg: out t) is
+    begin arg(0) := '1'; end;
+  procedure release (variable arg: out t) is
+    begin arg(0) := '0'; end;
+end Lock;
+
+library ieee; 
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+use work.int;
+package ram is
+  alias t is std_logic_vector;
+  procedure start_read(x : inout std_logic_vector;
+                       i : in std_logic_vector;
+                       sz_val : in integer);
+  procedure start_write(x : inout std_logic_vector;
+                        i, v : in std_logic_vector;
+                        sz_val : in integer);
+  procedure end_write(x : out std_logic_vector);
+end package;
+
+package body ram is
+  procedure start_read(x : inout std_logic_vector;
+                       i : in std_logic_vector;
+                       sz_val : in integer) is
+    begin 
+      assert (x(0) = '1');
+      x(1) := '0';
+      x(2 to x'length-2*sz_val-1) := int.resize(i,x'length-2*sz_val-2);
+    end;
+  procedure start_write(x : inout std_logic_vector;
+                        i, v : in std_logic_vector;
+                        sz_val : in integer) is
+    begin
+      assert (x(0) = '1');
+      x(1) := '1';
+      -- report "The size is " & integer'image(x'length-2*sz_val-2);
+      x(2 to x'length-2*sz_val-1) := int.resize(i,x'length-2*sz_val-2);
+      x(x'length-v'length-v'length to x'length-v'length-1) := v;
+    end;
+  procedure end_write(x : out std_logic_vector) is
+    begin
+      x(1) := '0';
+  end;
+end ram;
 
