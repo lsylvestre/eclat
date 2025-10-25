@@ -67,7 +67,7 @@ type e =                      (** expression     [e]                       *)
 
   | E_generate of (p * (ty * tyB) * e) * e * e_static * deco
   | E_for of x * e_static * e_static * e * deco
-  | E_run of x * e       (* [f e] call external function [f] with argument [e] *)
+  | E_run of x * e * l   (* [f e] call external function [f] with argument [e] *)
   | E_pause of e         (* [pause e] starts [e] after one cycle *)
   | E_equations of p * (p * le) list
 

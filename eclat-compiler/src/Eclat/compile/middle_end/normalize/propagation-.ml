@@ -33,7 +33,7 @@ let linear_bindings2 x (e:e) : bool =
   let rec aux e = match e with
   | E_deco(e,_) ->
       aux e
-  | E_var y ->
+  | E_var y ->  
       if x = y then ((if !r > 0 then (raise Found)); incr r)
   | E_const _ ->
       ()
@@ -46,7 +46,6 @@ let rec simple_atom e =
   match e with
     | E_var _ | E_const _ -> true
     | E_tuple es -> List.for_all simple_atom es
-    | E_app(E_const(Op(GetTuple{pos;arity})),e1) -> simple_atom e1
     (* | E_app(E_const(Op(op)),e1) -> Combinational.op_combinational op  && simple_atom e1 *)
     | _ -> false
 
@@ -55,26 +54,24 @@ let propagation ~externals e =
   let _propagable e =
     if !flag_propagate_combinational_linear then Instantaneous.combinational ~externals e 
                                   && (SMap.cardinal (linear_bindings e) <= 1) else
-    simple_atom e
+    simple_atom e 
   in
-  let propagable2 x e1 e2 =
-    if !flag_propagate_combinational_linear then
-      Instantaneous.combinational ~externals e1
-      && linear_bindings2 x e2 else
-    simple_atom e
+  let propagable2 x e =
+    if !flag_propagate_combinational_linear then Instantaneous.combinational ~externals e 
+                                  && linear_bindings2 x e else
+    simple_atom e 
   in
   let rec prop e =
     match e with
     | E_letIn(P_tuple ps,ty,E_tuple es,e2) ->
         let ts = match Types.canon_ty ty with 
-                 | Ty_tuple ts -> ts
-                 | Ty_base (TyB_tuple tyBs) -> List.map (fun tyB ->Types.Ty_base tyB) tyBs
-                 | _ -> List.map (fun _ -> Types.new_ty_unknown()) ps in
+                 | Ty_tuple ts -> ts 
+                 | _ -> List.map (fun _ -> Types.new_ty_unknown()) ps  in
         prop @@ List.fold_right2 (fun (pi,ti) ei e -> E_letIn(pi,ti,ei,e)) 
                   (List.combine ps ts) es e2
     | E_letIn(P_var x as p,ty,e1,e2) ->
         let e1' = prop e1 in
-        if propagable2 x e1' e2
+        if propagable2 x e1'
         then prop (subst_p_e p e1' e2)
         else E_letIn(p,ty,e1',prop e2)
     | E_letIn(p,ty,e1,e2) ->

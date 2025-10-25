@@ -172,7 +172,7 @@ rule token = parse
 | eof | "%eof"        { EOF }
 | "(*"                { incr nested_comment_depth; comment lexbuf }
 | _  as lxm           { Prelude.Errors.raise_error ~loc:(get_loc lexbuf)
-                              ~msg:(Printf.sprintf "Unexpected character: %c"  lxm) () }
+                              ~msg:(Printf.sprintf "Unexpected character: %c (code %d)"  lxm (Char.code lxm)) () }
 
 and comment = parse
 | "(*"                { incr nested_comment_depth; comment lexbuf }

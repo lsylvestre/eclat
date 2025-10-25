@@ -136,7 +136,7 @@ pi:
                         let f = String.capitalize_ascii x in
                         let arg = gensym ~prefix:"arg" () in
                         let v = E_fun(P_var arg,(Types.new_ty_unknown(),Types.new_tyB_unknown()), 
-                             E_run(f,E_var arg)) in
+                             E_run(f,E_var arg,gensym())) in
                         (((f,t)::ecs,efs), gs,    ts,    (((P_var x,v),with_file $loc)::ds)) }
 | ef=ext_fun pi=pi    { let (ecs,efs),gs,ts,ds = pi in ((ecs,ef::efs), gs,    ts,    ds   ) }
 | g=static pi=pi      { let (ecs,efs),gs,ts,ds = pi in ((ecs,    efs), g::gs, ts,    ds   ) }
@@ -634,7 +634,7 @@ app_exp_desc:
     }*/
 
 | RUN i=UP_IDENT e=aexp 
-     { E_run(i, e) }
+     { E_run(i, e, gensym()) }
 
 | e1=app_exp x=WHEN e2=aexp { E_if(e2,e1,E_app(E_const (Op(Runtime(External_fun("Default.create",new_ty_unknown ())))),E_const(Unit))) }
 | e1=aexp RIGHT_ARROW e2=app_exp { E_app(E_var "arrow", E_tuple[e1;e2]) }

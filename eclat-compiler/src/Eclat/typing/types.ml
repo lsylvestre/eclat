@@ -1,3 +1,6 @@
+let one_hot_encoding_flag = ref false
+
+
 type x = string
 
 
@@ -514,3 +517,29 @@ let rec rename_ty unknowns = function
     Ty_array(rename_size unknowns sz, rename_tyB unknowns tyB)
 
 
+
+let size_sz sz =
+    match canon_size sz with
+    | Sz_lit n -> n
+    | _ -> 32
+
+let compute_tag_size cs =
+  let n = 
+    if !one_hot_encoding_flag
+    then List.length cs
+    else int_of_float @@ Float.ceil @@ Float.log2 @@ float @@ List.length cs
+  in
+  max 1 n
+  
+
+let size_tyB tyB =
+  let rec loop tyB = 
+    match canon_tyB tyB with
+    | TyB_var _ -> 32
+    | TyB_bool | TyB_unit -> 1
+    | TyB_int sz -> size_sz sz
+    | TyB_tuple ts -> List.fold_left (+) 0 (List.map loop ts)
+    | TyB_sum sum -> compute_tag_size sum + List.fold_left (max) 0 (List.map (fun (_,tyB) -> loop tyB) sum)
+    | TyB_string sz -> size_sz sz * 8
+    | _ -> Format.(fprintf std_formatter "[%a]" pp_tyB tyB); assert false (* todo *)
+  in loop tyB  

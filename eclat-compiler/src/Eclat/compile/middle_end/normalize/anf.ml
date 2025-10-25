@@ -186,9 +186,9 @@ let rec anf (e:e) : e =
   | E_vector_mapi(is_par,(p,typ,e1),e2,ty) ->
       plug (anf e2) @@ fun xc ->
       E_vector_mapi(is_par,(p,typ,anf e1),xc,ty) 
-  | E_run(i,e) ->
-      plug (anf e) @@ fun xc ->
-      E_run(i,xc) 
+  | E_run(f,e1,l) ->
+      plug (anf e1) @@ fun xc ->
+      E_run(f,xc,l) 
   | E_pause e -> E_pause (anf e)
   | E_equations(p,eqs) ->
       let rec anf_le le =

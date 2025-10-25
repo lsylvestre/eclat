@@ -2535,7 +2535,7 @@ let _menhir_action_080 =
   fun e i ->
     (
 # 637 "src/Eclat/frontend/parser.mly"
-     ( E_run(i, e) )
+     ( E_run(i, e, gensym()) )
 # 2540 "src/Eclat/frontend/parser.ml"
      : (Ast.e_static))
 
@@ -3619,7 +3619,7 @@ let _menhir_action_187 =
                         let f = String.capitalize_ascii x in
                         let arg = gensym ~prefix:"arg" () in
                         let v = E_fun(P_var arg,(Types.new_ty_unknown(),Types.new_tyB_unknown()), 
-                             E_run(f,E_var arg)) in
+                             E_run(f,E_var arg,gensym())) in
                         (((f,t)::ecs,efs), gs,    ts,    (((P_var x,v),with_file _loc)::ds)) )
 # 3625 "src/Eclat/frontend/parser.ml"
      : (((Ast.x * (Types.ty * bool)) list *

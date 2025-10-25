@@ -12,6 +12,8 @@ let prefix id e =
       E_reg((p,tyB,ren_e e1),ren_e e0,prefix_str^l)
   | E_exec(e1,e2,e3,l) ->
       E_exec(ren_e e1,ren_e e2,Option.map ren_e e3,prefix_str^l)
+  | E_run(f,e0,l) ->
+      E_run(f,ren_e e0,prefix_str^l)
   | e -> Ast_mapper.map ren_e e
   in
   ren_e e
@@ -118,9 +120,9 @@ let subst_e x ex e =
         let e1' = ss (0::id) e1 in
         let e2' = ss (1::id) e2 in
         E_set(e1', e2')
-    | E_run(i,e1) ->
+    | E_run(i,e1,l) ->
         let e1' = ss (0::id) e1 in
-        E_run(i, e1')
+        E_run(i, e1',l)
     | E_pause e1 -> 
         let e1' = ss (0::id) e1 in
         E_pause e1'

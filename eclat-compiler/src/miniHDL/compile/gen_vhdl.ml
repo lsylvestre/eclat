@@ -29,6 +29,8 @@ let rec pp_s externals ~st fmt = function
     Option.iter (fun s ->
       fprintf fmt "@[<v 2>when others =>@,%a@]@," (pp_s externals ~st) s) so;
     fprintf fmt "@]end case;";
+| S_set(x,((A_call(Runtime(((Print|Print_string|Print_int|Print_newline))),_)) as a))->
+   fprintf fmt "%a;@," (pp_a externals) a
 | S_set(x,a) -> fprintf fmt "@[<v>%a := %a;@]" pp_ident x (pp_a externals) a
 | S_acquire_lock(l) ->
       fprintf fmt
@@ -97,18 +99,18 @@ let rec pp_s externals ~st fmt = function
       (pp_a externals) a
 | S_call(op,a) ->
    fprintf fmt "%a;@," (pp_call externals) (Runtime(op),a)
-| S_external_run(f,id,res,rdy,a) ->
-   fprintf fmt "%a := %s_result_%d(0 to %s_result_%d'length - 2);@,"
+| S_external_run(f,l,res,rdy,a) ->
+   fprintf fmt "%a := %s_result_%a(0 to %s_result_%a'length - 2);@,"
           pp_ident res
-          f id 
-          f id;
-   fprintf fmt "%a := %s_result_%d(%s_result_%d'length - 1 to %s_result_%d'length - 1);@,"
+          f pp_ident l
+          f pp_ident l;
+   fprintf fmt "%a := %s_result_%a(%s_result_%a'length - 1 to %s_result_%a'length - 1);@,"
           pp_ident rdy
-          f id 
-          f id 
-          f id;
-   fprintf fmt "%s_argument_%d_var := \"1\" & %a;@,"
-          f id
+          f pp_ident l 
+          f pp_ident l 
+          f pp_ident l;
+   fprintf fmt "%s_argument_%a_var := \"1\" & %a;@,"
+          f pp_ident l
           (pp_a externals) a
 
 
@@ -266,6 +268,9 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
   if !intel_xilinx_target then ( (* attribute for enforcing RAM inference in Xilinx Vivado *)
     fprintf fmt "attribute ram_style : string;@,"
   );
+  if !has_init_file_ram <> [] then ( (* attribute for enforcing RAM inference in Xilinx Vivado *)
+    fprintf fmt "attribute ram_init_file : string;@,"
+  );
 
   declare_machine fmt ~state_var ~idle ~infos (ts,s);
 
@@ -407,9 +412,10 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
   (* *************** *)
   let sensibility_external fmt (n,(_,shared)) =    
     let instances = match Hashtbl.find_opt Count_externals.external_count n with
-             | None ->  Count_externals.IMap.empty  | Some v -> v in
-      Count_externals.IMap.iter (fun i () ->
-        fprintf fmt ", %s_result_%d" n i
+                    | None ->  Count_externals.SMap.empty
+                    | Some v -> v in
+      Count_externals.SMap.iter (fun l () ->
+        fprintf fmt ", %s_result_%a" n pp_ident l
       ) instances
     in    
     List.iter (sensibility_external fmt) (fst externals);
@@ -437,6 +443,20 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
   
 
   fprintf fmt "@]@,@[<v 2>begin@,";
+
+
+
+
+
+  List.iter (fun (x,st) ->
+    match st with
+    | Static_array_of _
+    | Static_array _ ->
+        fprintf fmt "%a <= '0';@," pp_ident ("$"^x^"_write_request");
+        fprintf fmt "%a <= 0;@," pp_ident ("$"^x^"_ptr_write");
+        fprintf fmt "%a <= 0;@," pp_ident ("$"^x^"_ptr");
+        fprintf fmt "%a <= (others => '0');@," pp_ident ("$"^x^"_write")
+    ) statics;
 
   List.iter (variable_init_go_external fmt) (fst externals);
 

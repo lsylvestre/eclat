@@ -221,7 +221,7 @@ let pp_exp (fmt:fmt) (e:e) : unit =
       fprintf fmt "%a %a" (pp_e ~paren:true) 
                             (E_fun(p,(Types.Ty_base tyB1,tyB2),e1))
                           (pp_e ~paren:true) e2
-  | E_run(i,e) ->
+  | E_run(i,e,_) ->
       fprintf fmt "run %s(%a)" i (pp_e ~paren:false) e
   | E_pause e -> fprintf fmt "pause %a"  (pp_e ~paren:true) e
   | E_equations(p,eqs) ->

@@ -2,15 +2,15 @@ open MiniHDL_syntax
 
 (** collect the names of external functions called within a MiniHDL program *)
 
-module IMap = Map.Make(Int)
+module SMap = Map.Make(String)
 
-let external_count : (x, unit IMap.t) Hashtbl.t = Hashtbl.create 8
+let external_count : (x, unit SMap.t) Hashtbl.t = Hashtbl.create 8
 
-let add (x:string) id =
+let add (x:string) l =
   let s =  match Hashtbl.find_opt external_count x with 
-           | None -> IMap.empty
+           | None -> SMap.empty
            | Some s -> s in 
-  Hashtbl.add external_count x (IMap.add id () s)
+  Hashtbl.add external_count x (SMap.add l () s)
 
 let rec count_s s =
   match s with
@@ -36,8 +36,8 @@ let rec count_s s =
       count_s s
   | S_call _ ->
       ()
-  | S_external_run(f,id,_,_,_) ->
-      add f id
+  | S_external_run(f,l,_,_,_) ->
+      add f l
 
 let count_externals_fsm (ts,s) =
   Hashtbl.clear external_count;

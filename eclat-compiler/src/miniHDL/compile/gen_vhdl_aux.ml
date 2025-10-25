@@ -280,10 +280,10 @@ let print_external fmt (n,(ty,shared)) =
   | _ -> assert false
   in
   let instances = match Hashtbl.find_opt Count_externals.external_count n with
-                  | None -> Count_externals.IMap.empty | Some v -> v in
-  Count_externals.IMap.iter (fun i () ->
-      fprintf fmt "signal %s_argument_%d : std_logic_vector(0 to %d) := (others => '0');\n" n i arg;
-      fprintf fmt "signal %s_result_%d : std_logic_vector(0 to %d) := (others => '0');\n" n i ret
+                  | None -> Count_externals.SMap.empty | Some v -> v in
+  Count_externals.SMap.iter (fun l () ->
+      fprintf fmt "signal %s_argument_%a : std_logic_vector(0 to %d) := (others => '0');\n" n pp_ident l arg;
+      fprintf fmt "signal %s_result_%a : std_logic_vector(0 to %d) := (others => '0');\n" n pp_ident l ret
     ) instances;
 
   fprintf fmt "@[<v 2>component %s is@, port(@[" n;
@@ -296,14 +296,14 @@ let print_external fmt (n,(ty,shared)) =
 
 let instantiate_external fmt (n,(_,shared)) =    
   let instances = match Hashtbl.find_opt Count_externals.external_count n with
-                  | None -> Count_externals.IMap.empty
+                  | None -> Count_externals.SMap.empty
                   | Some v -> v in
-  Count_externals.IMap.iter (fun i () ->
-    fprintf fmt "@[%s_cc_%d : component %s port map (@[" n i n;
+  Count_externals.SMap.iter (fun l () ->
+    fprintf fmt "@[%s_cc_%a : component %s port map (@[" n pp_ident l n;
     fprintf fmt "clk => clk,@,";
     fprintf fmt "reset => reset,@,";
-    fprintf fmt "argument => %s_argument_%d,@," n i;
-    fprintf fmt "result => %s_result_%d@," n i;
+    fprintf fmt "argument => %s_argument_%a,@," n pp_ident l;
+    fprintf fmt "result => %s_result_%a@," n pp_ident l;
     fprintf fmt ");@]@,@]"
   ) instances
 
@@ -316,19 +316,19 @@ let variable_decl_go_external fmt (n,(ty,_)) =
   | _ -> assert false
   in  
   let instances = match Hashtbl.find_opt Count_externals.external_count n with
-                  | None ->  Count_externals.IMap.empty
+                  | None -> Count_externals.SMap.empty
                   | Some v -> v in
-  Count_externals.IMap.iter (fun i () ->
-    fprintf fmt "variable %s_argument_%d_var : std_logic_vector(0 to %d);@," 
-      n i (size_ty ty_arg);
+  Count_externals.SMap.iter (fun l () ->
+    fprintf fmt "variable %s_argument_%a_var : std_logic_vector(0 to %d);@," 
+      n pp_ident l (size_ty ty_arg);
   ) instances
 
 let variable_init_go_external fmt (n,_) =    
   let instances = match Hashtbl.find_opt Count_externals.external_count n with
-                  | None ->  Count_externals.IMap.empty
+                  | None ->  Count_externals.SMap.empty
                   | Some v -> v in
-  Count_externals.IMap.iter (fun i () ->
-    fprintf fmt "%s_argument_%d_var := (others => '0');@," n i;
+  Count_externals.SMap.iter (fun l () ->
+    fprintf fmt "%s_argument_%a_var := (others => '0');@," n pp_ident l;
     (* fprintf fmt "restart_%s_%d := \"0\";@," n i; *)
   ) instances
 
@@ -340,11 +340,11 @@ let variable_init_go_external fmt (n,_) =
 
 let variable_set_go_external fmt (n,_) =    
   let instances = match Hashtbl.find_opt Count_externals.external_count n with
-                  | None ->  Count_externals.IMap.empty
+                  | None ->  Count_externals.SMap.empty
                   | Some v -> v in
-  Count_externals.IMap.iter (fun i () ->
+  Count_externals.SMap.iter (fun l () ->
     (* fprintf fmt "%s_argument_%d(0 to 0) <= restart_%s_%d;@," n i n i; *)
-    fprintf fmt "%s_argument_%d <= %s_argument_%d_var;@," n i n i
+    fprintf fmt "%s_argument_%a <= %s_argument_%a_var;@," n pp_ident l n pp_ident l
   ) instances
 
 
