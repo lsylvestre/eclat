@@ -448,6 +448,20 @@ let rec to_s ~is_zero ~statics ~externals ~sums gs e x k =
                                      (S_continue q1))) in
           (SMap.empty, SMap.add q_wait s' ts, s')
       )
+
+  | E_array_get_start(y,idx) ->
+      let a = to_a ~externals ~sums idx in
+      let s = (* let_plug_s (A_ptr_taken(y)) @@ fun z ->
+                S_if(z, S_skip, Some(S_read_start(y,a))) *) seq_ (S_acquire_lock(y)) (S_read_start(y,a)) in
+      (SMap.empty, SMap.empty, return_ s)
+  | E_array_get_end(y) ->
+      let s = seq_ (S_release_lock(y)) (S_read_stop(x,y)) in
+      (SMap.empty, SMap.empty, return_ s)
+  | E_array_set_immediate(y,idx,e_upd) ->
+      let a = to_a ~externals ~sums idx in
+      let a_upd = to_a ~externals ~sums e_upd in
+      let s = S_write_start(y,a,a_upd) in
+      (SMap.empty, SMap.empty, return_ s)
   | E_reg((p,_,e1),e0,l) ->
       let y = match p with
               | P_var y -> y 
@@ -702,7 +716,7 @@ let rec to_s ~is_zero ~statics ~externals ~sums gs e x k =
 
 and compile ?(result=(Ast.gensym ~prefix:"result" ())) ~is_zero pi =
   let open Ast in
-
+  
   let statics = pi.statics in
   let externals = pi.externals in
   let sums = pi.sums in
@@ -710,10 +724,15 @@ and compile ?(result=(Ast.gensym ~prefix:"result" ())) ~is_zero pi =
   let rdy = gensym ~prefix:"rdy" () in
   let idle = gensym ~prefix:"idle" () in
 
+  let e = pi.main in
+  let xs = List.map fst @@ SMap.bindings @@ Free_vars.fv ~get_arrays:false pi.main in
+  let ys,zs = List.split @@ (List.map (fun x -> x,Ast_rename.rename_ident ~statics:(List.map fst pi.statics) x) xs) in
+  let py,pz = let f xs = group_ps @@ List.map (fun x -> P_var x) xs in (f ys, f zs) in
+  let e_ren = Ast_subst.subst_p_e py (Pattern.pat2exp pz) e in
+  
   let k = seq_ (set_ rdy (A_const (Bool true))) (S_continue idle) in
-  let w0,ts0,s0 = to_s ~is_zero ~statics ~externals ~sums [idle] pi.main x k in
-
- (* show idle w0; *)
+  let w0,ts0,s0 = to_s ~is_zero ~statics ~externals ~sums [idle] e_ren x k in
+  let s0 = List.fold_left2 (fun s y z -> seq_ (set_ z (A_var y)) s) s0 ys zs in
 
   let wmain = SMap.add idle IMap.empty w0 in
   let s' = match insert_kont ~is_zero wmain ~idle ~x s0 with Some s -> s | None -> s0 in

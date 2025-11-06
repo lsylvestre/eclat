@@ -166,6 +166,17 @@ let rec anf (e:e) : e =
       plug e1' @@ fun xc1 ->
       plug e2' @@ fun xc2 ->
       E_array_set(x,xc1,xc2)
+  | E_array_get_start(x,e1) ->
+      let e1' = glob e1 in
+      plug e1' @@ fun xc1 ->
+          E_array_get_start(x,xc1)
+  | E_array_get_end(x) as e -> e
+  | E_array_set_immediate(x,e1,e2) ->
+      let e1' = glob e1 in
+      let e2' = glob e2 in
+      plug e1' @@ fun xc1 ->
+      plug e2' @@ fun xc2 ->
+      E_array_set_immediate(x,xc1,xc2)
   | E_par(es) ->
       E_par(List.map anf es)
   (*| E_absLabel(l,e1) ->

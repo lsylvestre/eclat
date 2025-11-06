@@ -100,7 +100,7 @@ let rec expand ~statics e =
             let x = gensym () in
             let ii = E_const(Int(i,Types.new_size_unknown())) in
             E_letIn(P_var x, Types.new_ty_unknown(),E_letIn(P_var z,Types.new_ty_unknown(),
-                                  E_app(E_const(Op(Runtime (External_fun("Vect.nth",Types.new_ty_unknown())))),
+                                  E_app(E_const(Op(Runtime (Vector_get(Types.new_tyB_unknown())))),
                                   E_tuple[E_var y;ii]),
                               Ast_subst.subst_p_e p (E_tuple[ii;E_var z]) (Ast_rename.rename_e ~statics:(List.map fst statics) e1')),
             loop (x::xs) (i+1)) in loop [] 0)

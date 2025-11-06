@@ -15,7 +15,7 @@ let normalize (pi:pi) : pi =
   let pi = Instantiate.instantiate_pi pi in
   display_pi Lambda_lifting pi;
   let pi = Monomorphize.monomorphize pi in
-
+  display_pi Specialize pi;
   (** renaming all bindings in the source program *)
   let pi = Ast_rename.rename_pi pi in
   (** enforce each recursive function [fix f (fun p -> e)] is bound to the name [f]

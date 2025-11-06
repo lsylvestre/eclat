@@ -555,24 +555,34 @@ package body vect is
     begin
       return t(to_unsigned(sa/(sr-16),16))&zero;
     end function;
+  
+  -- 'a vect<'N> * int<16> => 'a
   function nth (sa,sr : integer; arg1: t; arg2 : t) return t is
     constant i : natural := to_integer(unsigned(arg2));
     variable r : t(0 to sr-1);
-    variable u : t(0 to sa - 16 - 1) := t(arg1);    -- needed because, with GHDL, depending on the caller, arg1 is an array that does not start by 0 
+    variable u : t(0 to sa - 16 - 1); 
     begin
+      u := t(arg1); -- needed because, with GHDL, depending on the caller, arg1 is an array that does not start by 0 
       for j in 0 to sr - 1 loop
         r(j) := u(sr * i + j);
       end loop;
       return t(r);
     end function;
+  
+  -- 'a vect<'N> * int<16> * 'a => 'a vect<'N>
   function copy_with (sa,sr : integer; arg1: t;arg2 : t; arg3 : t) return t is
     constant size_elem : integer := arg3'length;
     constant i : natural := to_integer(unsigned(arg2));
     variable r : t(0 to arg1'length - 1) := arg1; 
     begin
-      r(size_elem * i to size_elem * i + size_elem - 1) := arg3;
+      for j in 0 to sr/size_elem - 1 loop
+        if i = j then
+           -- note: synthetizer 
+           r(size_elem * j to size_elem * j + size_elem - 1) := arg3;
+        end if;
+      end loop;
       return r;
-    end function;
+  end function;
 end vect;
 
 

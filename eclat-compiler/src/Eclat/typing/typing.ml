@@ -600,7 +600,27 @@ let rec typ_exp ?(collect_sig=false) ~statics ~externals ~sums ~ctors ?(toplevel
     unify_ty ~loc ty2 (Ty_base tyB);
     unify_ty ~loc (Ty_array(new_size_unknown(),tyB)) tyx;
     (Ty_base TyB_unit, dur_add (Dur_max(d1,d2)) Dur_one)
-
+  | E_array_get_start(x,e1) ->
+    let ty1,d = typ_exp ~collect_sig ~statics ~externals ~sums ~ctors ~toplevel:false ~loc g e1 in
+    unify_ty ~loc ty1 (Ty_base (TyB_int (new_size_unknown ())));
+    let tyx = typ_ident ~loc g x in
+    let tyB = new_tyB_unknown () in
+    unify_ty ~loc (Ty_array(new_size_unknown(),tyB)) tyx;
+    (Ty_base TyB_unit, d)
+  | E_array_get_end(x) ->
+      let tyx = typ_ident ~loc g x in
+      let tyB = new_tyB_unknown () in
+      unify_ty ~loc (Ty_array(new_size_unknown(),tyB)) tyx;
+      (Ty_base tyB, Dur_zero)
+  | E_array_set_immediate(x,e1,e2) ->
+    let ty1,d1 = typ_exp ~collect_sig ~statics ~externals ~sums ~ctors ~toplevel:false ~loc g e1 in
+    let ty2,d2 = typ_exp ~collect_sig ~statics ~externals ~sums ~ctors ~toplevel:false ~loc g e2 in
+    unify_ty ~loc ty1 (Ty_base (TyB_int (new_size_unknown ())));
+    let tyx = typ_ident ~loc g x in
+    let tyB = new_tyB_unknown () in
+    unify_ty ~loc ty2 (Ty_base tyB);
+    unify_ty ~loc (Ty_array(new_size_unknown(),tyB)) tyx;
+    (Ty_base TyB_unit, (Dur_max(d1,d2)))
   | E_for(x,e_st1,e_st2,e3,_) ->
     let  vsize1 = new_size_unknown() in
       let  vsize2 = new_size_unknown() in

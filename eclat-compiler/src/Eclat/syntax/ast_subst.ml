@@ -53,6 +53,15 @@ let subst_e x ex e =
     | E_array_set(y, e1, e2) ->
         let z = if x <> y then y else as_ident ex in
         E_array_set(z, ss e1, ss e2)
+    | E_array_get_start(y, e1) ->
+        let z = if x <> y then y else as_ident ex in
+        E_array_get_start(z, ss e1)
+    | E_array_get_end(y) ->
+        let z = if x <> y then y else as_ident ex in
+        E_array_get_end(z)
+    | E_array_set_immediate(y, e1, e2) ->
+        let z = if x <> y then y else as_ident ex in
+        E_array_set_immediate(z, ss e1, ss e2)   
     | E_for(y, e_st1, e_st2, e3, loc) ->
        E_for(y,ss e_st1,ss e_st2,
              (if x = y then e3 else ss e3),loc)

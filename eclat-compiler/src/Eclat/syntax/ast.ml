@@ -57,7 +57,9 @@ type e =                      (** expression     [e]                       *)
   | E_array_get of x * e      (** static array access        [x.(e)]      *)
   | E_array_length of x       (** static array length access [x.length]   *)
   | E_array_set of x * e * e  (** static array assignment    [x.(e) <- e] *)
-
+  | E_array_get_start of x * e
+  | E_array_get_end of x
+  | E_array_set_immediate of x * e * e
   | E_ref of e
   | E_get of e
   | E_set of e * e

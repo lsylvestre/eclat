@@ -72,7 +72,7 @@ let const_zero nbits =
   let bits_in_hexa = nbits / 4 in
     let bits_in_binary = nbits mod 4 in
     let make ?(hexa=false) n =
-      "\""^(String.make n '0')^"\""
+      try ("\""^(String.make n '0')^"\"") with _ -> assert false
     in
     match bits_in_binary,bits_in_hexa  with
     | 0,n -> "X"^make n
@@ -97,6 +97,8 @@ let decl_locks ?(init=false) fmt x =
   (* if !single_read_write_lock_flag then *)
     fprintf fmt "variable %a : value(0 to 0)%s;@," pp_ident (ptr_taken x)
       (if init then " := (others => '0')" else "")
+
+
 (* ******************************** *)
 
 let pp_tuple fmt pp vs =
@@ -115,11 +117,12 @@ let rec pp_c fmt c =
       let n = abs n in
       let sz = size_ty tsize in
       if is_neg then fprintf fmt "eclat_neg(";
-      if sz < 16 then
+      if true (* sz < 16 *) then
         fprintf fmt "\"%s\"" (int2bin ~int_size:sz n)
       else
         (let v = Printf.sprintf "%x" n in (* dislay in hexa directly *)
          let l_pad = sz - String.length v * 4 in
+           Printf.printf "=====>--%d. / %s.  %d\n" l_pad v sz;
          if l_pad = 0 then fprintf fmt "X\"%s\"" v else
          fprintf fmt "%s & X\"%s\"" (const_zero l_pad) v);
       if is_neg then fprintf fmt ")";
@@ -199,15 +202,15 @@ and pp_call externals fmt (op,a) =
  | Runtime(Vector_create sz) ->
       let n = size_ty @@ MiniHDL_typing.translate_size sz in
       fprintf fmt "eclat_vector_make(%d,%a)" n (pp_a externals) a
- (* | Runtime(Vector_length (sz,sz_res)) ->
+  | Runtime(Vector_length (sz)) ->
       (match Types.canon_size sz with
-      | Sz_lit n -> pp_c fmt (Int {value=n;tsize=(MiniHDL_typing.translate_size sz_res)})
+      | Sz_lit n -> pp_c fmt (Int {value=n;tsize=(MiniHDL_typing.translate_size (Sz_lit 16))})
       | _ -> Types.pp_size Format.std_formatter (Types.canon_size sz); assert false)
    | Runtime(Vector_get t) ->
       fprintf fmt "eclat_vector_get(%a,%d)" (pp_a externals) a (size_ty MiniHDL_typing.(translate_tyB t))
-   | Runtime(Vector_update t) ->
-      fprintf fmt "eclat_vector_update(%a,%d)" (pp_a externals) a (size_ty MiniHDL_typing.(translate_size t))
- *)
+   | Runtime(Vector_update(t,sz)) ->
+      fprintf fmt "eclat_vector_update(%a,%d)" (pp_a externals) a (size_ty MiniHDL_typing.(translate_size sz))
+ 
   | Runtime(External_fun (x,ty)) ->
       let annot_with_sizes,arity = match List.assoc_opt x (snd externals) with
                                    | Some (_,(b,n,_)) -> (b,n)
@@ -385,7 +388,7 @@ let array_decl fmt x sz_elem n default_value_pp =
   if List.mem x !has_init_file_ram then fprintf fmt "attribute ram_init_file of %s : signal is \"%s.mif\";@," x x;
 
   fprintf fmt "signal %a : value(0 to %d) := (others => '0');@," pp_ident ("$"^x^"_value") (sz_elem - 1);
-  fprintf fmt "signal %a : natural range 0 to %d := 0;@," pp_ident ("$"^x^"_ptr") (n - 1);
-  fprintf fmt "signal %a : natural range 0 to %d := 0;@," pp_ident ("$"^x^"_ptr_write") (n - 1);
-  fprintf fmt "signal %a : value(0 to %d) := (others => '0');@," pp_ident ("$"^x^"_write") (sz_elem - 1);
-  fprintf fmt "signal %a : std_logic := '0';@," pp_ident ("$"^x^"_write_request")
+  fprintf fmt "signal %a, %a : natural range 0 to %d := 0;@," pp_ident ("$"^x^"_ptr") pp_ident ("$"^x^"_ptr%pre") (n - 1);
+  fprintf fmt "signal %a, %a : natural range 0 to %d := 0;@," pp_ident ("$"^x^"_ptr_write") pp_ident ("$"^x^"_ptr_write%pre") (n - 1);
+  fprintf fmt "signal %a, %a : value(0 to %d) := (others => '0');@," pp_ident ("$"^x^"_write") pp_ident ("$"^x^"_write%pre") (sz_elem - 1);
+  fprintf fmt "signal %a, %a : std_logic := '0';@," pp_ident ("$"^x^"_write_request") pp_ident ("$"^x^"_write_request%pre")

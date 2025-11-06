@@ -1,4 +1,4 @@
-let one_hot_encoding_flag = ref false
+let one_hot_encoding_flag = ref true
 
 
 type x = string

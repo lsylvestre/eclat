@@ -18,9 +18,9 @@ type op =
 
   | Vector_create of Types.size
 
-(*  | Vector_length of Types.size * Types.size  (* size * size_int *)
+  | Vector_length of Types.size
   | Vector_get of Types.tyB
-  | Vector_update of Types.size*)
+  | Vector_update of Types.tyB * Types.size
 
   (* for simulation only *)
   | Print | Print_string | Print_int | Print_newline | Assert
@@ -86,20 +86,18 @@ let ty_op ~externals op =
   | Vector_create sz ->
       let v = new_tyB_unknown() in
       Ty_fun(Ty_base (v),Dur_zero,vect_ sz v)
- (* | Vector_length (sz,sz_res) ->
+  | Vector_length (sz) ->
       let v = new_tyB_unknown() in
-      let sz_int = sz_res in
-      Ty_fun(Ty_base(vect_ sz v),Dur_zero,TyB_int sz_int)
+      Ty_fun(Ty_base(vect_ sz v),Dur_zero,TyB_int (Sz_lit 16))
   | Vector_get v ->
       let sz = new_size_unknown() in
       Ty_fun(Ty_base (TyB_tuple[vect_ sz v;
-                                TyB_int (Sz_lit 32)]),Dur_zero,v)
-  | Vector_update sz ->
-      let v = new_tyB_unknown() in
-      let t = vect_ sz v in
-      Ty_fun(Ty_base (TyB_tuple[t;TyB_int (Sz_lit 32);v]),Dur_zero,t) *)
-  | Size_of_val _ ->
-      Ty_fun(new_ty_unknown(),Dur_zero,TyB_int (new_size_unknown()))
+                                TyB_int (Sz_lit 16)]),Dur_zero,v)
+  | Vector_update (tyB,sz) ->
+      let t = vect_ sz tyB in
+      Ty_fun(Ty_base (TyB_tuple[t;TyB_int (Sz_lit 16);tyB]),Dur_zero,t)
+  | Size_of_val(ty,_) ->
+      Ty_fun(ty,Dur_zero,TyB_int (new_size_unknown()))
   | String_length ->
       (* enforce result to be a 16-bit integer *)
       let sz = new_size_unknown() in
@@ -162,13 +160,13 @@ let gen_op fmt (op:op) pp a : unit =
       funcall fmt "eclat_updateBit"
   | Unroll _ -> assert false (* should be eliminated before *)
   | Vector_create _ ->
-      assert false (* special case *)  
-  (*| Vector_length _ -> 
+      assert false (* special case *)
+  | Vector_length _ -> 
       assert false (* special case *)
   | Vector_get _ ->
      assert false (* special case *)
   | Vector_update _ ->
-      assert false (* special case *)*)
+      assert false (* special case *)
   | Size_of_val _ ->
       assert false (* special case *)
   | Print ->

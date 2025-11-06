@@ -91,6 +91,8 @@ type token =
   | IDENT of (string)
   | HAT
   | GT
+  | GET_START
+  | GET_END
   | GET
   | GE
   | FUN

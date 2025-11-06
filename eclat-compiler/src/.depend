@@ -6,8 +6,10 @@ src/Eclat/compile/backend/gen_miniHDL.cmo : \
     src/miniHDL/miniHDL_typing.cmo \
     src/miniHDL/miniHDL_syntax.cmo \
     src/Eclat/compile/instantaneous.cmo \
+    src/Eclat/syntax/free_vars.cmo \
     src/miniHDL/compile/flag_mealy.cmo \
     src/Eclat/syntax/ast_subst.cmo \
+    src/Eclat/syntax/ast_rename.cmo \
     src/Eclat/syntax/ast_pprint.cmo \
     src/Eclat/syntax/ast.cmo
 src/Eclat/compile/backend/gen_miniHDL.cmx : \
@@ -18,8 +20,10 @@ src/Eclat/compile/backend/gen_miniHDL.cmx : \
     src/miniHDL/miniHDL_typing.cmx \
     src/miniHDL/miniHDL_syntax.cmx \
     src/Eclat/compile/instantaneous.cmx \
+    src/Eclat/syntax/free_vars.cmx \
     src/miniHDL/compile/flag_mealy.cmx \
     src/Eclat/syntax/ast_subst.cmx \
+    src/Eclat/syntax/ast_rename.cmx \
     src/Eclat/syntax/ast_pprint.cmx \
     src/Eclat/syntax/ast.cmx
 src/Eclat/compile/backend/naming_convention.cmo :
@@ -232,11 +236,13 @@ src/Eclat/compile/middle_end/normalize/lustre_scheduling.cmx : \
     src/Eclat/syntax/ast.cmx
 src/Eclat/compile/middle_end/normalize/move_down_gfun_under_exec_and_par.cmo : \
     src/Eclat/typing/types.cmo \
+    src/Eclat/syntax/free_vars.cmo \
     src/Eclat/syntax/ast_subst.cmo \
     src/Eclat/syntax/ast_mapper.cmo \
     src/Eclat/syntax/ast.cmo
 src/Eclat/compile/middle_end/normalize/move_down_gfun_under_exec_and_par.cmx : \
     src/Eclat/typing/types.cmx \
+    src/Eclat/syntax/free_vars.cmx \
     src/Eclat/syntax/ast_subst.cmx \
     src/Eclat/syntax/ast_mapper.cmx \
     src/Eclat/syntax/ast.cmx

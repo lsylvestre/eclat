@@ -53,7 +53,10 @@ let rec combinational ~externals (e:e) : bool =
 	| E_array_create _ ->
       false
 	| E_array_get _
-	| E_array_set _ ->
+	| E_array_set _ 
+	| E_array_get_start _ 
+	| E_array_get_end _
+	| E_array_set_immediate _ ->
 	    false (* side effect *)
 	| E_for(_,e_st1,e_st2,e3,_) ->
 	   combinational ~externals e_st1 && combinational ~externals e_st2 && combinational ~externals e3
@@ -108,7 +111,10 @@ let rec instantaneous ~externals (e:e) : bool =
 	| E_array_create _ ->
       false
 	| E_array_get _
-	| E_array_set _ ->
+	| E_array_set _ 
+	| E_array_get_start _ 
+	| E_array_get_end _
+	| E_array_set_immediate _ ->
 	    false (* side effect *)
 	| E_for(_,e_st1,e_st2,e3,_) ->
 	   instantaneous ~externals e_st1 && instantaneous ~externals e_st2 && instantaneous ~externals e3

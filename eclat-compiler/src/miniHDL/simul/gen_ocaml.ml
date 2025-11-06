@@ -234,13 +234,13 @@ let rec pp_s typing_env externals ~st fmt = function
  | S_release_lock l ->
       fprintf fmt "@[Lock.release(%a)@]" 
         pp_ident (ptr_taken l)
-| S_read_start(x,idx) -> 
+  | S_read_start(x,idx) -> 
       (* todo: avoid code duplication between S_setptr & S_setptr_write *)
       fprintf fmt "@[%a_value := %a.(Int64.to_int (%a))@]" 
         pp_ident x 
         pp_ident x 
         (pp_a typing_env externals) idx;
-| S_read_stop(x,l) ->
+  | S_read_stop(x,l) ->
         fprintf fmt "@[%a := !%a@]" 
             pp_ident x
             pp_ident (l^"_value") 

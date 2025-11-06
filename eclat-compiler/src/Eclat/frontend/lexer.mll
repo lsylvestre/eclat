@@ -69,6 +69,8 @@
        "set", SET;
        "create", CREATE;
        "length", LENGTH;
+       "get_start", GET_START;
+       "get_end", GET_END;
        "size_create", SIZE_CREATE;
        "vect_mapi", VECTOR_MAPI;
        "int_mapi", INT_MAPI;

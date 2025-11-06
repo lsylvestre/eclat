@@ -80,6 +80,18 @@ let fv ?(get_arrays=true) ?(xs=SMap.empty) e =
       if get_arrays 
       then fv_var xs x ++ vs 
       else vs
+  | E_array_get_start(x,e1) ->
+      let vs = aux xs e1 in
+      if get_arrays 
+      then fv_var xs x ++ vs 
+      else vs
+  | E_array_get_end _ ->
+      SMap.empty
+  | E_array_set_immediate(x,e1,e2) ->
+      let vs = aux xs e1 ++ aux xs e2 in
+      if get_arrays 
+      then fv_var xs x ++ vs 
+      else vs
   | E_par(es) ->
       fv_list xs es
   | E_for(i,e_st1,e_st2,e,_) ->
@@ -185,7 +197,15 @@ let fv_arrays ?(xs=SMap.empty) e =
       SMap.add x () vs 
   | E_array_set(x,e1,e2) ->
       let vs = aux xs e1 ++ aux xs e2 in
-      SMap.add x () vs 
+      SMap.add x () vs
+  | E_array_get_start(x,e1) ->
+      let vs = aux xs e1 in
+      SMap.add x () vs
+  | E_array_get_end _ ->
+      SMap.empty
+  | E_array_set_immediate(x,e1,e2) ->
+      let vs = aux xs e1 ++ aux xs e2 in
+      SMap.add x () vs
   | E_par(es) ->
       fv_list xs es
   | E_for(i,e_st1,e_st2,e,_) ->

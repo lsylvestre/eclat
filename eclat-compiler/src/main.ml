@@ -95,7 +95,7 @@ let () =
                  "allow the main function to be non-instantaneous (such program is no longer reactive!)");
     
     ("-one-hot",   Arg.Set Types.one_hot_encoding_flag, "encodes sum types using one-hot encoding");
-
+    ("-no-one-hot",   Arg.Clear Types.one_hot_encoding_flag, "disable -one-hot option");
     ("-noassert",   Arg.Set Operators.flag_no_assert, "remove assertion after typing");
     ("-noprint",   Arg.Set Operators.flag_no_print, "remove printing primitives after typing");
 

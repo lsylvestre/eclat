@@ -224,7 +224,7 @@ let declare_variable ~argument ~statics typing_env fmt =
 
 (* code generator for the whole design *)
 let pp_component fmt ~vhdl_comment ~name ~externals ~state_var ~argument ~result ~idle ~rdy ~statics typing_env infos (ts,s) =
-
+   
   let arty = List.fold_left (fun arty (_,g) ->
       match g with
       | Static_array_of ty -> 
@@ -321,8 +321,6 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
   (* instantiate externals *)
   List.iter (instantiate_external fmt) (fst externals);
 
-
-
   List.iter (fun (x,st) ->
     match st with
     | Static_array_of _
@@ -394,6 +392,17 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
        pp_ident (state_var^"%now")
        pp_ident (state_var^"%next");
 
+  List.iter (fun (x,st) ->
+    match st with
+    | Static_array_of _
+    | Static_array _ ->
+        fprintf fmt "%a <= %a;@," pp_ident ("$"^x^"_write_request%pre") pp_ident ("$"^x^"_write_request");
+        fprintf fmt "%a <= %a;@," pp_ident ("$"^x^"_ptr_write%pre") pp_ident ("$"^x^"_ptr_write");
+        fprintf fmt "%a <= %a;@," pp_ident ("$"^x^"_ptr%pre") pp_ident ("$"^x^"_ptr");
+        fprintf fmt "%a <= %a;@," pp_ident ("$"^x^"_write%pre") pp_ident ("$"^x^"_write")
+    ) statics;
+
+
   fprintf fmt "@]@,end if;
     end process;@,@,@]";
 
@@ -403,11 +412,14 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
   List.iter (fun (_,(sv,_,_)) -> fprintf fmt ",%a" pp_ident (sv^"%now")) !List_machines.extra_machines;
 
   List.iter (fun (x,(Static_array_of _ | Static_array _)) ->
-      fprintf fmt ", %a"  pp_ident ("$"^x^"_value") 
+      fprintf fmt ", %a" pp_ident ("$"^x^"_value");
+      fprintf fmt ", %a" pp_ident ("$"^x^"_write_request%pre");
+      fprintf fmt ", %a" pp_ident ("$"^x^"_ptr_write%pre");
+      fprintf fmt ", %a" pp_ident ("$"^x^"_ptr%pre");
+      fprintf fmt ", %a" pp_ident ("$"^x^"_write%pre")
   ) statics;
 
   List.iter (fun (x,_) -> fprintf fmt ", %a" pp_ident (x^"%now")) variables;
-
 
   (* *************** *)
   let sensibility_external fmt (n,(_,shared)) =    
@@ -445,17 +457,14 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
   fprintf fmt "@]@,@[<v 2>begin@,";
 
 
-
-
-
   List.iter (fun (x,st) ->
     match st with
     | Static_array_of _
     | Static_array _ ->
-        fprintf fmt "%a <= '0';@," pp_ident ("$"^x^"_write_request");
-        fprintf fmt "%a <= 0;@," pp_ident ("$"^x^"_ptr_write");
-        fprintf fmt "%a <= 0;@," pp_ident ("$"^x^"_ptr");
-        fprintf fmt "%a <= (others => '0');@," pp_ident ("$"^x^"_write")
+        fprintf fmt "%a <= %a;@," pp_ident ("$"^x^"_write_request") pp_ident ("$"^x^"_write_request%pre");
+        fprintf fmt "%a <= %a;@," pp_ident ("$"^x^"_ptr_write") pp_ident ("$"^x^"_ptr_write%pre");
+        fprintf fmt "%a <= %a;@," pp_ident ("$"^x^"_ptr") pp_ident ("$"^x^"_ptr%pre");
+        fprintf fmt "%a <= %a;@," pp_ident ("$"^x^"_write") pp_ident ("$"^x^"_write%pre")
     ) statics;
 
   List.iter (variable_init_go_external fmt) (fst externals);
@@ -476,7 +485,6 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
      fprintf fmt "%a := %a;@," pp_ident sv pp_ident (sv^"%now");
   ) !List_machines.extra_machines;
 
-
   (* fprintf fmt "@,rdy <= \"1\";"; 
   fprintf fmt "@,%a := \"0\";@," pp_ident rdy;*)
   (* fprintf fmt "%a <= %a;@," pp_ident state_var pp_ident idle; *)
@@ -487,6 +495,7 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
   pp_fsm externals fmt ~state_var ~idle ~rdy ("main",ts,s);
 
   fprintf fmt "%a <= %a;@," pp_ident (state_var^"%next") pp_ident state_var;
+  
   List.iter (fun (_,(sv,_,_)) ->
      fprintf fmt "%a <= %a;@," pp_ident (sv^"%next") pp_ident sv;
   ) !List_machines.extra_machines;

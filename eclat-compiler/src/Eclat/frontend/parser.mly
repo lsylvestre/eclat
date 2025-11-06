@@ -83,7 +83,7 @@
 %token XOR LAND LOR LXOR LSL LSR ASR RESIZE_INT TUPLE_OF_INT INT_OF_TUPLE
 %token TUPLE_GET TUPLE_UPDATE
 %token UNROLL AT AT_AT
-%token GET SET LENGTH CREATE
+%token GET SET LENGTH CREATE GET_START GET_END
 %token SIZE_CREATE
 %token WITH_SIZES
 %token EXTERNAL OPERATOR SHARED RUN
@@ -551,6 +551,18 @@ app_exp_desc:
                | E_tuple[E_var x;e1;e2] -> E_array_set(x,e1,e2) 
                | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
                    ~msg:"... array set" () }
+| GET_START e=lexp { match Ast_undecorated.remove_deco e with 
+               | E_tuple[E_var x;e1] -> E_array_get_start(x,e1) 
+               | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
+                   ~msg:"... array set start" () }
+| GET_END e=lexp { match Ast_undecorated.remove_deco e with 
+                   | E_var x -> E_array_get_end(x) 
+                   | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
+                   ~msg:"... array set end" () }
+| IMMEDIATE SET e=lexp { match Ast_undecorated.remove_deco e with 
+               | E_tuple[E_var x;e1;e2] -> E_array_set_immediate(x,e1,e2) 
+               | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
+                   ~msg:"... array set" () }
 | x=IDENT LBRACKET e1=exp RBRACKET
 | x=IDENT DOT LPAREN e1=exp RPAREN
    { E_array_get(x,e1) }
@@ -682,13 +694,16 @@ aexp_desc:
             | "assert" -> E_const (Op(Runtime(Assert)))
             | "get_bit"| "nth_bit" -> E_const (Op(Runtime(GetBit)))
             | "update_bit" -> E_const (Op(Runtime(UpdateBit)))
-           (*  | "size_of_val" -> E_const (Op(Runtime(Size_of_val (unknown(),unknown())))) *)
+            | "size_of_val" -> E_const (Op(Runtime(Size_of_val (Types.new_ty_unknown(),Types.new_size_unknown()))))
             | "get" -> let x = gensym () in let y = gensym () in
                        E_fun(P_tuple[P_var x;P_var y], (Types.new_ty_unknown(),Types.new_tyB_unknown()), 
                           E_array_get(x,E_var y))
             | "bvect_of_int" -> E_const (Op(Runtime(Bvect_of_int)))
             | "int_of_bvect" -> E_const (Op(Runtime(Int_of_bvect)))
-            | "_" -> Prelude.Errors.raise_error ~loc:(with_file $loc)
+            (* | "vect_size" -> E_const (Op(Runtime(Vector_length (Types.new_size_unknown()))))
+            | "vect_nth" -> E_const (Op(Runtime(Vector_get (Types.new_tyB_unknown()))))
+            | "vect_copy_with" -> E_const (Op(Runtime(Vector_update (Types.new_tyB_unknown(),Types.new_size_unknown()))))
+            *)| "_" -> Prelude.Errors.raise_error ~loc:(with_file $loc)
                          ~msg:"wildcard \"_\" not expected." ()
             | _ -> E_var x }
 | SHARP_PIPE_LBRACKET separated_list(COMMA,app_exp) PIPE_RBRACKET

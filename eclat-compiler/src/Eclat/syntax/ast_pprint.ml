@@ -198,6 +198,20 @@ let pp_exp (fmt:fmt) (e:e) : unit =
           pp_ident x
           (pp_e ~paren:false) e1
           (pp_e ~paren:false) e2) fmt ()
+  | E_array_get_start(x,e1) ->
+      parenthesize ~paren (fun fmt () ->
+        fprintf fmt "@[<v>get_start(%a,%a)@]"
+          pp_ident x
+          (pp_e ~paren:false) e1) fmt ()
+  | E_array_get_end x ->
+      fprintf fmt "@[<v>get_end(%a)@]"
+          pp_ident x
+  | E_array_set_immediate(x,e1,e2) ->
+      parenthesize ~paren (fun fmt () ->
+        fprintf fmt "@[<v>set_immediate(%a,%a,%a)@]"
+          pp_ident x
+          (pp_e ~paren:false) e1
+          (pp_e ~paren:false) e2) fmt ()
   | E_par(es) ->
       fprintf fmt "(";
       pp_print_list
