@@ -1,5 +1,6 @@
 
 let bnot n = int_of_bool (n == 0) ;;
+let negint n = 0 - n ;;
 
 let addint (n,m) = n + m ;;
 let subint (n,m) = n - m ;;

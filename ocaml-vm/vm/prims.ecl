@@ -29,6 +29,27 @@ let caml_cons ((v,(l,_)),st) =
 
 let caml_identity((v,_),st) = (v,st) ;;
 
+(* ************** binop ************** *)
+
+let caml_sub((v1,(v2,_)),st) = (val_long (subint (long_val v1,long_val v2)),st) ;;
+let caml_mult((v1,(v2,_)),st) = (val_long (mulint (long_val v1,long_val v2)),st) ;;
+let caml_div((v1,(v2,_)),st) = (val_long (divint (long_val v1,long_val v2)),st) ;;
+let caml_mod((v1,(v2,_)),st) = (val_long (modint (long_val v1,long_val v2)),st) ;;
+let caml_and((v1,(v2,_)),st) = (val_long (andint (long_val v1,long_val v2)),st) ;;
+let caml_or((v1,(v2,_)),st) = (val_long (orint (long_val v1,long_val v2)),st) ;;
+let caml_xor((v1,(v2,_)),st) = (val_long (xorint (long_val v1,long_val v2)),st) ;;
+let caml_lsl((v1,(v2,_)),st) = (val_long (lslint (long_val v1,long_val v2)),st) ;;
+let caml_lsr((v1,(v2,_)),st) = (val_long (lsrint (long_val v1,long_val v2)),st) ;;
+let caml_asr((v1,(v2,_)),st) = (val_long (asrint (long_val v1,long_val v2)),st) ;;
+
+(* ************** unop ************** *)
+
+let caml_not((v,_),st) = (val_long (bnot (long_val v)),st) ;;
+let caml_neg((v,_),st) = (val_long (negint (long_val v)),st) ;;
+let caml_is_int((v,_),st) = (val_long (int_of_bool(is_int(v))),st) ;;
+let caml_vectlength((v,_),st) = 
+  (val_long (as_long (size_val v)), st) ;;
+  
 (* *********** displaying *************** *)
 
 let caml_print_int ((v1,_),st) =
@@ -175,6 +196,7 @@ let rec check_bounds(idx,sz) =
   pause (if (idx < 0) or (idx >= sz) then bound_error (idx,sz) else ()) ;;
 
 let caml_array_get((v_array,(v_index,_)),st) =
+  print_string "========| Boom!";
   let idx = as_short(long_val(v_index)) in
   let sz = size_val(v_array) in
   check_bounds(idx,sz);
@@ -182,8 +204,12 @@ let caml_array_get((v_array,(v_index,_)),st) =
   (v,st) ;;
 
 
-let caml_array_set((v_array,(v_index,(newval,_))),st) =
+let rec caml_array_set((v_array,(v_index,(newval,_))),st) =
+    print_string "~~~~~~~~|arr:"; print_int (long_val v_array); print_newline ();
+    print_string "~~~~~~~~|idx:"; print_int (long_val v_index); print_newline ();
+  print_string "~~~~~~~~|val:"; print_int (long_val newval); print_newline ();
   let idx = as_short(long_val(v_index)) in
+
   let sz = size_val(v_array) in
   check_bounds(idx,sz);
   set_field(v_array, idx, newval);

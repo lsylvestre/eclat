@@ -1,7 +1,7 @@
 
 external queens : int -> int = "caml_queens" ;;
 
-print_int (queens(10)) ;;
+print_int (queens(12)) ;;
 
 
 (* 23568636 *)

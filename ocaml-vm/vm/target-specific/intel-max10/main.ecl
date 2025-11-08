@@ -49,6 +49,6 @@ let main (ii : inputs) : outputs =
             else display_zero in
   (* blinking a led *)
   let b = blink(10000000) in
-  let switches = (stop,busy,b,led,false,false,false,false,false,false) in
+  let switches = (stop,stop,stop,stop,stop,stop,stop,stop,stop,stop) (* (stop,busy,b,led,false,false,false,false,false,false)*) in
   (switches, dis) ;;
 *)

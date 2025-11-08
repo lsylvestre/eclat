@@ -5,6 +5,24 @@ let target_globals_rom_size = 2048 ;;
 
 let primitives_list = [ (*"string_length";*)
        "caml_identity";
+       
+       "caml_sub";
+       "caml_mult";
+       "caml_div";
+       "caml_mod";
+       "caml_and";
+       "caml_or";
+       "caml_xor";
+       "caml_lsl";
+       "caml_lsr";
+       "caml_asr";
+
+       "caml_not";
+       "caml_neg";
+       "caml_is_int";
+       "caml_vectlength";
+       "caml_fresh_oo_id";
+       "caml_print_int";
        "caml_print_string";
        "caml_print_int";
        "caml_led_off";
@@ -66,7 +84,7 @@ let () =
                  "load bytecode at VM starting");
     ("-load-data", Arg.Set load_data_flag,
                  "load globals at VM starting");
-    ("-custom", Arg.String (fun s -> custom_list := s :: !custom_list),
+    ("-custom", Arg.String (fun s -> custom_list := !custom_list @ [s]),
                  "add a custom external primitive");
     ("-ml-syntax", Arg.Unit (fun () -> ml_syntax_flag := true;
                                        load_code_flag := true;
@@ -166,7 +184,7 @@ let _write_data oc data =
    Printf.fprintf oc "let init_data () =\nlet global_start = 0 in\n"; 
    Printf.fprintf oc  "  exec\n";
 
-  Printf.fprintf oc  "  print_string \"WIDTH=32;\"; print_newline ();\n";
+  Printf.fprintf oc  "  print_string \"WIDTH=\"; print_int (size_of_val (val_unit)); print_string \";\"; print_newline ();\n";
   Printf.fprintf oc  "  print_string \"DEPTH=%d;\"; print_newline ();\n" target_globals_rom_size (*!closures_pos+n*);
 
   Printf.fprintf oc  "print_string \"ADDRESS_RADIX=DEC;\"; print_newline ();";
@@ -255,19 +273,19 @@ let write_code2 ~version:_ ~prim oc oc2 code =
     let open Printf in
     let open Normalised_instr in
     match i with
-    | ACC(n) -> sprintf "GROUP1(ACC(),%d)" n
-    | PUSH -> "GROUP1(PUSH(),0)"
-    | POP(n) -> sprintf "GROUP1(POP(),%d)" n
-    | ASSIGN(n) -> sprintf "GROUP1(ASSIGN(),%d)" n
-    | ENVACC(n) -> sprintf "GROUP1(ENVACC(),%d)" n
-    | PUSH_RETADDR(n) -> sprintf "GROUP1(PUSHRETADDR(),%d)" n
-    | APPLY(((1|2|3) as s)) -> sprintf "APPLY(true,%d,0)" s
-    | APPLY(n) -> sprintf "APPLY(false,%d,0)" n
-    | APPTERM(n,s) -> sprintf "APPTERM(%d,%d)" n s
-    | RETURN(n) -> sprintf "RETURN(%d)" n
+    | ACC(n) -> sprintf "ACC(%d)" (n+1)
+    | PUSH -> "PUSH()"
+    | POP(n) -> sprintf "POP(%d)" n
+    | ASSIGN(n) -> sprintf "ASSIGN(%d)" (n+1)
+    | ENVACC(n) -> sprintf "GET(ENVACC(),%d)" n
+    | PUSH_RETADDR(n) -> sprintf "GROUP4(PUSHRETADDR(%d))" n
+    | APPLY(((1|2|3) as s)) -> sprintf "GROUP4(APPLY(true,%d,0))" s
+    | APPLY(n) -> sprintf "GROUP4(APPLY(false,%d,0))" n
+    | APPTERM(n,s) -> sprintf "GROUP4(APPTERM(%d,%d))" n s
+    | RETURN(n) -> sprintf "GROUP4(RETURN(%d))" n
     | RESTART -> "GROUP4(RESTART())"
-    | GRAB(n) -> sprintf "GRAB(%d)" n
-    | CLOSURE(n,l) -> sprintf "MAKEBLOCK(false,true,%d,closure_tag,%d)" n l
+    | GRAB(n) -> sprintf "GROUP4(GRAB(%d))" n
+    | CLOSURE(n,l) -> sprintf "GROUP4(MAKEBLOCK(false,true,%d,closure_tag,%d))" n l
     | CLOSUREREC(v,t) -> 
         let f = Array.length t in
         let o = !closures_pos in
@@ -275,22 +293,22 @@ let write_code2 ~version:_ ~prim oc oc2 code =
         (if Array.length t < 256 then () 
          else (Printf.printf "recursive closure starting at position %d \
                               should have at less than 256 mutual recursive values" o; exit 0));
-        sprintf "CLOSUREREC(%d,%d,%d,%d)" f v o t.(0)
-    | OFFSETCLOSURE(n) -> sprintf "GROUP1(OFFSETCLOSURE(),%d)" n
-    | GETGLOBAL(n) -> sprintf "GROUP1(GETGLOBAL(),%d)" n
-    | SETGLOBAL(n) -> sprintf "GROUP1(SETGLOBAL(),%d)" n
-    | ATOM(n) -> sprintf "MAKEBLOCK(true,false,1,%d,0)" n
-    | MAKEBLOCK(tag,sz) -> sprintf "MAKEBLOCK(false,false,%d,%d,0)" sz tag
+        sprintf "GROUP4(CLOSUREREC(%d,%d,%d,%d))" f v o t.(0)
+    | OFFSETCLOSURE(n) -> sprintf "OFFSETCLOSURE(%d)" n
+    | GETGLOBAL(n) -> sprintf "GET(GETGLOBAL(),%d)" (n-1)
+    | SETGLOBAL(n) -> sprintf "SET(SETGLOBAL(),%d)" (n-1)
+    | ATOM(n) -> sprintf "GROUP4(MAKEBLOCK(true,false,1,%d,0))" n
+    | MAKEBLOCK(tag,sz) -> sprintf "GROUP4(MAKEBLOCK(false,false,%d,%d,0))" sz tag
     (*| MAKEFLOATBLOCK of int *)
-    | GETFIELD(n) -> sprintf "GROUP1(GETFIELD(),%d)" n
+    | GETFIELD(n) -> sprintf "GET(GETFIELD(),%d)" n
     (*| GETFLOATFIELD  of int*)
-    | SETFIELD(n) -> sprintf "GROUP2(SETFIELD(%d))" n
+    | SETFIELD(n) -> sprintf "SET(SETFIELD(),%d)" n
     (*| SETFLOATFIELD  of int *)
-    | GETVECTITEM -> "GROUP2(GETVECTITEM())"
-    | SETVECTITEM -> "GROUP2(SETVECTITEM())"
-    | GETBYTESCHAR -> "GROUP2(GETBYTESCHAR())"
-    | SETBYTESCHAR -> "GROUP2(GETSTRINGCHAR())"
-    | GETSTRINGCHAR -> "GROUP2(GETSTRINGCHAR())"
+    | GETVECTITEM -> "GETVECTITEM()"
+    | SETVECTITEM -> "SETVECTITEM()"
+    | GETBYTESCHAR -> "GROUP1(GETBYTESCHAR())"
+    | SETBYTESCHAR -> "GROUP1(GETSTRINGCHAR())"
+    | GETSTRINGCHAR -> "GROUP1(GETSTRINGCHAR())"
     | BRANCH(n) -> sprintf "GROUP3(BRANCH(%d))" n(* 3 *)
     | BRANCHIF(n) -> sprintf "GROUP3(BRANCHIF(true,%d))" n(* 3 *)
     | BRANCHIFNOT(n) -> sprintf "GROUP3(BRANCHIF(false,%d))" n (* 3 *)
@@ -300,7 +318,7 @@ let write_code2 ~version:_ ~prim oc oc2 code =
         let l2 = !closures_pos in
         closures_pos := l2 + Array.length t2 ;
         sprintf "GROUP3(SWITCH(%d,%d))" l1 l2
-    | PUSHTRAP(n) -> sprintf "PUSHTRAP(%d)" n
+    | PUSHTRAP(n) -> sprintf "GROUP4(PUSHTRAP(%d))" n
     | POPTRAP -> "GROUP4(POPTRAP())"
     | RAISE
     | RERAISE
@@ -309,41 +327,35 @@ let write_code2 ~version:_ ~prim oc oc2 code =
     | C_CALL(narg, idx) ->
         let num = match Hashtbl.find_opt primitives prim.(idx) with
                   | Some n -> n
-                  | None -> (Printf.printf "Unknown primitive %s\n" prim.(idx); exit 0) in
-        sprintf "(CALL(%d,%s))" num (match narg with
-                                     | 1 -> "false,false,false,false"
-                                     | 2 -> "true,false,false,false"
-                                     | 3 -> "true,true,false,false"
-                                     | 4 -> "true,true,true,false"
-                                     | 5 -> "true,true,true,false"
-                                     | _ -> assert false)
-    | CONSTINT(n) -> sprintf "GROUP1(CONST(%d),0)" n
-    | UNAPP(OFFSET ofs) -> sprintf "GROUP1(OFFSET(%d),0)" ofs
+                  | None -> (Printf.printf "Unknown primitive %s\n" prim.(idx); exit 1) in
+        sprintf "GROUP4(CALL(%d,%s))" num (match narg-1 with
+                                           | 0 -> "false,false,false,false"
+                                           | 1 -> "true,false,false,false"
+                                           | 2 -> "true,true,false,false"
+                                           | 3 -> "true,true,true,false"
+                                           | _ -> "true,true,true,true")
+    | CONSTINT(n) -> sprintf "CONST(%d)" n
     | UNAPP(unop) -> 
-        "GROUP1(UNOP("^
           (match unop with
-           | NOT -> "NOT()"
-           | NEG -> "NEG()"
-           | OFFSET _ -> assert false
-           | VECTLENGTH -> "VECTLENGTH()"
-           | ISINT -> "ISINT()")
-        ^"),0)"
-    | BINAPP(SUB) -> "GROUP2(SUB())"
+           | NOT -> "GROUP4(CALL(11,false,false,false,false))"
+           | NEG -> "GROUP4(CALL(12,false,false,false,false))"
+           | OFFSET ofs -> sprintf "ADD(true,%d)" ofs
+           | ISINT -> "GROUP4(CALL(13,false,false,false,false))"
+           | VECTLENGTH -> "GROUP4(CALL(14,false,false,false,false))")
     (* | BINAPP(MUL) -> "MULT()"*)
     | BINAPP(binop) ->
-        "GROUP2(" ^
         (match binop with 
-        | ADD -> "ADD"
-        | SUB -> "SUB"
-        | MUL -> "MUL"
-        | DIV -> "DIV"
-        | MOD -> "MOD"
-        | AND -> "AND"
-        | OR -> "OR"
-        | XOR -> "XOR"
-        | LSL -> "LSL"
-        | LSR -> "LSR"
-        | ASR -> "ASR") ^ "())"
+        | ADD -> "ADD(false,0)"
+        | SUB -> "GROUP4(CALL(1,true,false,false,false))"
+        | MUL -> "GROUP4(CALL(2,true,false,false,false))"
+        | DIV -> "GROUP4(CALL(3,true,false,false,false))"
+        | MOD -> "GROUP4(CALL(4,true,false,false,false))"
+        | AND -> "GROUP4(CALL(5,true,false,false,false))"
+        | OR ->  "GROUP4(CALL(6,true,false,false,false))"
+        | XOR -> "GROUP4(CALL(7,true,false,false,false))"
+        | LSL -> "GROUP4(CALL(8,true,false,false,false))"
+        | LSR -> "GROUP4(CALL(9,true,false,false,false))"
+        | ASR -> "GROUP4(CALL(10,true,false,false,false))")
     | COMPBRANCH(op,n,l) -> 
        let s = match op with
                | ULT | LT -> "LT()" (* U ok ? *)
@@ -352,7 +364,7 @@ let write_code2 ~version:_ ~prim oc oc2 code =
                | GE -> "GE()"
                | GT -> "GT()"
                | NEQ -> "NEQ()"  in
-       sprintf "GROUP3(BCOMPARE(%s,%d,%d))" 
+       sprintf "GROUP_COMPARE(%s,BCOMPARE(%d,%d))" 
           s n l
    
     (*| COMPARE        of compop
@@ -362,12 +374,12 @@ let write_code2 ~version:_ ~prim oc oc2 code =
     | GETPUBMET(n) -> sprintf "GETPUBMET(%d)" n
     | GETDYNMET -> "GETDYNMET()"
     | STOP -> "GROUP3(STOP())"
-  | COMPARE(LT) -> "GROUP2(COMPARE(LT()))" 
-    | COMPARE(GT) -> "GROUP2(COMPARE(GT()))" 
-    | COMPARE(NEQ) -> "GROUP2(COMPARE(NEQ()))" 
-    | COMPARE(EQ) -> "GROUP2(COMPARE(EQ()))" 
-    | COMPARE(GE) -> "GROUP2(COMPARE(GE()))" 
-    | COMPARE(LE) -> "GROUP2(COMPARE(LE()))" 
+  | COMPARE(LT) -> "GROUP_COMPARE(LT(),COMPARE())" 
+    | COMPARE(GT) -> "GROUP_COMPARE(GT(),COMPARE())" 
+    | COMPARE(NEQ) -> "GROUP_COMPARE(NEQ(),COMPARE())" 
+    | COMPARE(EQ) -> "GROUP_COMPARE(EQ(),COMPARE())" 
+    | COMPARE(GE) -> "GROUP_COMPARE(GE(),COMPARE())" 
+    | COMPARE(LE) -> "GROUP_COMPARE(LE(),COMPARE())" 
     | COMPARE _ -> assert false
     | _ -> Printf.printf "%s" (Normalised_instr.to_string i);  assert false
   in
@@ -391,7 +403,7 @@ let write_code2 ~version:_ ~prim oc oc2 code =
   Printf.fprintf oc2  "let get_code () =\n";
   Printf.fprintf oc2  "  exec\n";
 
-  Printf.fprintf oc2  "  print_string \"WIDTH=60;\"; print_newline ();";
+  Printf.fprintf oc2  "  print_string \"WIDTH=\"; print_int (size_of_val (GROUP3(STOP()))); print_string \";\"; print_newline ();";
   Printf.fprintf oc2  "  print_string \"DEPTH=%d;\"; print_newline ();" target_code_size (*!closures_pos+n*);
 
   Printf.fprintf oc2  "print_string \"ADDRESS_RADIX=DEC;\"; print_newline ();\n";
@@ -460,8 +472,9 @@ let main () =
   let oc = open_out "../bytecode.ecl" in
   Printf.fprintf oc "(* THIS FILE HAS BEEN GENERATED *)\n\n";
   write_prim oc;
-  
+
   let oc2 = open_out "../get_code.ecl" in
+ 
   write_code2 ~version ~prim oc oc2 code;
 
   let oc3 = open_out "../init_data.ecl" in

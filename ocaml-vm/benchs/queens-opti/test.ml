@@ -58,7 +58,7 @@ let queens_v1(n) =
    loop (1, 1, 1, Array.length v,v,0) ;;
 
 let main () =
-   queens_v1 6 ;;
+    queens_v1 12 ;;
 
 main ();;
 

@@ -15,38 +15,51 @@ GEN_BYTECODE_DIR=gen_bytecode
 
 BCOPT=
 
-byte:
-	(cd $(GEN_BYTECODE_DIR) ; make SRC="$(SRC)")
-
-
 CUSTOM=
 CUSTOM_PATH=$(foreach f,$(CUSTOM),../$(f))$
+CUSTOM_NAMES=
+CUSTOM_DECL=$(foreach f,$(CUSTOM_NAMES),-custom $(f))$
+
+
+byte:
+	(cd $(GEN_BYTECODE_DIR) ; make SRC="$(SRC)" BCOPT="$(CUSTOM_DECL)")
+
+
 
 BOARD=intel-max10
-
+ARG="((true, true, true, true, true, true, true, true, true, true),(true,true))"
 CLK=clk
+
+externals:
+	(cd $(ECLAT_COMPILER); ./eclat -main=comparator $(ECLAT_FLAGS) \
+	   $(ECLAT_COMPILER)/stdlib.ecl \
+	   $(VM_FROM_ECLAT_COMPILER)/vm/int.ecl \
+	   $(VM_FROM_ECLAT_COMPILER)/vm/opcode.ecl \
+	   $(VM_FROM_ECLAT_COMPILER)/vm/externals/comparator.ecl)
 
 vm: $(ECLAT_COMPILER)/eclat
 	(cd $(ECLAT_COMPILER); ./eclat $(ECLAT_FLAGS) \
-		    $(FLAGS) -arg="((true, true, true, true, true, true, true, true, true, true),(true,true))" \
+		    $(FLAGS) -arg=$(ARG) \
+		    $(ECLAT_COMPILER)/stdlib.ecl \
 	        $(VM_FROM_ECLAT_COMPILER)/vm/int.ecl \
 	        $(VM_FROM_ECLAT_COMPILER)/vm/static.ecl \
 	        $(VM_FROM_ECLAT_COMPILER)/vm/mlvalue.ecl \
 	        $(VM_FROM_ECLAT_COMPILER)/vm/opcode.ecl \
-	        $(VM_FROM_ECLAT_COMPILER)/vm/fail.ecl \
-	        $(VM_FROM_ECLAT_COMPILER)/vm/ram.ecl \
 	        $(VM_FROM_ECLAT_COMPILER)/vm/runtime.ecl \
-			$(VM_FROM_ECLAT_COMPILER)/vm/debug.ecl \
+	        $(VM_FROM_ECLAT_COMPILER)/vm/ram.ecl \
+	         $(VM_FROM_ECLAT_COMPILER)/vm/fail.ecl \
+            $(VM_FROM_ECLAT_COMPILER)/vm/debug.ecl \
 	        $(VM_FROM_ECLAT_COMPILER)/vm/alloc.ecl \
-	        $(VM_FROM_ECLAT_COMPILER)/vm/prims.ecl $(CUSTOM_PATH) \
+	        $(VM_FROM_ECLAT_COMPILER)/vm/prims.ecl \
+	        $(CUSTOM_PATH) \
 			$(VM_FROM_ECLAT_COMPILER)/bytecode.ecl \
 			$(VM_FROM_ECLAT_COMPILER)/vm/vm.ecl \
-			$(VM_FROM_ECLAT_COMPILER)/vm/vm_exec.ecl \
+			$(VM_FROM_ECLAT_COMPILER)/vm/vm_step.ecl \
 			$(VM_FROM_ECLAT_COMPILER)/vm/target-specific/$(BOARD)/IOs.ecl \
 			$(VM_FROM_ECLAT_COMPILER)/vm/target-specific/$(BOARD)/main.ecl)
 
 code: 
-	(cd $(ECLAT_COMPILER); ./eclat -nonormalization \
+	(cd $(ECLAT_COMPILER); ./eclat -nonormalization $(ECLAT_FLAGS) \
        $(VM_FROM_ECLAT_COMPILER)/vm/int.ecl \
        $(VM_FROM_ECLAT_COMPILER)/vm/opcode.ecl \
        $(VM_FROM_ECLAT_COMPILER)/vm/mlvalue.ecl \
@@ -55,7 +68,7 @@ code:
 	(cd $(TARGET_DIR); make --silent NAME=get_code NS=10 | sed '$$d' | tr -d '\000' > code.mif)
 
 data: 
-	(cd $(ECLAT_COMPILER); ./eclat \
+	(cd $(ECLAT_COMPILER); ./eclat $(ECLAT_FLAGS) \
        $(VM_FROM_ECLAT_COMPILER)/vm/int.ecl \
        $(VM_FROM_ECLAT_COMPILER)/vm/opcode.ecl \
        $(VM_FROM_ECLAT_COMPILER)/vm/mlvalue.ecl \
@@ -82,13 +95,14 @@ ml:
 	    vm/target-specific/ocaml/vm_main.ml >> vm.ml
 
 bytecode:
-	(cd $(GEN_BYTECODE_DIR) ; make SRC=../$(SRC) BCOPT="-load-code -load-data")
+	(cd $(GEN_BYTECODE_DIR) ; make SRC=../$(SRC) BCOPT="-load-code -load-data $(CUSTOM_DECL)")
+
 
 simul:	bytecode
 	make vm
 
 synth:	byte
-	make vm "FLAGS=-ram-init=code -ram-init=data_rom"
+	make vm "FLAGS=-ram-init=code -ram-init=data_rom" SRC=../$(SRC)
 
 
 $(ECLAT_COMPILER)/eclat:

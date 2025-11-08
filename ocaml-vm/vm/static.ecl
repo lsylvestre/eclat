@@ -1,5 +1,5 @@
 let static stack = (0,true)^4096 ;;
-let static ram = (0,true)^32768 ;;
+let static ram = (0,true)^28672 ;;
 
 let static global_end = 0^1 ;;
 

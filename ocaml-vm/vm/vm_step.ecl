@@ -2,14 +2,8 @@
 (* ********************************************** *)
 
 let interp (go) =
-  let exec_step (s,_) =
-    if not(go) then (s,true)
-    else (let (s2,rdy) = exec
-                           step_vm s
-                         default s
-          in (s2,rdy))
-  in
-  reg exec_step last ((0,val_unit,stack_start,(val_unit, 0, 0),others_default),true) ;;
+let s0 = (0,val_unit,stack_start,(val_unit, 0, 0),others_default) in
+  reg (fun s -> interp_vm s) init s0 ;;
 
 let config1 () =
   stack_set(0, val_unit);
@@ -45,14 +39,13 @@ let ocaml_vm (button) =
       let rdy = load_bytecode(false) in
       ((false,true,rdy,led),last_acc)
     else
-      let (s,rdy) = interp(init_done) in
+      let s = interp (button) in
       let (pc,acc,sp,(env, extra_args, trap_sp),(finished,led)) = s in
       let cy = counter() in
-      let nbi = reg (fun c -> if  rdy then c + 1 else c) init 0 in
-      if finished then (print_string "CY="; print_int cy; print_string "NBI="; print_int nbi);
-      ((finished,rdy,init_done,led),acc)
+      if finished then (print_string "CY="; print_int cy);
+      ((finished,finished,init_done,led),acc)
   in
   let ((stop,rdy,_,o),acc) = reg step last ((false,false,false,false),val_unit) in
-  (stop,not(rdy),o,acc)
-;;
+  (stop,not(rdy),o,acc) ;;
 
+  
