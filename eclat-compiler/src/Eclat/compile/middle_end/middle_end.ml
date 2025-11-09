@@ -36,7 +36,7 @@ let compile ?globalize
             (pi:pi) : pi =
 
             
-  let pi = Lustre_scheduling.schedule_pi pi in
+  (**let pi = Lustre_scheduling.schedule_pi pi in**)
     
   let pi = Ast_rename.rename_pi pi in
   (* todo: should works without renaming,
@@ -86,6 +86,7 @@ let compile ?globalize
 
   let pi = Specialize_ref.specialize_ref pi in
   display_pi Specialize_ref pi;
+
   (** compile pattern matching *)
 
   (* Check_exec_mem.check_pi pi; *)

@@ -25,6 +25,7 @@ let prop_ident_s env x k =
 let rec prop env a =
   match a with
   | A_const _ -> a 
+  | A_sig_get _ -> a
   | A_var x -> 
       (match SMap.find_opt x env with
       | None -> a
@@ -67,6 +68,9 @@ let rec prop_s env s =
   | S_set(x,a) ->
       (* todo: warning if x\in dom(env)) *)
       S_set(x,prop env a)
+  | S_sig_set(x,a) ->
+      (* todo: warning if x\in dom(env)) *)
+      S_sig_set(x,prop env a)
   | S_acquire_lock _ | S_release_lock _ -> s
   | S_write_start(l,a1,a2) ->
      let a1' = prop env a1 in

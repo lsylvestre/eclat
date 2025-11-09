@@ -83,6 +83,12 @@ let subst_e x ex e =
         let eqs' = if pat_mem x p_tuple then eqs else
                    List.map (fun (p,ei) -> p, ss_le ei) eqs in
         E_equations(p,eqs')
+    | E_sig_get(y) ->
+        let z = if x <> y then y else as_ident ex in
+        E_sig_get(z)
+    | E_emit(y,e1) ->
+        let z = if x <> y then y else as_ident ex in
+        E_emit(z, ss e1)
     | e -> Ast_mapper.map ss e
   in
   ss e

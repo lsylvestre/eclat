@@ -68,7 +68,9 @@ let rec combinational ~externals (e:e) : bool =
   | E_run _ -> false (* sometimes true, sometimes false, depending on the type *)
   | E_pause _ -> false
   | E_equations(_,_) -> false (* List.for_all (fun (_,e) -> combinational ~externals e) eqs *)
-
+  | E_sig_get _ -> true
+  | E_emit _ -> false
+  | E_sig_create _ -> false
 (* same as combinational, but may contain cas/match, registers or even exec blocks *)
 
 let rec instantaneous ~externals (e:e) : bool =
@@ -126,3 +128,6 @@ let rec instantaneous ~externals (e:e) : bool =
   | E_run _ -> false (* sometimes true, sometimes false, depending on the type *)
   | E_pause _ -> false
   | E_equations _ -> true
+  | E_sig_get _
+  | E_emit _
+  | E_sig_create _ -> true

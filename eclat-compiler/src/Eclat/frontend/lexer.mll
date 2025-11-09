@@ -17,9 +17,8 @@
        "reg",   REGISTER;
        "exec",  EXEC;
        "reset", RESET;
-       "when",  WHEN;
-       "fby",   FBY;
-       "merge", MERGE;
+       (* "fby",   FBY;
+       "merge", MERGE;*)
        "where", WHERE;
        "returns", RETURNS;
        "and",   AND;
@@ -82,6 +81,8 @@
        "vect_create",VECT_CREATE;
        "make", ARRAY_MAKE;
        "pause", PAUSE;
+       "emit", EMIT;
+       "signal", SIGNAL;
        (* "vect_of_tuple", VECT_OF_TUPLE*)
      ]
 
@@ -99,7 +100,7 @@ let get_loc lexbuf =
 }
 
 (* let tvar_ident = [''']['a'-'z'] ['a'-'z''A'-'Z''0'-'9''_''A'-'Z'''']* *)
-let ident = ['a'-'z''_'] ['a'-'z''A'-'Z''0'-'9''_''A'-'Z']*[''']*
+let ident = ['a'-'z''_'] ['a'-'z''0'-'9''_']*[''']*
 let up_ident = ['A'-'Z']['a'-'z''A'-'Z''0'-'9''_''A'-'Z']*
 let tvar_ident = ['''] ['a'-'z''A'-'Z''0'-'9''_''A'-'Z']*
 let tyB_var_ident = ['`''~'] ['a'-'z''A'-'Z''0'-'9''_''A'-'Z']*

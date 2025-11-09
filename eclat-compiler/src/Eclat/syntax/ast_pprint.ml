@@ -260,6 +260,12 @@ let pp_exp (fmt:fmt) (e:e) : unit =
         ~pp_sep:(fun fmt () -> fprintf fmt "@,and ")
         (fun fmt (p,e) -> fprintf fmt "%a = %a" pp_pat p (pp_le ~paren:false) e) fmt eqs;
       fprintf fmt ")@]"
+  | E_sig_get(x) -> 
+      fprintf fmt "?%a" pp_ident x
+  | E_emit(x,e1) ->
+      fprintf fmt "emit %a %a" pp_ident x (pp_e ~paren:true) e1
+  | E_sig_create e1 ->
+      fprintf fmt "signal %a" (pp_e ~paren:true) e1
   in
   fprintf fmt "@[<v 0>%a@]" (pp_e ~paren:false) e
 

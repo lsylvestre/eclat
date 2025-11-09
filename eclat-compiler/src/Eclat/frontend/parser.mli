@@ -24,6 +24,7 @@ type token =
   | STRING_LIT of (string)
   | STATIC
   | SIZE_CREATE
+  | SIGNAL
   | SHARP_PIPE_LBRACKET
   | SHARED
   | SET
@@ -106,6 +107,7 @@ type token =
   | EQ
   | EOF
   | END
+  | EMIT
   | ELSE
   | DOT_LENGTH
   | DOT

@@ -76,6 +76,7 @@ let rec filter ty =
       ty
   | Ty_array _ ->
       ty
+  | Ty_signal _ -> ty
 
 let contains_fun ty =
   let open Types in
@@ -91,6 +92,8 @@ let contains_fun ty =
   | Ty_ref _ ->
       ()
   | Ty_array _ ->
+      ()
+  | Ty_signal _ ->
       ()
   in try aux ty; false with F -> true
 

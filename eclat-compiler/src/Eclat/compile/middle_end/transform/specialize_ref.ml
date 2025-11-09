@@ -17,6 +17,8 @@ let rec filter ty =
       Ty_base TyB_unit
   | Ty_array _ ->
       Ty_base TyB_unit
+  | Ty_signal _ ->
+      Ty_base TyB_unit
 
 let contains_array ty =
   let open Types in
@@ -32,6 +34,8 @@ let contains_array ty =
   | Ty_ref _ ->
       raise F
   | Ty_array _ ->
+      raise F
+  | Ty_signal _ ->
       raise F
   in try aux ty; false with F -> true
 
@@ -50,6 +54,7 @@ let p_without_array f p ty =
         P_tuple (List.map2 remove_array (List.map (fun tyB -> Ty_base tyB) tyBs) ps)
     | Ty_fun _,_ -> P_unit
     | Ty_array _, _ -> P_unit
+    | Ty_signal _, _ -> P_unit    
     | Ty_var{contents=Is t},p ->
         remove_array t p
     | _ -> p
@@ -84,7 +89,7 @@ let specialize ds e =
               let p' = p_without_array f p ty in
               (*Format.fprintf Format.std_formatter "~~~~~~~> %a || %a %a %a %a\n" Types.pp_ty ty_orig Types.pp_ty ty Ast_pprint.pp_pat p' Ast_pprint.pp_pat p Ast_pprint.pp_exp (E_fix(x,(p,(ty,tyB),e1)));*)
               (* Inline.subst_ty ty_orig @@*)
-              E_letIn(p,ty_orig,E_app(E_const(Op(TyConstr ty_orig)),xc2),
+              E_letIn(p,ty_orig,xc2,
                 let e1' = (* Ast_subst.subst_p_e p (Pattern.pat2exp p')*) e1 in
                 E_app(E_fix(x,(p',(ty,tyB),e1')),Pattern.pat2exp p'))
         | Some _ ->

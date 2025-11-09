@@ -19,19 +19,24 @@ let rec pp_s externals ~st fmt = function
     Option.iter (fun s2 -> fprintf fmt "@,@[<v 2>else@,%a@]" (pp_s externals ~st) s2) so;
      fprintf fmt "@,end if;"
 | S_case(y,hs,so) ->
-    fprintf fmt "@[<v>case %a is@," pp_ident y;
-    let pp_cs fmt cs = 
-      pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt " | ")
-        pp_c fmt cs
-    in
-    List.iter (fun (cs,s) ->
-      fprintf fmt "@[<v 2>when %a =>@,%a@]@," pp_cs cs (pp_s externals ~st) s) hs;
-    Option.iter (fun s ->
-      fprintf fmt "@[<v 2>when others =>@,%a@]@," (pp_s externals ~st) s) so;
-    fprintf fmt "@]end case;";
+    (match hs,so with 
+    | [(_,s)], (None|Some S_skip) -> (* optimization *)
+        pp_s externals ~st fmt s
+    | _ ->
+      fprintf fmt "@[<v>case %a is@," pp_ident y;
+      let pp_cs fmt cs = 
+        pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt " | ")
+          pp_c fmt cs
+      in
+      List.iter (fun (cs,s) ->
+        fprintf fmt "@[<v 2>when %a =>@,%a@]@," pp_cs cs (pp_s externals ~st) s) hs;
+      Option.iter (fun s ->
+        fprintf fmt "@[<v 2>when others =>@,%a@]@," (pp_s externals ~st) s) so;
+      fprintf fmt "@]end case;")
 | S_set(x,((A_call(Runtime(((Print|Print_string|Print_int|Print_newline))),_)) as a))->
    fprintf fmt "%a;@," (pp_a externals) a
 | S_set(x,a) -> fprintf fmt "@[<v>%a := %a;@]" pp_ident x (pp_a externals) a
+| S_sig_set(x,a) -> fprintf fmt "@[<v>%a <= %a;@]" pp_ident x (pp_a externals) a
 | S_acquire_lock(l) ->
       fprintf fmt
          "@[acquire(%a);@]" 
@@ -117,16 +122,22 @@ let rec pp_s externals ~st fmt = function
 
 (** code generator for FSMs *)
 and pp_fsm externals fmt ~state_var:st ~idle ~rdy (id,ts,s) =
-  fprintf fmt "@[<v>case %a is@," pp_ident st;
-  List.iter (fun (x,s) ->
+  match ts with 
+  | [] -> (* optimization *)
+      fprintf fmt "@[<v> -- case %a is when %a =>@," pp_ident st pp_state idle;
+      pp_s externals ~st fmt s;
+      fprintf fmt "@,-- end case;@,@]"
+  | _ ->
+      fprintf fmt "@[<v>case %a is@," pp_ident st;
+      List.iter (fun (x,s) ->
+          fprintf fmt "@[<v 2>when %a =>@,%a@]@," 
+            pp_state x 
+            (pp_s externals ~st) 
+            s) ts;
       fprintf fmt "@[<v 2>when %a =>@,%a@]@," 
-        pp_state x 
-        (pp_s externals ~st) 
-        s) ts;
-  fprintf fmt "@[<v 2>when %a =>@,%a@]@," 
-    pp_state idle 
-    (pp_s externals ~st) s;
-  fprintf fmt "@]end case;@,"
+        pp_state idle 
+        (pp_s externals ~st) s;
+      fprintf fmt "@]end case;@,"
 
 (* default value as bitvector where each bit is at '0' *)
 let default_zero_value nbits =
@@ -184,7 +195,7 @@ let pp_ty fmt t =
   | _ ->
       fprintf fmt "value(0 to %d)" (size_ty t-1)
 
-let declare_signals variables fmt =
+let declare_signals others variables fmt =
   let var_decls = Hashtbl.create 10 in
   let add_var x n =
     match Hashtbl.find_opt var_decls n with
@@ -192,15 +203,19 @@ let declare_signals variables fmt =
     | Some s -> Hashtbl.replace var_decls n (x::s)
   in
   List.iter (fun (x,t) ->
-          let n = (size_ty t) in
-          add_var ((x^"%now")) n;
-          add_var ((x^"%next")) n
+      let n = (size_ty t) in
+      if (match t with TSig _ -> false | _ -> true)
+      then (add_var ((x^"%now")) n;
+            add_var ((x^"%next")) n) else add_var x n
     ) variables;
-
+  List.iter (fun (x,t) ->
+      let n = (size_ty t) in
+      add_var x n) others;
   Hashtbl.iter (fun n xs ->
       fprintf fmt "signal @[<v>@[<hov>%a@] : value(0 to %d) := (others => '0');@]@,"
         (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt ",@ @,") pp_ident) xs (n-1)
     ) var_decls
+
 
 
 let declare_variable ~argument ~statics typing_env fmt =
@@ -211,7 +226,8 @@ let declare_variable ~argument ~statics typing_env fmt =
     | Some s -> Hashtbl.replace var_decls n (x::s)
   in
   Hashtbl.iter (fun x t ->
-      if x <> argument && not (List.mem_assoc x statics) then
+      if (match t with TSig _ -> false | _ -> true)
+         && x <> argument && not (List.mem_assoc x statics) then
           add_var x (size_ty t)
     ) typing_env;
 
@@ -303,17 +319,29 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
 
 
 
-  let variables = List.filter (fun (x,t) ->
+  let variables = List.filter (fun (x,t) -> 
+          (match t with TSig _ -> false | _ -> true) &&
           x <> argument && not (List.mem_assoc x statics) 
           && not (List.mem_assoc x (fst externals))
           && not (List.mem_assoc x (snd externals))
   )
     @@ List.of_seq (Hashtbl.to_seq typing_env) in
-  let variables = variables @ List.map (fun (x,_) -> ptr_taken x, TBool) statics in
-  let variables = variables @ List.filter_map (fun (x,(_,shared)) -> 
-                                 if shared then Some (ptr_taken x, TBool) else None) (fst externals) in
+  
+  let others = List.of_seq (Hashtbl.to_seq typing_env) |> 
+               List.filter (fun (x,t) -> (match t with TSig _ -> true | _ -> false)) in
 
-  declare_signals variables fmt;
+  declare_signals others variables fmt;
+
+  let variables = List.filter (fun (x,t) -> 
+          (match t with TSig _ -> false | _ -> true) &&
+          x <> argument && not (List.mem_assoc x statics) 
+          && not (List.mem_assoc x (fst externals))
+          && not (List.mem_assoc x (snd externals))
+  )
+    @@ List.of_seq (Hashtbl.to_seq typing_env) in
+
+
+
 
   fprintf fmt "@,@[<v 2>begin@,";
 
@@ -420,6 +448,8 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
   ) statics;
 
   List.iter (fun (x,_) -> fprintf fmt ", %a" pp_ident (x^"%now")) variables;
+
+  List.iter (fun (x,_) -> fprintf fmt ", %a" pp_ident x) others;
 
   (* *************** *)
   let sensibility_external fmt (n,(_,shared)) =    

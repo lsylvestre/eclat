@@ -65,6 +65,8 @@ let propagation ~externals e =
   in
   let rec prop e =
     match e with
+    | E_letIn(p,ty,E_sig_create a,e2) ->
+      E_letIn(p,ty,E_sig_create a,prop e2)
     | E_letIn(P_tuple ps,ty,E_tuple es,e2) ->
         let ts = match Types.canon_ty ty with 
                  | Ty_tuple ts -> ts

@@ -18,7 +18,8 @@ let rec list_machines_s s =
   | S_acquire_lock _ | S_release_lock _
   | S_read_start _ | S_read_stop _ 
   | S_write_start _  | S_write_stop _ 
-  | S_array_set _ -> s
+  | S_array_set _
+  | S_sig_set _ -> s
   | S_seq(s1,s2) ->
       seq_ (list_machines_s s1)
            (list_machines_s s2)

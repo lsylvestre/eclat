@@ -250,7 +250,8 @@ and pp_op fmt = function
 (* assumes that the let-bindings of atoms are not nested *)
 and pp_a externals fmt = function
 | A_const c -> pp_c fmt c
-| A_var x -> fprintf fmt "%a" pp_ident x
+| A_var x
+| A_sig_get x -> fprintf fmt "%a" pp_ident x
 | A_call(op,a) ->
    pp_call externals fmt (op,a)
 | A_letIn(x,a1,a2) ->

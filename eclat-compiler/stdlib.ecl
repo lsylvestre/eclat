@@ -143,3 +143,27 @@ let print_fixed_point (f) =
 
 operator%with_sizes Default.create : unit => 'a ;; (* unsafe *)
 
+
+
+let absent () =
+  let s = signal <> 
+  in ?s ;;
+
+let fby (x, y) =
+  let shift (_, o) = (o, y) in
+  let (o, _) = reg shift init (absent(), x)
+  in o ;;
+
+let mux(a, b, c) = 
+  if a then b else c ;;
+
+let when(f, clk) =
+  if clk then f() else absent() ;;
+
+let merge(clk, a, b) =
+  if clk then a else b ;;
+
+let fixpoint (f) =
+  let s = signal <> in
+  emit s(f(?s));
+  ?s ;;

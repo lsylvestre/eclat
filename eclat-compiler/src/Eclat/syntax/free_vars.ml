@@ -4,7 +4,7 @@ open Ast
 let fv_var xs x =
   if SMap.mem x xs then SMap.empty else SMap.singleton x ()
 
-let fv ?(get_arrays=true) ?(xs=SMap.empty) e =
+let fv ?(get_sig=true) ?(get_arrays=true) ?(xs=SMap.empty) e =
   let open Ast in
   let rec fv_list xs es =
     List.fold_left (fun acc ei -> acc ++ aux xs ei) SMap.empty es
@@ -123,9 +123,15 @@ let fv ?(get_arrays=true) ?(xs=SMap.empty) e =
         List.fold_left (fun acc lei -> acc ++ fv_le xs lei) SMap.empty les
       in
       fv_list_le (xs++ys) (List.map snd eqs)
+  | E_sig_get(x) -> 
+      if get_sig then fv_var xs x else SMap.empty
+  | E_emit(x,e1) ->
+      let vs = aux xs e1 in
+      if get_sig then vs ++ fv_var xs x else vs
+  | E_sig_create(e1) ->
+      aux xs e1
   in
   aux xs e
-
 
 
 let fv_arrays ?(xs=SMap.empty) e =
@@ -191,21 +197,21 @@ let fv_arrays ?(xs=SMap.empty) e =
   | E_array_create _ ->
       SMap.empty
   | E_array_length(x) ->
-      SMap.singleton x () 
+      fv_var xs x
   | E_array_get(x,e1) ->
       let vs = aux xs e1 in
-      SMap.add x () vs 
+      vs ++ fv_var xs x
   | E_array_set(x,e1,e2) ->
       let vs = aux xs e1 ++ aux xs e2 in
-      SMap.add x () vs
+      vs ++ fv_var xs x
   | E_array_get_start(x,e1) ->
       let vs = aux xs e1 in
-      SMap.add x () vs
+      vs ++ fv_var xs x
   | E_array_get_end _ ->
       SMap.empty
   | E_array_set_immediate(x,e1,e2) ->
       let vs = aux xs e1 ++ aux xs e2 in
-      SMap.add x () vs
+     vs ++ fv_var xs x
   | E_par(es) ->
       fv_list xs es
   | E_for(i,e_st1,e_st2,e,_) ->
@@ -220,13 +226,13 @@ let fv_arrays ?(xs=SMap.empty) e =
       fv_list xs es
   | E_vector_mapi(_,(p,_,e1),e2,_) ->
       let ys = vars_of_p p in
-      let xs' = xs++ys in
+      let xs' = xs++ ys in
       aux xs' e1 ++ aux xs e2
   | E_run(_x,e1,_) -> (* what about _x ? *)
       aux xs e1
   | E_pause e -> aux xs e
   | E_equations(p,eqs) ->
-      let ys = vars_of_p (P_tuple (p::List.map fst eqs)) in
+      let ys = vars_of_p (P_tuple (List.map fst eqs)) in
       let rec fv_le xs le =
         match le with
         | Exp e1 -> aux xs e1
@@ -238,6 +244,12 @@ let fv_arrays ?(xs=SMap.empty) e =
         List.fold_left (fun acc lei -> acc ++ fv_le xs lei) SMap.empty les
       in
       fv_list_le (xs++ys) (List.map snd eqs)
+  | E_sig_get _ -> 
+      SMap.empty
+  | E_emit(_,e1) ->
+      aux xs e1
+  | E_sig_create(e1) ->
+      aux xs e1
   in
   aux xs e
 

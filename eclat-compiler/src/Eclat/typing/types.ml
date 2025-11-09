@@ -52,6 +52,7 @@ type ty = Ty_var of ty var
         | Ty_fun of ty * dur * tyB
         | Ty_ref of tyB
         | Ty_array of size * tyB
+        | Ty_signal of tyB
 
 let dur_add d1 d2 =
   Dur_max(d1,d2)
@@ -139,7 +140,8 @@ let rec canon_ty = function
     Ty_ref(canon_tyB tyB)
 | Ty_array(sz,tyB) ->
     Ty_array(canon_size sz, canon_tyB tyB)
-
+| Ty_signal(tyB) ->
+    Ty_signal(canon_tyB tyB)
 
 let pp_dur fmt (d:dur) : unit =
   let open Format in
@@ -216,6 +218,8 @@ let pp_ty fmt (ty:ty) : unit =
   | Ty_ref tyB -> fprintf fmt "ref<%a>" pp_tyB tyB
   | Ty_array(sz,tyB) ->
       fprintf fmt "array<%a,%a>" pp_size sz pp_tyB tyB
+  | Ty_signal(tyB) ->
+      fprintf fmt "signal<%a>" pp_tyB tyB
   in pp fmt ty
 
 
@@ -286,24 +290,26 @@ let rec occ = function
 in occ tyB
 
 let rec occur_ty v ty =
-let rec occ = function
-| Ty_var {contents=Unknown v'} ->
-    if v = v' then raise Found
-| Ty_var {contents=Is ty} -> occ ty
-| Ty_base tyB ->
-    occur_tyB v tyB
-| Ty_tuple ty_list ->
-    List.iter occ ty_list
-| Ty_fun(ty1,d,tyB2) ->
-    occ ty1;
-    occur_dur v d;
-    occur_tyB v tyB2
-| Ty_ref tyB ->
-    occur_tyB v tyB
-| Ty_array(sz,tyB) ->
-    occur_size v sz;
-    occur_tyB v tyB
-in occ ty
+  let rec occ = function
+  | Ty_var {contents=Unknown v'} ->
+      if v = v' then raise Found
+  | Ty_var {contents=Is ty} -> occ ty
+  | Ty_base tyB ->
+      occur_tyB v tyB
+  | Ty_tuple ty_list ->
+      List.iter occ ty_list
+  | Ty_fun(ty1,d,tyB2) ->
+      occ ty1;
+      occur_dur v d;
+      occur_tyB v tyB2
+  | Ty_ref tyB ->
+      occur_tyB v tyB
+  | Ty_array(sz,tyB) ->
+      occur_size v sz;
+      occur_tyB v tyB
+  | Ty_signal(tyB) ->
+      occur_tyB v tyB
+  in occ ty
 
 let test_occur occ o =
 try occ o; false with Found -> true
@@ -354,8 +360,10 @@ let rec vars s = function
     vars_of_dur ~s:s2 d
 | Ty_ref tyB -> vars_of_tyB ~s tyB
 | Ty_array (sz,tyB) ->
-    let s1 = vars_of_size ~s:s sz in
+    let s1 = vars_of_size ~s sz in
     vars_of_tyB ~s:s1 tyB
+| Ty_signal (tyB) ->
+    vars_of_tyB ~s:s tyB
 in vars s ty
 
 let free_vars_of_type (bv,t) =
@@ -417,6 +425,8 @@ let instance (Forall(vs,ty)) =
       Ty_ref(inst_tyB tyB)
   | Ty_array(sz,tyB) ->
       Ty_array(inst_size sz, inst_tyB tyB)
+  | Ty_signal(tyB) ->
+      Ty_signal(inst_tyB tyB)
   in
   inst_ty ty
 
@@ -515,7 +525,8 @@ let rec rename_ty unknowns = function
     Ty_ref(rename_tyB unknowns tyB)
 | Ty_array(sz,tyB) ->
     Ty_array(rename_size unknowns sz, rename_tyB unknowns tyB)
-
+| Ty_signal(tyB) ->
+    Ty_signal(rename_tyB unknowns tyB)
 
 
 let size_sz sz =

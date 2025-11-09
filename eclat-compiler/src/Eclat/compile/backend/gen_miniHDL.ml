@@ -66,7 +66,8 @@ let contain_return s =
   | S_write_start _
   | S_write_stop _
   | S_call _
-  | S_set _ 
+  | S_set _
+  | S_sig_set _
   | S_array_set _ -> false
   | S_letIn(_,_,s1) -> aux s1
   | S_seq(s1,s2) -> aux s1 || aux s2
@@ -125,7 +126,8 @@ let rec insert_kont ~is_zero w ~idle ~x s =
     | S_call _
     | S_set _
     | S_external_run _ 
-    | S_array_set _ -> s
+    | S_array_set _ 
+    | S_sig_set _ -> s
   in
   Some (aux s)
 
@@ -192,6 +194,7 @@ let rec to_a ~externals ~sums (e:Ast.e) : a =
         let n,arg_size,ty_n = find_ctor y sums in
         A_tuple[A_const(n);A_encode(z,ty_n,arg_size)])
   | Ast.E_vector(es) -> A_vector (List.map (to_a ~externals ~sums) es)  
+  | Ast.E_sig_get x -> A_sig_get x
   | _ ->
       Format.fprintf Format.std_formatter "--> %a\n"  Ast_pprint.pp_exp  e; assert false
 
@@ -316,6 +319,10 @@ let rec to_s ~is_zero ~statics ~externals ~sums gs e x k =
             S_letIn(z2,A_call((to_op @@ (GetTuple{pos=1;arity=2}),A_var z)),
 
             S_case(z1,hs',so))))
+  | E_letIn(P_var y,_,E_sig_create(ey),e1) ->
+      let w1,ts1,s1 = to_s ~is_zero ~statics ~externals ~sums gs e1 x k in
+      w1,ts1,seq_ (S_sig_set(y,to_a ~externals ~sums ey)) s1
+
   | E_letIn(P_var f,_,(E_fix(h,(p,_,e1)) as phi),e2) ->
      assert (f = h);
      let e1 = replace_arg phi in
@@ -506,13 +513,12 @@ let rec to_s ~is_zero ~statics ~externals ~sums gs e x k =
         SMap.empty,SMap.empty,seq_ (seq_ (seq_list_ s_list) (set_ x (A_tuple xs))) k
       else
       let q = Ast.gensym ~prefix:"par" () in
+      let rdys = List.map (fun (rdy_i,_,_,_) -> A_var rdy_i) pi_s in
+      let ress = List.map (fun (_,res_i,_,_) -> A_var res_i) pi_s in
+      let end_s = let_plug_s (conjonction_atoms rdys) (fun z ->
+                  S_if(z, (seq_ (S_set(x,(A_tuple ress))) @@ k),Some (S_continue q))) in
       let ts = SMap.singleton q (
-        let s_fin =
-          let rdys = List.map (fun (rdy_i,_,_,_) -> A_var rdy_i) pi_s in
-          let ress = List.map (fun (_,res_i,_,_) -> A_var res_i) pi_s in
-          let_plug_s (conjonction_atoms rdys) (fun z ->
-                       S_if(z,
-                        (seq_ (S_set(x,(A_tuple ress))) @@ k),Some (S_continue q)))
+        let s_fin = end_s
         in
         let s_list' = List.map2 (fun id_i (rdy_i,res_i,idle_i,(ts_i,s_i)) -> 
                         S_fsm(id_i,rdy_i,res_i,idle_i,ts_i,S_skip)) id_s pi_s
@@ -520,8 +526,10 @@ let rec to_s ~is_zero ~statics ~externals ~sums gs e x k =
       ) in
       let s_inFsm_list = List.map2 (fun id_i (rdy_i,res_i,idle_i,(ts_i,s_i)) -> 
                                    (S_in_fsm(id_i,s_i))) id_s pi_s in
-      SMap.empty,ts, seq_ (seq_list_ s_inFsm_list)
-                     (S_continue q)
+      SMap.empty,ts, seq_ (seq_list_ s_inFsm_list) @@ end_s
+                     (*S_continue q*) 
+                     (** todo: avoid duplication of the continuation 
+                         of all the [es] are always non instantaneous **)
 
   | E_for _ -> assert false (* already expanded *)
  
@@ -614,7 +622,20 @@ let rec to_s ~is_zero ~statics ~externals ~sums gs e x k =
       let w1,ts1,s1 = to_s ~is_zero ~statics ~externals ~sums gs e1 x (S_continue q) in
       (w1, SMap.add q k ts1, s1)
   | E_equations(p,eqs) ->
-      let acc = ref [] in
+      let ws,tss,list_s = Prelude.map_split3 (fun (Ast.P_var y,Ast.Exp e) ->
+                         let z = Ast.gensym () in
+                         let w,ts,s = to_s ~is_zero ~statics ~externals ~sums gs e z S_skip in
+                         w,ts,seq_ s (S_sig_set(y^"%signal",A_var z))
+                       ) eqs
+      in
+      let ts = List.fold_left (++) SMap.empty tss in
+      let w1,ts1,s1 = to_s ~is_zero ~statics ~externals ~sums gs (Pattern.pat2exp p) x k in
+      let w' = List.fold_left (++>) w1 ws in
+      let s' = List.fold_right seq_ list_s s1 in
+      let s_with_init = List.fold_right (fun (Ast.P_var y,_) s -> seq_ (set_ y (A_sig_get(y^"%signal"))) s) eqs s' in
+      w',ts ++ ts1,s_with_init
+     
+      (* let acc = ref [] in
       let rec compile_le clks p x le =
         let rec aux p ax = 
           match p with
@@ -689,7 +710,7 @@ let rec to_s ~is_zero ~statics ~externals ~sums gs e x k =
                                  *)
                                  
                                  (* (aux p_tuple p_tuple_pre)*)
-
+*)
     (*let p_tuple = Ast.P_tuple (List.map fst eqs) in
       let p_tuple_pre = Ast_rename.rename_pat ~statics:(List.map fst statics) p_tuple in
       let rec aux p1 p2 = 
@@ -710,6 +731,8 @@ let rec to_s ~is_zero ~statics ~externals ~sums gs e x k =
       SMap.empty,SMap.empty,seq_ (seq_ S_skip (seq_ s' (set_ x (to_a ~externals ~sums @@ Pattern.pat2exp p))))
                                  k (* (aux p_tuple p_tuple_pre)*)
 *)
+  | E_emit(x,ey) ->
+       SMap.empty,SMap.empty,return_ @@ S_sig_set(x,to_a ~externals ~sums ey)
   | e -> Ast_pprint.pp_exp Format.std_formatter e; assert false (* todo *)
 
 (* takes a program and translates it into an FSM *)
@@ -725,7 +748,7 @@ and compile ?(result=(Ast.gensym ~prefix:"result" ())) ~is_zero pi =
   let idle = gensym ~prefix:"idle" () in
 
   let e = pi.main in
-  let xs = List.map fst @@ SMap.bindings @@ Free_vars.fv ~get_arrays:false pi.main in
+  let xs = List.map fst @@ SMap.bindings @@ Free_vars.fv ~get_sig:false ~get_arrays:false pi.main in
   let ys,zs = List.split @@ (List.map (fun x -> x,Ast_rename.rename_ident ~statics:(List.map fst pi.statics) x) xs) in
   let py,pz = let f xs = group_ps @@ List.map (fun x -> P_var x) xs in (f ys, f zs) in
   let e_ren = Ast_subst.subst_p_e py (Pattern.pat2exp pz) e in

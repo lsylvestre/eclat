@@ -10,6 +10,7 @@ and ty = TInt of ty | TBool | TUnit
        | TVect of int
        | TAbstract of x * size list * ty list
        | TSize of int
+       | TSig of ty
 and size = ty
 
 let new_tvar = let c = ref 0 in fun () -> incr c; TVar (ref (V ("'a"^string_of_int !c)))
@@ -49,6 +50,7 @@ type a = A_letIn of x * a * a
   | A_array_length of x * ty (* [ty] is the size of the resulting integer *)
   | A_decode of x * ty
   | A_encode of x * ty * int
+  | A_sig_get of x
 
 type write = Delayed | Immediate
 
@@ -74,7 +76,7 @@ type s = (* all instructions terminates in one clock cycle *)
   | S_in_fsm of id * s
   | S_call of Operators.op * a
   | S_external_run of x * l * x * x * a (* (f,id,result,rdy,a) *)
-
+  | S_sig_set of x * a
 
 and t = (x * s)
 
@@ -111,6 +113,7 @@ module Debug = struct
       fprintf fmt "]@]"
   | TSize n -> fprintf fmt "size<%d>" n
   | TStatic {elem ; size} -> fprintf fmt "%a static<%a>" pp_ty elem pp_ty size
+  | TSig t -> fprintf fmt "tsig<%a>" pp_ty t
 
 let pp_tuple = Ast_pprint.pp_tuple
 let pp_vector = Ast_pprint.pp_vector
@@ -154,7 +157,8 @@ let pp_vector = Ast_pprint.pp_vector
   | A_array_length(x,_) -> fprintf fmt "array_length(%s)" x
   | A_decode(x,_) -> fprintf fmt "decode(%s)" x
   | A_encode(x,_,n) -> fprintf fmt "encode(%s,%d)" x n
-
+  | A_sig_get(x) ->
+      fprintf fmt "@[<v>?%s@]" x
   let rec pp_s fmt = function
   | S_skip -> fprintf fmt "skip"
   | S_continue q ->
@@ -198,6 +202,8 @@ let pp_vector = Ast_pprint.pp_vector
       fprintf fmt "@[%a(%a)@]" Operators.pp_op op pp_a a
   | S_external_run(f,l,res,rdy,a) ->
       fprintf fmt "@[(%s,%s) := run_%s %s %a;@]" res rdy l f pp_a a
+  | S_sig_set(x,a) ->
+      fprintf fmt "@[<v>%s <= %a;@]" x pp_a a
   and pp_fsm fmt (ts,s) =
     let pp_t fmt (x,s) = fprintf fmt "@[%s = %a@]@," x pp_s s in
     fprintf fmt "@[<v>let rec ";

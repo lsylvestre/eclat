@@ -18,6 +18,8 @@ let get_tuple pos arity e =
    let-bindings are of the form [let x = e1 in e2]. *)
 let rec matching e =
   match e with
+  | E_letIn(p,ty,E_sig_create a,e2) ->
+      E_letIn(p,ty,E_sig_create a,matching e2)
   | E_letIn(p,ty,e1,e2) ->
       (match p with
        | P_unit ->
@@ -63,15 +65,28 @@ let rec matching e =
   | E_reg((p,tyB,e1),e0,l) ->
      let x = gensym () in
      E_reg((P_var x,tyB,matching @@ E_letIn(p,Ty_base tyB,E_var x,e1)),matching e0,l)
-  (*| E_equations(p,eqs) ->
-      let x = gensym () in
-let eqs' = List.map (fun (pz,e) ->
+  | E_equations(p,eqs) ->
+      let eqs' = List.concat @@ List.map (fun (pz,Exp e) ->
              match pz with 
-             | P_var z -> pz, matching e
+             | P_var z -> [pz, Ast.Exp(matching e)]
+             | P_unit _ -> let z = gensym () in [P_var z, Ast.Exp(matching e)]
              | _ -> let z = gensym () in
-                    P_var z,matching @@ E_letIn(p,Types.new_ty_unknown(),e,Pattern.pat2exp p)) eqs in
-      E_equations(P_var x,eqs' @ [P_var x,Pattern.pat2exp p])
-*)  | e -> Ast_mapper.map matching e
+                    let ez = E_var z in
+                    (P_var z,Ast.Exp (matching e))::
+                    let rec loop i len ez p =
+                      match p with
+                      | P_var x -> [(P_var x, Ast.Exp (get_tuple i len ez))]
+                      | P_tuple ps ->
+                          let e = Pattern.pat2exp p in 
+                          let z' = gensym () in
+                          let ez' = E_var z' in
+                          let len = List.length ps in
+                           (P_var z', Ast.Exp ez)::(List.concat @@
+                           List.mapi (fun i p -> 
+                           (loop i len ez' p)) ps)
+                    in loop 0 (-1) ez pz) eqs in
+      E_equations(p,eqs')
+  | e -> Ast_mapper.map matching e
 
 
 let matching_pi pi =

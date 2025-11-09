@@ -326,6 +326,14 @@ let globalize_e (e:e) : ((x * _ * e) list * e) =
         in
         let dss,eqs' = List.split @@ List.map (fun (p,le) -> let ds,le' = glob_le le in ds,(p,le')) eqs in
         List.concat dss, E_equations(p,eqs') 
+    | E_sig_get _ ->
+        [], e
+    | E_emit(x,e1) ->
+      let ds1,e1' = glob e1 in
+      ds1,E_emit(x,e1')
+    | E_sig_create(e1) ->
+      let ds1,e1' = glob e1 in
+      ds1,E_sig_create(e1')
   in glob e
 
 

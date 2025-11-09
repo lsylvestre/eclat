@@ -126,22 +126,23 @@ let rec lfloat (e:e) : e =
       let ds,e' = glob e in
       ds,E_pause e'
   | E_equations(p,eqs) ->
-      let rec glob_le le =
+      let rec lfloat_le le =
         match le with
-        | Exp e1 -> let ds,e1' = glob e1 in (ds, Exp e1')
-        | Fby(le1, le2) -> let ds1,le1' = glob_le le1 in
-                           let ds2,le2' = glob_le le2 in
-                           (ds1@ds2, Fby(le1', le2'))
-        | When(le1, e2) -> let ds1,le1' = glob_le le1 in
-                           let ds2,e2' = glob e2 in
-                           (ds1@ds2, When(le1', e2'))
-        | Merge(le1, le2, e3) -> let ds1,le1' = glob_le le1 in
-                                 let ds2,le2' = glob_le le2 in
-                                 let ds3,e3' = glob e3 in
-                                 (ds1@ds2@ds3, Merge(le1', le2', e3'))
+        | Exp e1 -> Exp (lfloat e1)
+        | Fby(le1, le2) -> Fby(lfloat_le le1, lfloat_le le2)
+        | When(le1, e2) -> When(lfloat_le le1, lfloat e2)
+        | Merge(le1, le2, e3) -> Merge(lfloat_le le1, lfloat_le le2, lfloat e3)
       in
-      let dss,eqs' = List.split @@ List.map (fun (p,le) -> let ds,le' = glob_le le in ds,(p,le')) eqs in
-      List.concat dss, E_equations(p,eqs') 
+      let eqs' = List.map (fun (p,le) -> p,lfloat_le le) eqs in
+      [], E_equations(p,eqs')
+  | E_sig_get _ ->
+      [],e
+  | E_emit(x,e1) ->
+      let ds,e1' = glob e1 in
+      ds, E_emit(x,e1')
+  | E_sig_create(e1) ->
+      let ds,e1' = glob e1 in
+      ds,E_sig_create(e1')
   in 
   let ds,e' = glob e in 
   declare ds e'

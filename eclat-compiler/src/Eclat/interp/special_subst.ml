@@ -135,6 +135,15 @@ let subst_e x ex e =
     | E_pause e1 -> 
         let e1' = ss (0::id) e1 in
         E_pause e1'
+    | E_sig_get y ->
+        let z = if x <> y then y else as_ident ex in
+        E_sig_get(z)
+    | E_emit(y,e1) ->
+        let e1' = ss (0::id) e1 in
+        E_emit(y,e1')
+    | E_sig_create(e1) ->
+        let e1' = ss (0::id) e1 in
+        E_sig_create(e1')
   in
   ss [] e
 

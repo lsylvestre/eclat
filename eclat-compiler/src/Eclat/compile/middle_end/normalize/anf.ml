@@ -210,6 +210,14 @@ let rec anf (e:e) : e =
         | Merge(le1, le2, e3) -> Merge(anf_le le1, anf_le le2, anf e3)
       in
       E_equations(p,List.map (fun (p,le) -> p, anf_le le) eqs)
+  | E_sig_get _ ->
+      e
+  | E_emit(x,e1) ->
+      plug (anf e1) @@ fun xc ->
+      E_emit(x,xc)
+  | E_sig_create(e1) ->
+      plug (anf e1) @@ fun xc ->
+      E_sig_create(xc)
   in 
   glob e ;;
 

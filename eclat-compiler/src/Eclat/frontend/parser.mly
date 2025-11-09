@@ -104,6 +104,7 @@
 %token INIT_TUPLE INIT_INT
 %token VECTOR_MAPI INT_MAPI VECT_CREATE
 %token PAUSE
+%token EMIT SIGNAL
 /* The precedences must be listed from low to high. */
 
 %right    PIPE_PIPE PIPE_COMMA_PIPE /* parallel construct */
@@ -208,7 +209,10 @@ decl:
 decl_all:
 | LET b=after_let(SEMI_SEMI)
         { b,(with_file $loc) }
-| NODE f=IDENT p=apat RETURNS p2=apat EQ eqs=equations SEMI_SEMI { (P_var f, E_fun(p,(Types.new_ty_unknown(),Types.new_tyB_unknown()),E_equations(p2,eqs))),(with_file $loc) }
+| NODE f=IDENT p=apat RETURNS p2=apat EQ eqs=equations SEMI_SEMI { 
+    (let p',e = eqs in
+        P_var f, E_fun(p,(Types.new_ty_unknown(),Types.new_tyB_unknown()),
+     E_letIn(p',Types.new_ty_unknown(),e,Pattern.pat2exp p2))),(with_file $loc) }
 /*| NODE b=fun_decl(SEMI_SEMI)
         { enforce_node b,(with_file $loc) }
 */
@@ -277,7 +281,22 @@ after_let(In_kw):
             P_var f, v
         }
 fun_rec_decl(In_kw):
-| REC (* o=IMMEDIATE?*) f=IDENT p_ty_opt=arg_ty_atomic ty_opt=ret_ty_annot_eq e1=exp In_kw
+| REC f=IDENT p_ty_opt=arg_ty_atomic ty_opt=ret_ty_annot_eq e1=exp In_kw
+        {
+            let p_ty_opt_f =
+              let open Types in
+              match p_ty_opt with
+              | p,None -> p,None
+              | p,Some t -> p,Some (Ty_fun(t,new_dur_unknown(),new_tyB_unknown()))
+            in
+            let loc_fun = with_file ($startpos(f),$endpos(e1)) in
+            let (p,ty_f_opt) = p_ty_opt_f in
+            let ef = mk_fun_ty_annot p ty_f_opt (ty_annot_opt ~ty:ty_opt e1)
+                   |> mk_loc loc_fun in
+            let v = mk_fix f ef loc_fun in
+            P_var f, v
+        }
+| REC IMMEDIATE f=IDENT p_ty_opt=arg_ty_atomic ty_opt=ret_ty_annot_eq e1=exp In_kw
         {
             let p_ty_opt_f =
               let open Types in
@@ -291,10 +310,10 @@ fun_rec_decl(In_kw):
                    |> mk_loc loc_fun in
             let v = mk_fix f ef loc_fun in
             (*match o with 
-            | None -> *)P_var f, v
-            (* | Some _ -> P_var f, E_letIn(P_var f,v,e1)*)
+            | None -> P_var f, v
+            | Some _ -> *)
+            P_var f, E_letIn(P_var f,new_ty_unknown(),v,ef)
         }
-
 
 
 
@@ -459,10 +478,10 @@ lexp_desc:
 | FUN p_ty_opt=arg_ty RIGHT_ARROW e=exp
         { let (p,ty_p_opt) = p_ty_opt in
           mk_fun_ty_annot_p p ty_p_opt e }
-| e=aexp WHERE eqs=equations { 
+(* | e=aexp WHERE eqs=equations { 
           let p = Pattern.exp2pat e in
           E_letIn(p,Types.new_ty_unknown(),E_equations(p, eqs),e) } 
-| IF e1=exp THEN e2_e3=if_end
+*)| IF e1=exp THEN e2_e3=if_end
         { let (e2,e3) = e2_e3 in E_if(e1,e2,e3) }
 | LET b=after_let(IN) e2=exp
         { let (p,e1) = b in
@@ -482,8 +501,12 @@ lexp_desc:
         }
 
 equations:
-| REC eqs=separated_nonempty_list(AND,separated_pair(apat,EQ,lustre_lexp)) { eqs }
-
+| REC eqs=separated_nonempty_list(AND,separated_pair(apat,EQ,exp)) 
+| eqs=separated_nonempty_list(SEMI,separated_pair(apat,EQ,app_exp)) 
+    { let p' = group_ps (List.map fst eqs) in
+       p',E_app(E_var "fixpoint", E_fun(p', (Types.new_ty_unknown(),Types.new_tyB_unknown()),
+                                    group_es (List.map snd eqs))) }
+/*
 lustre_lexp:
 | e=lexp { Exp(e) }
 | LPAREN le=lustre_lexp RPAREN { le }
@@ -494,7 +517,7 @@ lustre_lexp:
 lustre_aexp:
 | e=aexp { Exp(e) }
 | LPAREN le=lustre_lexp RPAREN { le }
-
+*/
 if_end:
 | e2=lexp { e2,E_const Unit }
 | e2=lexp ELSE e3=lexp { e2, e3 }
@@ -584,6 +607,11 @@ app_exp_desc:
                         E_app(e1,e2)
                       | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
                    ~msg:"expression in functional position should be a variable or a constante" ())
+        | [e1; e2; e3] when un_annot e2 = E_var "when" ->
+              E_app(E_var "when",
+                       E_tuple[E_fun(P_unit,(Ty_base TyB_unit,new_tyB_unknown ()),e1);e3])
+    (* E_if(e2,e1,E_app(E_const (Op(Runtime(External_fun("Default.create",
+        new_ty_unknown ())))),E_const(Unit))) *)
         | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
                    ~msg:"All functions and primitives should be unary. Hints: use a tuple as argument" () }
 | MINUS e1=aexp %prec prec_unary_minus { E_app(E_const(Op(Runtime(External_fun("Int.neg",new_ty_unknown ())))),e1) }
@@ -647,12 +675,16 @@ app_exp_desc:
 
 | RUN i=UP_IDENT e=aexp 
      { E_run(i, e, gensym()) }
-
-| e1=app_exp x=WHEN e2=aexp { E_if(e2,e1,E_app(E_const (Op(Runtime(External_fun("Default.create",new_ty_unknown ())))),E_const(Unit))) }
 | e1=aexp RIGHT_ARROW e2=app_exp { E_app(E_var "arrow", E_tuple[e1;e2]) }
 
 
+| EMIT x=IDENT e=aexp { E_emit(x,e) }
+/* | EMIT x=IDENT { E_emit(x,E_const (Bool true)) } */
+| SIGNAL e=aexp { E_sig_create e }
+| SIGNAL NEQ { E_sig_create (E_app(E_const (Op(Runtime(External_fun("Default.create",new_ty_unknown ())))),E_const(Unit))) }
 | e=aexp { e }
+
+
 
 
 dot_get:
@@ -663,6 +695,7 @@ aexp:
   e=aexp_desc { mk_loc (with_file $loc) e }
 
 aexp_desc:
+| QUESTION_MARK x=IDENT { E_sig_get(x) }
 | BANG ex=aexp { E_get(ex) }
 | LPAREN e=exp RPAREN { e }
 | LPAREN e=exp COL ty=ty RPAREN { ty_annot ~ty e }

@@ -117,6 +117,14 @@ let rec map f e =
       in  
       let eqs' = List.map (fun (p,le) -> p,map_le f le) eqs in
       E_equations(p,eqs')
+  | E_sig_get(x) -> 
+      E_sig_get(x)
+  | E_emit(x,e1) ->
+      let e1' = f e1 in
+      E_emit(x,e1')
+  | E_sig_create(e1) ->
+      let e1' = f e1 in
+      E_sig_create(e1')
 
 (** traversal order of sub-expressions is unspecified *)
 let rec iter f (e:e) : unit =
@@ -188,6 +196,12 @@ let rec iter f (e:e) : unit =
         | Merge(le1,le2,e3) -> iter_le f le1; iter_le f le2; f e3
       in
       List.iter (fun (_,le) -> iter_le f le) eqs
+  | E_sig_get _ -> 
+      ()
+  | E_emit(_,e1) ->
+      f e1
+  | E_sig_create(e1) ->
+      f e1
 
 let declare ds ts e =
   List.fold_right2 (fun (x,v) t e -> E_letIn(P_var x,t,v,e)) ds ts e
@@ -343,10 +357,18 @@ let accum f (e:e) =   (* : ((x * ty * e) list * e)*)
                                        p, accum_le le) eqs in
             
                 [], E_equations(p,eqs')
-  ) 
+        | E_sig_get _ -> 
+            [],e
+        | E_emit(x,e1) ->
+            let ds1,e1' = aux e1 in
+            ds1, E_emit(x,e1')
+        | E_sig_create e1 -> 
+            let ds1,e1' = aux e1 in
+            ds1, E_sig_create(e1')
+    ) 
   in 
   aux e
-
+   
 
 let map_pi f pi =
   Map_pi.map (map f) pi

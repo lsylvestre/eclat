@@ -6,6 +6,7 @@ let clean_fsm ~rdy ~result (ts,s) typing_env =
   Hashtbl.add vs_read result ();
   let rec collect_read_a = function
   | A_var x -> Hashtbl.add vs_read x ()
+  | A_sig_get _ -> ()
   | A_tuple aa -> List.iter collect_read_a aa
   | A_letIn(x,a1,a2) ->
       Hashtbl.add vs_read x ();
@@ -41,7 +42,9 @@ let clean_fsm ~rdy ~result (ts,s) typing_env =
       Hashtbl.add vs_read x ();
       List.iter (fun (_,s) -> collect_s s) hs;
       Option.iter collect_s so
-  | S_set(x,a) ->
+  | S_set(_,a) ->
+     collect_read_a a
+  | S_sig_set(_,a) ->
      collect_read_a a
   | S_acquire_lock _ | S_release_lock _ -> ()
   | S_read_start(_,a) ->

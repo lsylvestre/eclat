@@ -198,6 +198,8 @@ let rec unify_ty ~loc ty1 ty2 =
   | Ty_array(sz1,tyB1),Ty_array(sz2,tyB2) ->
     unify_size ~loc sz1 sz2;
     unify_tyB ~loc tyB1 tyB2
+  | Ty_signal(tyB1),Ty_signal(tyB2) ->
+    unify_tyB ~loc tyB1 tyB2
   | Ty_base _,_ | _,Ty_base _ ->
     raise @@ CannotUnify_tyB(loc,ty1,ty2)
   | _ -> raise @@ CannotUnify_ty(loc,ty1,ty2)
@@ -745,7 +747,25 @@ let rec typ_exp ?(collect_sig=false) ~statics ~externals ~sums ~ctors ?(toplevel
         let tyOut,_ = typ_exp ~collect_sig ~statics ~externals ~sums ~ctors
                             ~toplevel ~loc g' (Pattern.pat2exp p) in
         tyOut,Dur_zero  
-
+  | E_sig_get(x) ->
+      let tyx = typ_ident ~loc g x in
+      let v = new_tyB_unknown () in
+      unify_ty ~loc (Ty_signal(v)) tyx;
+      (Ty_base v, Dur_zero)
+  | E_emit(x,e1) ->
+      let tyx = typ_ident ~loc g x in
+      let ty1,d1 = typ_exp ~collect_sig ~statics ~externals ~sums ~ctors ~toplevel:false ~loc g e1 in
+      let v = new_tyB_unknown () in
+      unify_ty ~loc:(loc_of e1) ty1 (Ty_base v);
+      unify_ty ~loc (Ty_signal(v)) tyx;
+      unify_dur ~loc:(loc_of e1) d1 Dur_zero;
+      (Ty_base TyB_unit, Dur_zero)
+  | E_sig_create(e1) ->
+      let ty1,d1 = typ_exp ~collect_sig ~statics ~externals ~sums ~ctors ~toplevel:false ~loc g e1 in
+      unify_dur ~loc:(loc_of e1) d1 Dur_zero;
+      let v = new_tyB_unknown () in
+      unify_ty ~loc:(loc_of e1) ty1 (Ty_base v);
+      (Ty_signal v, Dur_zero)
 
 let typing_handler ?(msg="") f () =
   let open Format in

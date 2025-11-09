@@ -72,6 +72,9 @@ type e =                      (** expression     [e]                       *)
   | E_run of x * e * l   (* [f e] call external function [f] with argument [e] *)
   | E_pause of e         (* [pause e] starts [e] after one cycle *)
   | E_equations of p * (p * le) list
+  | E_sig_get of x
+  | E_emit of x * e
+  | E_sig_create of e
 
 and e_static = e
 

@@ -23,7 +23,8 @@ let rec flat = function
 | A_array_get _
 | A_array_length _
 | A_encode _
-| A_decode _ as a ->  (* no sub-atoms*)
+| A_decode _ 
+| A_sig_get _ as a ->  (* no sub-atoms*)
     [],a
 | A_vector(aas) ->
     let bss,aas' = List.map flat aas |> List.split in
@@ -75,6 +76,9 @@ let rec flat_s s =
   | S_external_run(f,i,res,rdy,a) ->
       let bs,a' = flat a in
       s_let_bindings bs @@S_external_run(f,i,res,rdy,a')
+  | S_sig_set(x,a) ->
+     let bs,a' = flat a in
+     s_let_bindings bs @@ S_sig_set(x,a')
 
 let flat_let_atom (ts,s) =
   List.map (fun (x,s) -> x,flat_s s) ts, flat_s s

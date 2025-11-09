@@ -18,6 +18,7 @@ let rec canon = function
   | TVect _ as t -> t
   | TSize _ as t -> t
   | TAbstract(x,ns,ts) -> TAbstract(x,List.map canon ns,List.map canon ts)
+  | TSig t -> TSig (canon t)
 (** [size_ty t] returns the size (in number of bytes) of type [t]
   Unspecified size are fixe to 32 bits by default
   (customizable via argument [?when_tvar]) *)
@@ -42,7 +43,7 @@ let rec size_ty =
     | TAbstract(x,ns,tys) ->
         let prod_ns = List.fold_left ( * ) 1 (List.map size_ty ns) in
         let sum_ts = if tys = [] then 1 else List.fold_left (+) 0 (List.map size_ty tys) in
-        match Hashtbl.find_opt Ast.typ_decl_abstract x with
+        (match Hashtbl.find_opt Ast.typ_decl_abstract x with
         | None ->
             let k = prod_ns * sum_ts in
             if List.length tys > 1 then   
@@ -53,7 +54,8 @@ let rec size_ty =
         | Some ("only_size_sum",_,_) -> List.fold_left (+) 0 (List.map size_ty ns)
         | Some ("mul",_,_) -> prod_ns * sum_ts
         | Some ("only_size",_,_) -> prod_ns
-        | _ -> assert false (* todo *)
+        | _ -> assert false (* todo *))
+   | TSig t -> size_ty t
 
 let rec string_of_ty = function
   | TInt tz -> "int<"^string_of_ty tz^">"
@@ -69,6 +71,8 @@ let rec string_of_ty = function
   | TStatic {elem ; size} -> string_of_ty elem ^ " static<" ^ string_of_ty size ^ ">"
   | TAbstract(x,ns,ts) ->  "("^(String.concat "," @@ List.map string_of_ty ts)^") " 
                            ^ x^"<"^ (String.concat "," @@ List.map string_of_ty ns) ^">" 
+  | TSig t -> "sig<"^string_of_ty t^">"
+
 exception CannotUnify of (ty*ty)
 
 let rec unify t1 t2 =
@@ -107,6 +111,7 @@ let rec unify t1 t2 =
       || List.compare_lengths ns ns' <> 0 
       then cannot_unify t1 t2
       else (List.iter2 unify ts ts'; List.iter2 unify ns ns')
+  | TSig t1, TSig t2 -> unify t1 t2
   | t1,t2 -> cannot_unify t1 t2
 
 let add_typing_env h (x:string) (t:ty) =
@@ -173,6 +178,7 @@ let rec translate_ty =
   *)
   | Ty_ref tyB -> translate_tyB tyB
   | Ty_array(sz,tyB) -> TStatic{elem=translate_tyB tyB;size=translate_size sz}
+  | Ty_signal(tyB) -> TSig(translate_tyB tyB)
   | Ty_fun _ -> assert false
 
 let rec typing_c = function
@@ -279,6 +285,11 @@ let rec typing_a ~externals h a =
   | A_decode(x,ty) ->
       add_typing_env h x (new_tvar());
       ty
+  
+  | A_sig_get x ->
+      let t = new_tvar () in
+      add_typing_env h x (TSig(t));
+      t
 
 let error_unbound_external x =
   Prelude.Errors.error (fun fmt -> 
@@ -293,6 +304,10 @@ let rec typing_s ~externals ~result h s =
       let t = typing_a ~externals h a in
       (* (Format.fprintf Format.std_formatter "======> (%s : %a)\n" x Fsm_syntax.Debug.pp_ty (canon t)); *)
       add_typing_env h x t
+  | S_sig_set(x,a) ->
+      let t = typing_a ~externals h a in
+      (* (Format.fprintf Format.std_formatter "======> (%s : %a)\n" x Fsm_syntax.Debug.pp_ty (canon t)); *)
+      add_typing_env h x (TSig(t))
   | S_acquire_lock(l) 
   | S_release_lock(l) ->
       ()
@@ -361,7 +376,6 @@ let rec typing_s ~externals ~result h s =
               add_typing_env h rdy TBool;
               unify (translate_ty arg) (typing_a ~externals h a)
           | _ -> assert false))
-
 (* typing of an fsm *)
 and typing_fsm h ~externals ~rdy ~result ~ty_result (ts,s) =
   add_typing_env h rdy TBool;
