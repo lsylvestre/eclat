@@ -17,10 +17,12 @@ type token =
   | TUPLE_UPDATE
   | TUPLE_OF_INT
   | TUPLE_GET
+  | TRAP
   | TO
   | TIMES
   | THEN
   | SYM of (string)
+  | SUSPEND
   | STRING_LIT of (string)
   | STATIC
   | SIZE_CREATE
@@ -70,6 +72,7 @@ type token =
   | LSL
   | LPAREN
   | LOR
+  | LOOP
   | LET
   | LENGTH
   | LEFT_ARROW
@@ -102,6 +105,7 @@ type token =
   | FBY
   | EXTERNAL
   | EXIT_REPL
+  | EXIT
   | EXEC
   | EQ_EQ
   | EQ
@@ -141,6 +145,6 @@ exception Error
 val pi: (Lexing.lexbuf -> token) -> Lexing.lexbuf -> (((Ast.x * (Types.ty * bool)) list *
    (Ast.x * (Types.ty * (bool * int * bool))) list) *
   (Ast.x * Ast.static) list * (Ast.x * (Ast.x * Types.tyB) list) list *
-  ((Ast.p * Ast.e_static) * Prelude.loc) list)
+  ((Ast.p * Ast.e) * Prelude.loc) list)
 
-val exp_eof: (Lexing.lexbuf -> token) -> Lexing.lexbuf -> (Ast.e_static)
+val exp_eof: (Lexing.lexbuf -> token) -> Lexing.lexbuf -> (Ast.e)

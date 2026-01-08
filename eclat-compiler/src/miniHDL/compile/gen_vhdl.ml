@@ -473,12 +473,12 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
      fprintf fmt "variable %a : %a;@," pp_ident sv pp_ident (Naming_convention.state_var_type sv);
   ) !List_machines.extra_machines;
 
-  List.iter (fun (x,(Static_array_of _ | Static_array _)) ->
+  (*List.iter (fun (x,(Static_array_of _ | Static_array _)) ->
       decl_locks fmt x
   ) statics;
   List.iter (fun (x,(_,shared)) ->
       if shared then decl_locks fmt x
-  ) (fst externals);
+  ) (fst externals);*)
 
   List.iter (variable_decl_go_external fmt) (fst externals);
 
@@ -486,6 +486,13 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
 
   fprintf fmt "@]@,@[<v 2>begin@,";
 
+  begin
+    let update fmt (x,_) =
+      fprintf fmt "%a <= (others => '0');@," pp_ident x
+    in
+    pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "@,")
+       update fmt others;
+  end;
 
   List.iter (fun (x,st) ->
     match st with

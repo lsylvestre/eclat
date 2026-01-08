@@ -67,16 +67,19 @@ type e =                      (** expression     [e]                       *)
   | E_vector of e list
   | E_vector_mapi of bool * (p * (tyB * tyB) * e) * e * size
 
-  | E_generate of (p * (ty * tyB) * e) * e * e_static * deco
+  | E_generate of (p * (ty * tyB) * e) * e * e_static * e_static * deco
   | E_for of x * e_static * e_static * e * deco
   | E_run of x * e * l   (* [f e] call external function [f] with argument [e] *)
-  | E_pause of e         (* [pause e] starts [e] after one cycle *)
-  | E_equations of p * (p * le) list
+  | E_pause of l * e     (* [pause e] starts [e] after one cycle *)
   | E_sig_get of x
   | E_emit of x * e
   | E_sig_create of e
+  | E_loop of e
+  | E_trap of tyB
+  | E_exit of x * e
+  | E_suspend of e * x
 
-and e_static = e
+and e_static = size
 
 and le = (* Lustre expression *)
   | Exp of e

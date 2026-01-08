@@ -68,36 +68,17 @@ let rename_e ~statics e =
       let pz = rename_pat ~statics p in
       let e1' = ren_e (subst_p_e p (pat2exp pz) e1) in
      E_reg((pz, tyB, e1'), ren_e e0, l)
-  | E_generate((p, ty, e1), e2, e3, l) ->
+  | E_for(x,sz1,sz2,e3,loc) ->
+      let x' = rename_ident ~statics x in
+      E_for(x',sz1,sz2,ren_e @@ subst_e x (E_var x') e3,loc)
+  | E_generate((p, ty, e1), e2, sz3, sz4, l) ->
       let pz = rename_pat ~statics p in
       let e1' = ren_e (subst_p_e p (pat2exp pz) e1) in
-     E_generate((pz, ty, e1'), ren_e e2, ren_e e3,l)
-  | E_for(x,lc,lc',e,loc) ->
-      let x' = rename_ident ~statics x in
-      E_for(x',lc,lc',ren_e @@ subst_e x (E_var x') e,loc) (* rename lc & lc' ? *)
-  | E_vector_mapi(is_par,(p, typ, e1),e2,ty) ->
+     E_generate((pz, ty, e1'), ren_e e2, sz3, sz4, l)
+      | E_vector_mapi(is_par,(p, typ, e1),e2,ty) ->
       let pz = rename_pat ~statics p in
       let e1' = ren_e (subst_p_e p (pat2exp pz) e1) in
      E_vector_mapi(is_par,(pz, typ, e1'),ren_e e2,ty)
-  | E_equations(p,eqs) ->
-      let rec ren_p_le p ex le =
-        let ren e =
-          ren_e (subst_p_e p ex e)
-        in
-        match le with
-        | Exp e' -> Exp(ren e')
-        | Fby(le1, le2) -> Fby(ren_p_le p ex le1, ren_p_le p ex le2)
-        | When(le1, e2) -> When(ren_p_le p ex le1, ren e2)
-        | Merge(le1, le2, e3) -> Merge(ren_p_le p ex le1, ren_p_le p ex le2, ren e3)
-      in
-      let p_tuple = P_tuple (p :: List.map (fun (p,_) -> p) eqs) in 
-      let pz = rename_pat ~statics p_tuple in
-      let eqs' = List.map (fun (pj,lei) -> 
-                  let pj' = exp2pat (subst_p_e p_tuple (pat2exp pz) (pat2exp pj)) in
-                  let lei' = ren_p_le p_tuple (pat2exp pz) lei in
-                  pj', lei') eqs in
-      let p' = exp2pat (subst_p_e p_tuple (pat2exp pz) (pat2exp p)) in
-      E_equations(p',eqs')
   | e -> Ast_mapper.map ren_e e
   in
   ren_e e
@@ -106,4 +87,18 @@ let rename_pi pi =
   let statics = List.map fst pi.statics in
   let main = rename_e ~statics pi.main in
   { pi with main }
+
+
+
+
+let rename_trap_and_signals ~statics e =
+  let rec ren_e = function
+  | E_letIn(p,ty, ((E_trap _ | E_sig_create _) as e1),e2) ->
+      let pz = rename_pat ~statics p in
+      let ez = pat2exp pz in
+      E_letIn(pz, ty, ren_e e1, ren_e @@ subst_p_e p ez e2)
+  | e -> Ast_mapper.map ren_e e
+  in
+  ren_e e
+
 

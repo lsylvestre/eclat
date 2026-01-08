@@ -46,6 +46,8 @@ let rec lfloat (e:e) : e =
                | (* Ty_var*) _ -> List.map (fun _ -> Types.new_ty_unknown()) ps 
                (* | _ -> assert false *)in
       glob (List.fold_right2 (fun (p,t) e acc -> E_letIn(p,t,e,acc)) (List.combine ps ts) es e2)
+  | E_letIn(P_var x,ty,E_trap tyB,e2) ->
+      [],E_letIn(P_var x,ty,E_trap tyB,lfloat e2)
   | E_letIn(p,ty,e1,e2) ->
       let ds1,e1' = glob e1 in
       let e' = lfloat e2 in
@@ -105,12 +107,12 @@ let rec lfloat (e:e) : e =
       ds1@ds2,E_array_set_immediate(x,e1',e2')
   | E_par(es) ->
       [],E_par(List.map lfloat es)
-  | E_for(x,e_st1,e_st2,e3,loc) ->
-      [],E_for(x,lfloat e_st1,lfloat e_st2,lfloat e3,loc)
+  | E_for(x,sz1,sz2,e3,loc) ->
+      [],E_for(x,sz1,sz2,lfloat e3,loc)
       (* NB: [e_st1] and [e_st2] are *not* moved up with `plug` (ah ? from anf)  *)
-  | E_generate((p,ty,e1),e2,e_st3,loc) ->
+  | E_generate((p,ty,e1),e2,sz3,sz4,loc) ->
       let ds2,e2' = glob e2 in
-      ds2,E_generate((p,ty,lfloat e1),e2',lfloat e_st3,loc) 
+      ds2,E_generate((p,ty,lfloat e1),e2',sz3,sz4,loc) 
       (* NB: [e_st3] is *not* moved up with `plug` (ah ? from anf) 
 *)
   | E_vector(es) ->
@@ -122,19 +124,9 @@ let rec lfloat (e:e) : e =
   | E_run(i,e,l) ->
       let ds,e' = glob e in
       ds,E_run(i,e,l)
-  | E_pause e -> 
+  | E_pause (l,e) -> 
       let ds,e' = glob e in
-      ds,E_pause e'
-  | E_equations(p,eqs) ->
-      let rec lfloat_le le =
-        match le with
-        | Exp e1 -> Exp (lfloat e1)
-        | Fby(le1, le2) -> Fby(lfloat_le le1, lfloat_le le2)
-        | When(le1, e2) -> When(lfloat_le le1, lfloat e2)
-        | Merge(le1, le2, e3) -> Merge(lfloat_le le1, lfloat_le le2, lfloat e3)
-      in
-      let eqs' = List.map (fun (p,le) -> p,lfloat_le le) eqs in
-      [], E_equations(p,eqs')
+      ds,E_pause (l,e')
   | E_sig_get _ ->
       [],e
   | E_emit(x,e1) ->
@@ -143,6 +135,14 @@ let rec lfloat (e:e) : e =
   | E_sig_create(e1) ->
       let ds,e1' = glob e1 in
       ds,E_sig_create(e1')
+  | E_loop(e1) ->
+      [],E_loop(lfloat e1)
+  | E_trap _ -> [],e
+  | E_exit(x,e1) ->
+      let ds1,e1' = glob e1 in
+      ds1,E_exit(x,e1')
+  | E_suspend(e1,x) ->
+      [],E_suspend(lfloat e1,x)
   in 
   let ds,e' = glob e in 
   declare ds e'

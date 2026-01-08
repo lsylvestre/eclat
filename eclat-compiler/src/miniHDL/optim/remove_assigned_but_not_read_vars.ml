@@ -92,6 +92,7 @@ let clean_fsm ~rdy ~result (ts,s) typing_env =
       S_if(x,clean s1,Option.map clean so)
   | S_case(x,hs,so) ->
       S_case(x, List.map (fun (c,s) -> c, clean s) hs,Option.map clean so)
+  | S_sig_set _ -> s
   | S_set(x,_) ->
      if not (Hashtbl.mem vs_read x) 
      then (Hashtbl.add vs_assigned_but_never_read x (); S_skip) 

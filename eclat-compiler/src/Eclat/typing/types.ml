@@ -28,7 +28,8 @@ and 'a var_content = Unknown of int
 
 type size = Sz_var of size var
           | Sz_lit of int
-
+          | Sz_add of size * int
+          | Sz_twice of size
 type tyB = TyB_var of tyB var
          | TyB_int of size
          | TyB_bool
@@ -53,6 +54,7 @@ type ty = Ty_var of ty var
         | Ty_ref of tyB
         | Ty_array of size * tyB
         | Ty_signal of tyB
+        | Ty_trap of tyB
 
 let dur_add d1 d2 =
   Dur_max(d1,d2)
@@ -63,6 +65,15 @@ let rec canon_size = function
   v := Is sz'; sz'
 | Sz_var {contents=Unknown _} as sz -> sz
 | Sz_lit _ as n -> n
+| Sz_add(sz,0) -> canon_size sz
+| Sz_add(sz,n) ->
+   (match canon_size sz with
+    | Sz_lit m -> Sz_lit(n+m)
+    | sz -> Sz_add (sz,n))
+| Sz_twice(sz) -> 
+    (match canon_size sz with
+    | Sz_lit m -> Sz_lit(2*m)
+    | sz -> Sz_twice (sz))
 
 let rec canon_tyB = function
 | TyB_var ({contents=Is tyB} as v) ->
@@ -142,6 +153,8 @@ let rec canon_ty = function
     Ty_array(canon_size sz, canon_tyB tyB)
 | Ty_signal(tyB) ->
     Ty_signal(canon_tyB tyB)
+| Ty_trap(tyB) ->
+    Ty_trap(canon_tyB tyB)
 
 let pp_dur fmt (d:dur) : unit =
   let open Format in
@@ -162,6 +175,8 @@ let pp_size fmt (sz:size) : unit =
   | Sz_var{contents=Unknown n} -> fprintf fmt "~z%d" n
   | Sz_var{contents=Is sz} -> pp fmt sz
   | Sz_lit k -> fprintf fmt "%d" k
+  | Sz_add(sz,n) -> fprintf fmt "(%a + %d)" pp sz n
+  | Sz_twice(sz) -> fprintf fmt "(2 * %a)" pp sz
   in pp fmt sz
 
 let pp_tuple fmt pp vs =
@@ -220,6 +235,8 @@ let pp_ty fmt (ty:ty) : unit =
       fprintf fmt "array<%a,%a>" pp_size sz pp_tyB tyB
   | Ty_signal(tyB) ->
       fprintf fmt "signal<%a>" pp_tyB tyB
+  | Ty_trap(tyB) ->
+      fprintf fmt "trap<%a>" pp_tyB tyB
   in pp fmt ty
 
 
@@ -261,6 +278,8 @@ let rec occ = function
     if v = v' then raise Found
 | Sz_var {contents=Is sz} -> occ sz
 | Sz_lit _ -> ()
+| Sz_add(sz,_) -> occ sz
+| Sz_twice(sz) -> occ sz
 in occ sz
 
 let rec occur_dur v d =
@@ -309,6 +328,8 @@ let rec occur_ty v ty =
       occur_tyB v tyB
   | Ty_signal(tyB) ->
       occur_tyB v tyB
+  | Ty_trap(tyB) ->
+      occur_tyB v tyB
   in occ ty
 
 let test_occur occ o =
@@ -319,6 +340,8 @@ let rec vars s = function
   | Sz_var {contents=Unknown n} -> Vs.add n s
   | Sz_var {contents=Is sz} -> vars s sz
   | Sz_lit _ -> s
+  | Sz_add(sz,_) -> vars s sz
+  | Sz_twice(sz) -> vars s sz
 in vars s sz
 
 let vars_of_dur ?(s=Vs.empty) d =
@@ -364,6 +387,8 @@ let rec vars s = function
     vars_of_tyB ~s:s1 tyB
 | Ty_signal (tyB) ->
     vars_of_tyB ~s:s tyB
+| Ty_trap (tyB) ->
+    vars_of_tyB ~s:s tyB
 in vars s ty
 
 let free_vars_of_type (bv,t) =
@@ -379,8 +404,10 @@ let instance (Forall(vs,ty)) =
            with Not_found -> sz)
   | Sz_var {contents=Is sz} ->
       inst_size sz
-  | Sz_lit _ as k -> k in
-
+  | Sz_lit _ as k -> k
+  | Sz_add(sz,n) -> Sz_add (inst_size sz,n)
+  | Sz_twice(sz) -> Sz_twice(inst_size sz)
+  in
   let rec inst_dur = function
   | Dur_var {contents=Unknown n} as d ->
           (try Dur_var(find_unsafe unknowns n)
@@ -389,7 +416,8 @@ let instance (Forall(vs,ty)) =
       inst_dur d
   | Dur_zero | Dur_one as d -> d
   | Dur_max(d1,d2) ->
-      Dur_max(inst_dur d1,inst_dur d2) in
+      Dur_max(inst_dur d1,inst_dur d2)
+  in
   let rec inst_tyB = function
   | TyB_var {contents=Unknown n} as tyB ->
           (try TyB_var(find_unsafe unknowns n)
@@ -427,6 +455,8 @@ let instance (Forall(vs,ty)) =
       Ty_array(inst_size sz, inst_tyB tyB)
   | Ty_signal(tyB) ->
       Ty_signal(inst_tyB tyB)
+  | Ty_trap(tyB) ->
+      Ty_trap(inst_tyB tyB)
   in
   inst_ty ty
 
@@ -448,6 +478,8 @@ let generalize r ty =
       Forall(vs,ty)
   | ty -> Forall(Vs.empty,ty)
 
+let copy_ty ty =
+  instance (generalize [] ty)
 
 let rec as_tyB ~loc ty = 
   match ty with
@@ -456,6 +488,32 @@ let rec as_tyB ~loc ty =
   | Ty_var({contents=Unknown n} as r) -> TyB_var(Obj.magic r)
   | _ -> Prelude.Errors.raise_error ~loc ()
                  ~msg:"basic type expected"
+
+let extract_arg_res_fun ty =
+  match canon_ty ty with
+  | Ty_fun(ty1,d,tyB) -> (ty1,tyB)
+  | _ -> assert false
+  
+let extract_ty_fun ty =
+  match canon_ty ty with
+  | Ty_fun(ty1,d,tyB) -> (ty1,d,tyB)
+  | _ -> assert false
+
+let contains_fun ty =
+  let exception Find in
+  let rec aux = function
+  | Ty_var {contents=Is ty1} -> aux ty1
+  | Ty_var _ -> ()
+  | Ty_base _ -> () 
+  | Ty_tuple ty_list -> List.iter aux ty_list
+  | Ty_fun _ -> raise Find
+  | Ty_ref _
+  | Ty_array _
+  | Ty_signal _
+  | Ty_trap _ -> () 
+  in
+  try aux ty; false 
+  with Find -> true ;;
 
 
 let rec no_unknown_in_ty t =
@@ -468,22 +526,21 @@ let rec no_unknown_in_ty t =
 
 
 
-
-
-
 let rec rename_size unknowns = function
 | Sz_var {contents=Unknown n} as sz ->
         (try Sz_var(find_unsafe unknowns n)
          with Not_found -> sz)
-| Sz_var ({contents=Is sz} as v) ->
-    v := Is (rename_size unknowns sz); Sz_var v
+| Sz_var ({contents=Is sz} as _v) ->
+    (* _v := Is ( *) rename_size unknowns sz (* ); Sz_var _v *)
 | Sz_lit _ as k -> k
+| Sz_add(sz,n) -> Sz_add (rename_size unknowns sz, n)
+| Sz_twice(sz) -> Sz_twice(rename_size unknowns sz)
 
 let rec rename_dur unknowns = function
 | Dur_var {contents=Unknown n} as d ->
         (try Dur_var(find_unsafe unknowns n)
          with Not_found -> d)
-| Dur_var {contents=Is d} ->
+| Dur_var ({contents=Is d} as _v) ->
     rename_dur unknowns d
 | Dur_zero | Dur_one as d -> d
 | Dur_max(d1,d2) ->
@@ -494,7 +551,7 @@ let rec rename_tyB unknowns = function
 | TyB_var {contents=Unknown n} as tyB ->
         (try TyB_var(find_unsafe unknowns n)
          with Not_found -> tyB)
-| TyB_var {contents=Is tyB} ->
+| TyB_var ({contents=Is tyB} as _v) ->
     rename_tyB unknowns tyB
 | TyB_bool | TyB_unit as tyB -> tyB
 | TyB_int sz -> TyB_int (rename_size unknowns sz)
@@ -513,7 +570,7 @@ let rec rename_ty unknowns = function
 | Ty_var {contents=Unknown n} as ty ->
         (try Ty_var(Obj.magic @@ Hashtbl.find unknowns n)
          with Not_found -> ty)
-| Ty_var {contents=Is ty} ->
+| Ty_var ({contents=Is ty} as _v) ->
     rename_ty unknowns ty
 | Ty_base tyB ->
     Ty_base(rename_tyB unknowns tyB)
@@ -527,12 +584,17 @@ let rec rename_ty unknowns = function
     Ty_array(rename_size unknowns sz, rename_tyB unknowns tyB)
 | Ty_signal(tyB) ->
     Ty_signal(rename_tyB unknowns tyB)
-
+| Ty_trap(tyB) ->
+    Ty_trap(rename_tyB unknowns tyB)
 
 let size_sz sz =
-    match canon_size sz with
+    let sz' = canon_size sz in
+    let rec aux = function
     | Sz_lit n -> n
+    | Sz_add (sz,n) -> aux sz + n
+    | Sz_twice(sz) -> 2 * aux sz
     | _ -> 32
+    in aux(sz')
 
 let compute_tag_size cs =
   let n = 

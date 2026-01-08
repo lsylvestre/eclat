@@ -34,27 +34,78 @@ let eval_static_exp_int ~loc ~statics e =
            "@[<v>Cannot statically evaluate expression %a@]" 
                Ast_pprint.pp_exp e)
 
-
+let fv_type_in ?(s=Types.Vs.empty) e =
+  let open Types in
+  let (++) m1 m2 =
+    Vs.union m1 m2 in
+  let r = ref s in
+  let rec ss e =
+    match e with
+    | E_letIn(_, ty, e1, e2) ->
+        r := !r ++ free_vars_of_type (Vs.empty,ty);
+        ss e1;
+        ss e2
+    | E_fun(p, (ty,tyB), e1) ->
+        r := !r ++ free_vars_of_type (Vs.empty,ty);
+        r := !r ++ free_vars_of_type (Vs.empty,Ty_base tyB);
+        ss e1
+    | E_fix(f, (p, (ty,tyB), e1)) ->
+        r := !r ++ free_vars_of_type (Vs.empty,ty) ;
+        r := !r ++ free_vars_of_type (Vs.empty,Ty_base tyB);
+        ss e1
+    | E_reg((p, tyB, e1), e0, _) ->
+        r := !r ++ free_vars_of_type (Vs.empty,Ty_base tyB);
+        ss e1;
+        ss e0
+    | E_for(_,sz1,sz2,e3,_) ->
+        r := !r ++ free_vars_of_type (Vs.empty,Ty_base(TyB_int sz1));
+        r := !r ++ free_vars_of_type (Vs.empty,Ty_base(TyB_int sz2));
+        ss e3
+    | E_generate((p, (ty,tyB), e1), e2, sz3, sz4, _) ->
+        r := !r ++ free_vars_of_type (Vs.empty,ty);
+        r := !r ++ free_vars_of_type (Vs.empty,Ty_base tyB);
+        ss e1;
+        ss e2;
+        r := !r ++ free_vars_of_type (Vs.empty,Ty_base(TyB_int sz3));
+        r := !r ++ free_vars_of_type (Vs.empty,Ty_base(TyB_int sz4))
+    | E_vector_mapi(is_par, (p, (tyB1,tyB2), e1), e2, sz) ->
+        r := !r ++ free_vars_of_type (Vs.empty,Ty_base tyB1);
+        r := !r ++ free_vars_of_type (Vs.empty,Ty_base tyB2);
+        r := !r ++ free_vars_of_type (Vs.empty,Ty_base(TyB_int(sz)));
+        ss e1;
+        ss e2
+    | e -> Ast_mapper.iter ss e
+  in
+  ss e;
+  !r
 
 let subst_ty ty e =
   let open Types in
-  let vs = free_vars_of_type (Vs.empty,ty) in
+  let vs = (* fv_type_in e*) free_vars_of_type (Vs.empty,ty) in
   let unknowns = Hashtbl.create (Vs.cardinal vs) in
-  Vs.iter (fun n -> Hashtbl.add unknowns n (new_unknown_generic())) vs;
+  (* Ast_pprint.pp_exp Format.std_formatter e;
+   Vs.iter (fun n ->Printf.printf "=======>%d" n; Hashtbl.add unknowns n (new_unknown_generic())) vs; *)
+  
   let rec ss e =
     let open Operators in
     match e with
     | E_letIn(p, ty, e1, e2) ->
-        E_letIn(p, rename_ty unknowns ty, ss e1, ss e2)
+        E_letIn(p, (* rename_ty unknowns ty *) Types.new_ty_unknown() 
+                       (* fresh unknown because duplication breaks polymorphism.
+                          todo: avoid this unknown (which can cause the lost of a type annotation) *)
+                , ss e1, ss e2)
     | E_fun(p, (ty,tyB), e1) ->
        E_fun(p, (rename_ty unknowns ty,rename_tyB unknowns tyB), ss e1)
     | E_fix(f, (p, (ty, tyB), e1)) ->
         E_fix(f, (p, (rename_ty unknowns ty, rename_tyB unknowns tyB), ss e1))
+    | E_reg((p,tyB, e1),e0,l) ->
+        E_reg((p, rename_tyB unknowns tyB, ss e1),ss e0,l) 
     | E_app(E_const(Op(TyConstr ty)),e) ->
         E_app(E_const(Op(TyConstr (rename_ty unknowns ty))),ss e)
     | E_app(E_const(Op(Runtime (op))),e) ->
         let op' = (match op with 
                   | Resize_int sz -> Resize_int (rename_size unknowns sz)
+                  | Size_of_val(ty,sz) -> Size_of_val(rename_ty unknowns ty,rename_size unknowns sz)
                   | Vector_create sz -> Vector_create (rename_size unknowns sz)
                   | External_fun (op,ty) -> External_fun(op,(rename_ty unknowns ty))
                   | op -> op) in
@@ -63,7 +114,8 @@ let subst_ty ty e =
     | E_array_make(sz,c,deco) -> E_array_make(rename_size unknowns sz,c,deco)
     | e -> Ast_mapper.map ss e
   in
-  ss e
+  let e'= ss e in
+  (* Ast_pprint.pp_exp Format.std_formatter e'; *)e'
 
 
 
@@ -79,7 +131,7 @@ let inline_with_statics ~statics e =
         (match p,e1 with
         | P_var x,E_fun _ -> 
             has_changed := true;
-            inline @@ subst_e x e1 e2
+            inline @@ subst_e x (subst_ty ty e1) e2
         | _ -> E_letIn(p,ty,inline e1,inline e2))
 
     | E_app(E_fun(p,(ty,tyB),e1),e2) ->

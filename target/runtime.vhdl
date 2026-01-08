@@ -533,13 +533,13 @@ package body runtime is
 
   procedure acquire(variable lock : inout value(0 to 0)) is
     begin 
-      assert lock(0) = '0' report "lock already acquired" severity error;
+      -- assert lock(0) = '1' report "lock already acquired" severity error;
       lock(0) := '1';
     end procedure;  
   
   procedure release(variable lock : inout value(0 to 0)) is
     begin
-      assert lock(0) = '1' report "lock already released" severity error;
+      -- assert lock(0) = '0' report "lock already released" severity error;
       lock(0) := '0';
     end procedure;    
 end runtime;

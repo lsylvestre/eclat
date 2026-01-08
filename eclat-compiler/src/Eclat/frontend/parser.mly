@@ -104,7 +104,7 @@
 %token INIT_TUPLE INIT_INT
 %token VECTOR_MAPI INT_MAPI VECT_CREATE
 %token PAUSE
-%token EMIT SIGNAL
+%token EMIT SIGNAL LOOP TRAP EXIT SUSPEND
 /* The precedences must be listed from low to high. */
 
 %right    PIPE_PIPE PIPE_COMMA_PIPE /* parallel construct */
@@ -296,25 +296,6 @@ fun_rec_decl(In_kw):
             let v = mk_fix f ef loc_fun in
             P_var f, v
         }
-| REC IMMEDIATE f=IDENT p_ty_opt=arg_ty_atomic ty_opt=ret_ty_annot_eq e1=exp In_kw
-        {
-            let p_ty_opt_f =
-              let open Types in
-              match p_ty_opt with
-              | p,None -> p,None
-              | p,Some t -> p,Some (Ty_fun(t,new_dur_unknown(),new_tyB_unknown()))
-            in
-            let loc_fun = with_file ($startpos(f),$endpos(e1)) in
-            let (p,ty_f_opt) = p_ty_opt_f in
-            let ef = mk_fun_ty_annot p ty_f_opt (ty_annot_opt ~ty:ty_opt e1)
-                   |> mk_loc loc_fun in
-            let v = mk_fix f ef loc_fun in
-            (*match o with 
-            | None -> P_var f, v
-            | Some _ -> *)
-            P_var f, E_letIn(P_var f,new_ty_unknown(),v,ef)
-        }
-
 
 
 ty_annot(X) :
@@ -411,6 +392,11 @@ size:
 | x=TVAR_IDENT {
     decl_size_var x
   }
+| sz=size PLUS n=INT_LIT { Sz_add(sz,n) }
+| n=INT_LIT TIMES sz=size { 
+     if n = 2 then Sz_twice(sz) 
+     else Prelude.Errors.raise_error ~loc:(with_file $loc)
+            ~msg:"unsupported size operation" () }
 
 aty:
 ty=ty { ty } 
@@ -493,11 +479,18 @@ lexp_desc:
 | LPAREN e1=lexp PIPE_PIPE 
          es=separated_nonempty_list(PIPE_PIPE,lexp) 
   RPAREN
-| LPAREN e1=lexp PIPE_COMMA_PIPE 
+/*| LPAREN e1=lexp PIPE_COMMA_PIPE 
          es=separated_nonempty_list(PIPE_COMMA_PIPE,lexp)
-  RPAREN
+  RPAREN*/
         {
             E_par(e1::es)
+        }
+| LBRACKET e1=lexp PIPE_PIPE 
+         es=separated_nonempty_list(PIPE_PIPE,lexp)
+  RBRACKET
+        { let es' = e1::es in
+          E_letIn(group_ps (List.map (fun _ -> P_unit) es'), 
+                  Types.new_ty_unknown(), E_par(es'),E_const Unit)
         }
 
 equations:
@@ -555,7 +548,8 @@ app_exp:
   e=app_exp_desc { mk_loc (with_file $loc) e }
 
 app_exp_desc:
-| PAUSE e=aexp { mk_loc (with_file $loc) @@ E_pause e }
+| PAUSE e=aexp { mk_loc (with_file $loc) @@ E_pause (Ast.gensym(), e) }
+| PAUSE { mk_loc (with_file $loc) @@ E_pause (Ast.gensym(), E_const (Unit)) }
 | ARRAY_MAKE LT sz=size GT e=aexp { E_array_make(sz, e, with_file $loc) }
 | ARRAY_CREATE LT sz=size GT LPAREN RPAREN
 | CREATE LT sz=size GT LPAREN RPAREN { E_array_create(sz, with_file $loc) }
@@ -586,9 +580,9 @@ app_exp_desc:
                | E_tuple[E_var x;e1;e2] -> E_array_set_immediate(x,e1,e2) 
                | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
                    ~msg:"... array set" () }
-| x=IDENT LBRACKET e1=exp RBRACKET
+/* | x=IDENT LBRACKET e1=exp RBRACKET
 | x=IDENT DOT LPAREN e1=exp RPAREN
-   { E_array_get(x,e1) }
+   { E_array_get(x,e1) }*/
 | x=IDENT e1=dot_get { E_array_get(x,e1) }
 | x=IDENT DOT_LENGTH { E_array_length x }
 | ARRAY_LENGTH a=aexp
@@ -607,9 +601,6 @@ app_exp_desc:
                         E_app(e1,e2)
                       | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
                    ~msg:"expression in functional position should be a variable or a constante" ())
-        | [e1; e2; e3] when un_annot e2 = E_var "when" ->
-              E_app(E_var "when",
-                       E_tuple[E_fun(P_unit,(Ty_base TyB_unit,new_tyB_unknown ()),e1);e3])
     (* E_if(e2,e1,E_app(E_const (Op(Runtime(External_fun("Default.create",
         new_ty_unknown ())))),E_const(Unit))) *)
         | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
@@ -623,10 +614,10 @@ app_exp_desc:
         { let e3 = mk_loc (with_file $loc) @@ E_const (Bool false) in
           E_if(e1,e2,e3)
         }
-| e1=app_exp OR e3=app_exp
+(* | e1=app_exp OR e3=app_exp
         { let e2 = mk_loc (with_file $loc) @@ E_const (Bool true) in
           E_if(e1,e2,e3)
-        }
+        }*)
 | REGISTER ev=exp INIT e0=aexp
        { match un_annot ev with
          | E_fun(p,(_,tyB),e1) -> E_reg((p,tyB,e1),e0,Ast.gensym ())
@@ -644,9 +635,9 @@ app_exp_desc:
        { E_exec(e1,e2,None,"") }
 | EXEC e1=exp DEFAULT e2=lexp RESET e3=app_exp
        { E_exec(e1,e2,Some e3,"") }
-| MACRO_GENERATE ef1=aexp e_init2=aexp e_st3=aexp
+| MACRO_GENERATE LT sz3=size TO sz4=size GT ef1=aexp INIT e_init2=aexp
   { let z = Ast.gensym () in
-    E_generate((P_var z,(Types.new_ty_unknown(),Types.new_tyB_unknown()),  E_app(ef1,E_var z)),e_init2,e_st3,with_file $loc) }
+    E_generate((P_var z,(Types.new_ty_unknown(),Types.new_tyB_unknown()),  E_app(ef1,E_var z)),e_init2,sz3,sz4,with_file $loc) }
 
 (* | EXEC e1=exp 
     {
@@ -678,14 +669,24 @@ app_exp_desc:
 | e1=aexp RIGHT_ARROW e2=app_exp { E_app(E_var "arrow", E_tuple[e1;e2]) }
 
 
-| EMIT x=IDENT e=aexp { E_emit(x,e) }
-/* | EMIT x=IDENT { E_emit(x,E_const (Bool true)) } */
+| EMIT x=IDENT e=aexp?
+| EMIT x=UP_IDENT e=aexp? { 
+    match e with None -> E_emit(x,E_const (Bool true))
+    | Some e ->  E_emit(x,e) 
+}
 | SIGNAL e=aexp { E_sig_create e }
 | SIGNAL NEQ { E_sig_create (E_app(E_const (Op(Runtime(External_fun("Default.create",new_ty_unknown ())))),E_const(Unit))) }
 | e=aexp { e }
-
-
-
+| LOOP e=exp END { E_loop(e) }
+| TRAP LPAREN RPAREN { E_trap(new_tyB_unknown()) }
+| TRAP x=UP_IDENT IN e=exp { E_letIn(P_var x,new_ty_unknown(),E_trap(new_tyB_unknown()), e) }
+| EXIT x=IDENT
+| EXIT x=UP_IDENT { E_exit(x,E_const(Unit)) }
+| SUSPEND e=app_exp WHEN x=IDENT { E_suspend(e,x) }
+| e1=app_exp WHEN e2=app_exp {
+              E_app(E_var "when",
+                       E_tuple[E_fun(P_unit,(Ty_base TyB_unit,new_tyB_unknown ()),e1);e2])
+}
 
 dot_get:
 DOT LPAREN e=exp RPAREN { e }
@@ -767,8 +768,8 @@ aexp_desc:
                  E_app(E_var loop,E_var n0))))
                 }
 
-| PARFOR x=IDENT EQ e_st1=exp TO e_st2=exp DO e=exp DONE 
-      { E_for(x,e_st1,e_st2,e,with_file $loc) }
+| PARFOR x=IDENT EQ sz1=size TO sz2=size DO e=exp DONE 
+      { E_for(x,sz1,sz2,e,with_file $loc) }
 
 
 match_case_const:
@@ -833,6 +834,7 @@ const:
                        | Some y -> y in
                  External_fun(y,new_ty_unknown ())
                 }*/
+| OR         { External_fun("Bool.lor",new_ty_unknown ()) }
 | PLUS       { External_fun("Int.add",new_ty_unknown ()) }
 | MINUS      { External_fun("Int.sub",new_ty_unknown ()) }
 | TIMES      { External_fun("Int.mul",new_ty_unknown ()) }

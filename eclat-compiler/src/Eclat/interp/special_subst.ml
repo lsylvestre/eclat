@@ -108,12 +108,12 @@ let subst_e x ex e =
     | E_array_set_immediate(y,e1,e2) ->
         let z = if x <> y then y else as_ident ex in
         E_array_set_immediate(z, ss (0::id) e1, ss (1::id) e2)
-    | E_for(y,e_st1,e_st2,e3,loc) ->
-       E_for(y,ss (0::id) e_st1,ss (1::id) e_st2,
+    | E_for(y,sz1,sz2,e3,loc) ->
+       E_for(y,sz1,sz2,
              (if x = y then e3 else ss (2::id) e3),loc)
-    | E_generate((p,tyB,e1),e2,e_st3,loc) ->
+    | E_generate((p,tyB,e1),e2,sz3,sz4,loc) ->
         let e1' = if pat_mem x p then e1 else ss (0::id) e1 in
-        E_generate((p,tyB,e1'),ss (1::id) e2,ss (2::id) e_st3,loc)
+        E_generate((p,tyB,e1'),ss (1::id) e2,sz3,sz4,loc)
     | E_vector_mapi(is_par,(p,tyB,e1),e2,ty) ->
         let e1' = if pat_mem x p then e1 else ss (0::id) e1 in
         E_vector_mapi(is_par,(p,tyB,e1'),ss (1::id) e2,ty)
@@ -132,9 +132,9 @@ let subst_e x ex e =
     | E_run(i,e1,l) ->
         let e1' = ss (0::id) e1 in
         E_run(i, e1',l)
-    | E_pause e1 -> 
+    | E_pause (l,e1) -> 
         let e1' = ss (0::id) e1 in
-        E_pause e1'
+        E_pause (l,e1')
     | E_sig_get y ->
         let z = if x <> y then y else as_ident ex in
         E_sig_get(z)
@@ -144,6 +144,16 @@ let subst_e x ex e =
     | E_sig_create(e1) ->
         let e1' = ss (0::id) e1 in
         E_sig_create(e1')
+    | E_loop(e1) ->
+        let e1' = ss (0::id) e1 in
+        E_loop(e1')
+    | E_trap _ -> e
+    | E_exit(x,e1) ->
+        let e1' = ss (0::id) e1 in
+        E_exit(x,e1')
+    | E_suspend(e1,x) ->
+        let e1' = ss (0::id) e1 in
+        E_suspend(e1',x)
   in
   ss [] e
 

@@ -53,20 +53,22 @@ let rec simple_atom e =
 
 let propagation ~externals e =
   let _propagable e =
-    if !flag_propagate_combinational_linear then Instantaneous.combinational ~externals e 
+    if !flag_propagate_combinational_linear then Instantaneous.combinational ~with_sig_get:false ~externals e 
                                   && (SMap.cardinal (linear_bindings e) <= 1) else
     simple_atom e
   in
   let propagable2 x e1 e2 =
-    if !flag_propagate_combinational_linear then
-      Instantaneous.combinational ~externals e1
-      && linear_bindings2 x e2 else
-    simple_atom e
+    let b = if !flag_propagate_combinational_linear then
+      (Instantaneous.combinational ~with_sig_get:false ~externals e1
+      && linear_bindings2 x e2) || simple_atom e1 else
+    simple_atom e1 in (*Printf.printf "=====> %s %b\n" x b;*) b
   in
   let rec prop e =
-    match e with
+    (* let e' =*) match e with
     | E_letIn(p,ty,E_sig_create a,e2) ->
       E_letIn(p,ty,E_sig_create a,prop e2)
+    | E_letIn(p,ty,E_trap a,e2) ->
+      E_letIn(p,ty,E_trap a,prop e2)
     | E_letIn(P_tuple ps,ty,E_tuple es,e2) ->
         let ts = match Types.canon_ty ty with 
                  | Ty_tuple ts -> ts
@@ -76,8 +78,10 @@ let propagation ~externals e =
                   (List.combine ps ts) es e2
     | E_letIn(P_var x as p,ty,e1,e2) ->
         let e1' = prop e1 in
-        if propagable2 x e1' e2
-        then prop (subst_p_e p e1' e2)
+        if  propagable2 x e1' e2 (* simple_atom e1'*)
+        then let e3 = (subst_p_e p e1' e2) in
+        (*Format.(fprintf std_formatter "[%a\nGIVE:LET %s = %a IN\n%a]\n\n\n\n\n\n\n" Ast_pprint.pp_exp e x Ast_pprint.pp_exp e1' Ast_pprint.pp_exp e3);*)
+             (prop e3)
         else E_letIn(p,ty,e1',prop e2)
     | E_letIn(p,ty,e1,e2) ->
         E_letIn(p,ty,prop e1,prop e2)
@@ -86,7 +90,8 @@ let propagation ~externals e =
     | E_app(e1,e2) ->
         E_app(prop e1,prop e2)
     | e -> Ast_mapper.map prop e
-  in prop e
+    in (*(Format.(fprintf std_formatter "[<==================\n%a---->\n%a==============>]\n\n\n\n\n\n\n\n\n\n\n" Ast_pprint.pp_exp e Ast_pprint.pp_exp e'); e')*)
+   prop e 
 
 let propagation_pi pi =
   {pi with main = propagation ~externals:pi.externals pi.main }

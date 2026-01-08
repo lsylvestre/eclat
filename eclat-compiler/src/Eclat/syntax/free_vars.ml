@@ -94,14 +94,13 @@ let fv ?(get_sig=true) ?(get_arrays=true) ?(xs=SMap.empty) e =
       else vs
   | E_par(es) ->
       fv_list xs es
-  | E_for(i,e_st1,e_st2,e,_) ->
-      aux xs e_st1 ++ aux xs e_st2 ++
+  | E_for(i,_,_,e,_) ->
         (let xs' = SMap.add i () @@ xs in
         aux xs' e)
-  | E_generate((p,_,e1),e2,e_st3,_) ->
+  | E_generate((p,_,e1),e2,_,_,_) ->
       let ys = vars_of_p p in
       let xs' = xs++ys in
-      aux xs' e1 ++ aux xs e2 ++ aux xs e_st3
+      aux xs' e1 ++ aux xs e2
   | E_vector(es) ->
       fv_list xs es
   | E_vector_mapi(_,(p,_,e1),e2,_) ->
@@ -109,20 +108,7 @@ let fv ?(get_sig=true) ?(get_arrays=true) ?(xs=SMap.empty) e =
       let xs' = xs++ys in
       aux xs' e1 ++ aux xs e2
   | E_run(_x,e,_) -> aux xs e (* what about _x ? *)
-  | E_pause e -> aux xs e
-  | E_equations(p,eqs) ->
-      let ys = vars_of_p (P_tuple (p::List.map fst eqs)) in
-      let rec fv_le xs le =
-        match le with
-        | Exp e1 -> aux xs e1
-        | Fby(le1, le2) -> fv_le xs le1 ++ fv_le xs le2
-        | When(le1, e2) -> fv_le xs le1 ++  aux xs e2
-        | Merge(le1, le2, e3) -> fv_le xs le1 ++ fv_le xs le2 ++ aux xs e3
-      in
-      let rec fv_list_le xs les =
-        List.fold_left (fun acc lei -> acc ++ fv_le xs lei) SMap.empty les
-      in
-      fv_list_le (xs++ys) (List.map snd eqs)
+  | E_pause (_,e) -> aux xs e
   | E_sig_get(x) -> 
       if get_sig then fv_var xs x else SMap.empty
   | E_emit(x,e1) ->
@@ -130,6 +116,13 @@ let fv ?(get_sig=true) ?(get_arrays=true) ?(xs=SMap.empty) e =
       if get_sig then vs ++ fv_var xs x else vs
   | E_sig_create(e1) ->
       aux xs e1
+  | E_loop(e1) ->
+      aux xs e1
+  | E_trap _ -> SMap.empty
+  | E_exit(x,e1) ->
+      (if get_sig then fv_var xs x else SMap.empty) ++ aux xs e1
+  | E_suspend(e1,x) ->
+      (if get_sig then fv_var xs x else SMap.empty) ++ aux xs e1
   in
   aux xs e
 
@@ -214,14 +207,13 @@ let fv_arrays ?(xs=SMap.empty) e =
      vs ++ fv_var xs x
   | E_par(es) ->
       fv_list xs es
-  | E_for(i,e_st1,e_st2,e,_) ->
-      aux xs e_st1 ++ aux xs e_st2 ++
-        (let xs' = SMap.add i () @@ xs in
-        aux xs' e)
-  | E_generate((p,_,e1),e2,e_st3,_) ->
+  | E_for(i,_,_,e,_) ->
+      let xs' = SMap.add i () @@ xs in
+      aux xs' e
+  | E_generate((p,_,e1),e2,_,_,_) ->
       let ys = vars_of_p p in
       let xs' = xs++ys in
-      aux xs' e1 ++ aux xs e2 ++ aux xs e_st3
+      aux xs' e1 ++ aux xs e2
   | E_vector(es) ->
       fv_list xs es
   | E_vector_mapi(_,(p,_,e1),e2,_) ->
@@ -230,25 +222,19 @@ let fv_arrays ?(xs=SMap.empty) e =
       aux xs' e1 ++ aux xs e2
   | E_run(_x,e1,_) -> (* what about _x ? *)
       aux xs e1
-  | E_pause e -> aux xs e
-  | E_equations(p,eqs) ->
-      let ys = vars_of_p (P_tuple (List.map fst eqs)) in
-      let rec fv_le xs le =
-        match le with
-        | Exp e1 -> aux xs e1
-        | Fby(le1, le2) -> fv_le xs le1 ++ fv_le xs le2
-        | When(le1, e2) -> fv_le xs le1 ++  aux xs e2
-        | Merge(le1, le2, e3) -> fv_le xs le1 ++ fv_le xs le2 ++ aux xs e3
-      in
-      let rec fv_list_le xs les =
-        List.fold_left (fun acc lei -> acc ++ fv_le xs lei) SMap.empty les
-      in
-      fv_list_le (xs++ys) (List.map snd eqs)
+  | E_pause (_,e) -> aux xs e
   | E_sig_get _ -> 
       SMap.empty
   | E_emit(_,e1) ->
       aux xs e1
   | E_sig_create(e1) ->
+      aux xs e1
+  | E_loop(e1) ->
+      aux xs e1
+  | E_trap _ -> SMap.empty
+  | E_exit(x,e1) ->
+      aux xs e1
+  | E_suspend(e1,x) ->
       aux xs e1
   in
   aux xs e

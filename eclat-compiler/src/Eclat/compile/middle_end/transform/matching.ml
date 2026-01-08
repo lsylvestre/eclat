@@ -65,27 +65,6 @@ let rec matching e =
   | E_reg((p,tyB,e1),e0,l) ->
      let x = gensym () in
      E_reg((P_var x,tyB,matching @@ E_letIn(p,Ty_base tyB,E_var x,e1)),matching e0,l)
-  | E_equations(p,eqs) ->
-      let eqs' = List.concat @@ List.map (fun (pz,Exp e) ->
-             match pz with 
-             | P_var z -> [pz, Ast.Exp(matching e)]
-             | P_unit _ -> let z = gensym () in [P_var z, Ast.Exp(matching e)]
-             | _ -> let z = gensym () in
-                    let ez = E_var z in
-                    (P_var z,Ast.Exp (matching e))::
-                    let rec loop i len ez p =
-                      match p with
-                      | P_var x -> [(P_var x, Ast.Exp (get_tuple i len ez))]
-                      | P_tuple ps ->
-                          let e = Pattern.pat2exp p in 
-                          let z' = gensym () in
-                          let ez' = E_var z' in
-                          let len = List.length ps in
-                           (P_var z', Ast.Exp ez)::(List.concat @@
-                           List.mapi (fun i p -> 
-                           (loop i len ez' p)) ps)
-                    in loop 0 (-1) ez pz) eqs in
-      E_equations(p,eqs')
   | e -> Ast_mapper.map matching e
 
 

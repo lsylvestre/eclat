@@ -92,31 +92,11 @@ let rec map f e =
       E_vector_mapi (is_par, (p, typ, e1'), e2', ty)
   | E_run(i,e,l) ->
       E_run(i, f e, l)
-  | E_for(x,e_st1,e_st2,e,loc) ->
-      E_for(x,f e_st1,f e_st2,f e,loc)
-  | E_generate((p, ty, e1), e2, e_st1, loc) ->
-      E_generate((p, ty, f e1), f e2, f e_st1, loc)
-  | E_pause e1 -> E_pause (f e1)
-  | E_equations(p,eqs) ->
-      let rec map_le f le = 
-        match le with 
-        | Exp e' -> Exp(f e')
-        | Fby(le1,le2) ->
-            let le1' = map_le f le1 in
-            let le2' = map_le f le2 in
-            Fby(le1',le2') 
-        | When(le1,e2) ->
-            let le1' = map_le f le1 in
-            let e2' = f e2 in
-            When(le1',e2')
-        | Merge(le1,le2,e3) ->
-            let le1' = map_le f le1 in
-            let le2' = map_le f le2 in
-            let e3' = f e3 in
-            Merge(le1',le2',e3')
-      in  
-      let eqs' = List.map (fun (p,le) -> p,map_le f le) eqs in
-      E_equations(p,eqs')
+  | E_for(x,sz1,sz2,e,loc) ->
+      E_for(x,sz1,sz2,f e,loc)
+  | E_generate((p, ty, e1), e2, sz3, sz4, loc) ->
+      E_generate((p, ty, f e1), f e2, sz3, sz4, loc)
+  | E_pause (l,e1) -> E_pause (l,f e1)
   | E_sig_get(x) -> 
       E_sig_get(x)
   | E_emit(x,e1) ->
@@ -125,6 +105,17 @@ let rec map f e =
   | E_sig_create(e1) ->
       let e1' = f e1 in
       E_sig_create(e1')
+  | E_loop(e1) ->
+      let e1' = f e1 in
+      E_loop(e1')
+  | E_trap _ -> e
+  | E_exit(x,e1) ->
+      let e1' = f e1 in
+      E_exit(x,e1')
+  | E_suspend(e1,x) ->
+      let e1' = f e1 in
+      E_suspend(e1',x)
+
 
 (** traversal order of sub-expressions is unspecified *)
 let rec iter f (e:e) : unit =
@@ -178,29 +169,198 @@ let rec iter f (e:e) : unit =
       f e1; f e2
   | E_for(_,_,_,e,_) ->
       f e
-  | E_generate((_,_,e1),e2,e_st3,_) ->
-      f e1; f e2; f e_st3
+  | E_generate((_,_,e1),e2,_,_,_) ->
+      f e1; f e2
   | E_vector es ->
       List.iter f es
   | E_vector_mapi(_,(_,_,e1),e2,_) ->
       f e1; f e2
   | E_run(_,e1,_) ->
       f e1
-  | E_pause e1 -> f e1
-  | E_equations(_,eqs) ->
-      let rec iter_le f le =
-        match le with
-        | Exp e' -> f e'
-        | Fby(le1,le2) -> iter_le f le1; iter_le f le2
-        | When(le1,e2) -> iter_le f le1; f e2
-        | Merge(le1,le2,e3) -> iter_le f le1; iter_le f le2; f e3
-      in
-      List.iter (fun (_,le) -> iter_le f le) eqs
-  | E_sig_get _ -> 
+  | E_pause (_,e1) -> f e1
+ 
+(*
+
+type clock1 ;;
+operator Lustre.to_bool : bool => 'a ;;
+operator Lustre.as_bool : 'a => bool ;;
+
+let when(f,c) =
+  if as_bool c then f() else absent ();;
+
+let whenot(f,c) =
+  if as_bool c then absent() else f();;
+
+let merge(c,x,y) =
+  if as_bool c then
+  *)
+(****************
+
+
+
+operator Lustre.when_on : ('a * 'ck clock<1>) => ('a * 'ck clock<1>) on<1> ;;
+operator Lustre.when_not_on : ('a * 'ck clock<1>) => ('a * 'ck clock<1>) not_on<1> ;;
+
+type 'a clock<1> ;;
+
+let c1 : clock1 ;;
+let c2 : clock2 ;;
+
+
+let when(f,c) =
+  if as_bool Lustre.when_on(,c)
+
+let whenot(s,f) =
+  if as_clock(s) then absent() else f() ;; 
+
+
+
+let x = clock<> ;;
+let y = signal<> ;;
+
+node main i returns o =
+  o1 = when(c1,i);
+  o2 = whenot(c1,i);
+  o = merge(c1,o1,o2) ;;
+
+
+let f () = print_int 3 ;;
+let g () = print_int 4 ;;
+let main : int => unit = 
+  fun n ->
+    let s = signal<> in
+    merge (s,f,g) ;;
+
+
+(*
+type 'a not_on<1> ;;
+type 'a on<1> ;;
+type 'a clock<1> ;;
+
+operator%with_sizes Lustre.as_clock : (bool * 'ck) => 'ck clock<1> ;; 
+operator%with_sizes Lustre.as_bool : 'a => bool ;; 
+
+
+
+operator Lustre.when_on : ('a * 'ck clock<1>) => ('a * 'ck clock<1>) on<1> ;;
+operator Lustre.when_not_on : ('a * 'ck clock<1>) => ('a * 'ck clock<1>) not_on<1> ;;
+operator Lustre.merge : ('a clock<1> * 
+                  ('b * 'a clock<1>) on<1> * 
+                  ('b * 'a clock<1>) not_on<1>) => 'b ;;
+
+
+let as_bool ck = Lustre.as_bool ck ;;
+
+let when_on (f,ck) =
+  let x = if as_bool ck then f () else absent() in
+  Lustre.when_on(x,ck) ;;
+
+let whenot_on (f,ck) =
+  let x = if as_bool ck then absent() else f () in
+  Lustre.when_not_on(x,ck) ;;
+
+let merge = Lustre.merge ;;
+
+*)
+
+(*
+
+let main i = 
+  let x = fby(true,false) in
+  let c = abstype in
+  let y = when_on ((fun () -> print_int 3; 3),c) in
+  let z = whenot_on ((fun () -> print_int 4; 4),c) in 
+  let u = merge(c,y,z) in print_int u ;;
+
+let main v = 
+  let x = fby(true,false) in
+  let c = as_clock(x) in
+  let i = fby(false,true) in
+  let c2 = as_clock(i) in
+  let y = when_on ((fun () -> print_int 3; 3),c) in
+  let z = whenot_on ((fun () -> print_int 4; 4),c2) in 
+  let u = merge(c,y,z) in print_int u ;;
+
+
+let main i = 
+  let x = fby(true,false) in
+  let c = as_clock(x) in
+  let c2 = as_clock(x) in
+  let y = when_on (4,c) in
+  let z = whenot_on (3,c2) in 
+  let u = merge(c,y,z) in u ;;
+
+
+let main i = 
+  let x = fby(true,false) in
+  let c = as_clock(x) in let y = Lustre.when (4,c) in let z = when_not (3,c) in let u = Lustre.merge(c,y,z) in u ;;
+
+let main i = 
+  let x = fby(true,false) in
+  let c = Lustre.as_clock(x) in let y = Lustre.when_on (4,c) in let z = Lustre.when_not_on (3,c) in let u = Lustre.merge(c,y,z) in u ;;
+
+
+let main i = 
+  let x = fby(true,false) in
+  let c = Lustre.as_clock (x) in let y = Lustre.when_on (4,c) in let z = Lustre.when_not_on (3,c) in let u = Lustre.merge(c,y,y) in u ;;
+
+
+
+let fby2 (x, y) =
+  (x,y) ;;
+
+*)
+  (* let main _ = (fby(1,2), fby(true,false));;
+
+
+
+
+
+
+
+
+let foby(x,y) =
+  let pre_sy = signal<> in
+  let sy = signal<> in
+  emit sy(y);
+  let _ = exec emit pre_sy(x); %loop let z = ?sy in pause(); emit pre_sy(z) end default () in
+  ?pre_sy ;;
+
+let main (x,y) =
+  let z = foby(x,y) in
+  print_int z;print_string ";" ;;
+
+
+
+
+
+
+let foby(x,y) =
+  let pre_sy = signal<> in
+  let sy = signal<> in
+  emit sy(y);
+  let _ = exec emit pre_sy(x); %loop let z = ?sy in pause(); emit pre_sy(z) end default () in
+  ?pre_sy ;;
+
+let main (x,y) =
+  let z = foby(x,y) in
+  print_int z;print_string ";" ;;
+
+
+
+   *)*******)
+ | E_sig_get _ -> 
       ()
   | E_emit(_,e1) ->
       f e1
   | E_sig_create(e1) ->
+      f e1
+  | E_loop(e1) ->
+      f e1
+  | E_trap _ -> ()
+  | E_exit(_,e1) ->
+      f e1
+  | E_suspend(e1,_) ->
       f e1
 
 let declare ds ts e =
@@ -312,18 +472,15 @@ let accum f (e:e) =   (* : ((x * ty * e) list * e)*)
                           | Some e3 -> let ds,e3' = aux e3 in
                                        ds,Some e3' in
             ds2@ds1@ds3,E_exec(e1',e2',eo',l)
-        | E_for(x,e_st1,e_st2,e3,loc) ->
-            let ds1,e_st1' = aux e_st1 in
-            let ds2,e_st2' = aux e_st2 in
+        | E_for(x,sz1,sz2,e3,loc) ->
             let ds3,e3' = aux e3 in
-            ds1@ds2@ds3,E_for(x,e_st1',e_st2',e3,loc)
+            ds3,E_for(x,sz1,sz2,e3,loc)
              (* NB: definitions in [e_st1] and [e_st2] and [e3]
                 are *not* globalized *)
-        | E_generate((p,ty,e1),e2,e_st3,loc) ->
+        | E_generate((p,ty,e1),e2,sz3,sz4,loc) ->
           let ds1,e1' = aux e1 in
           let ds2,e2' = aux e2 in
-          let ds3,e_st3' = aux e_st3 in
-          ds1@ds2@ds3,E_generate((p,ty,e1'),e2',e_st3',loc)
+          ds1@ds2,E_generate((p,ty,e1'),e2',sz3,sz4,loc)
           (* NB: definitions in [e_st1] are *not* globalized *)
         | E_vector es ->
             let ds,es' = aux_list es in
@@ -335,28 +492,9 @@ let accum f (e:e) =   (* : ((x * ty * e) list * e)*)
         | E_run(x,e1,l) ->
             let ds1,e1' = aux e1 in
             ds1,E_run(x,e1',l)
-        | E_pause e1 -> 
+        | E_pause (l,e1) -> 
             let ds1,e1' = aux e1 in
-            [],E_pause (declare' ds1 e1')
-        | E_equations(p,eqs) ->   
-            let rec accum_le le = 
-                match le with
-                | Exp e -> let (ds,e') = aux e in Exp (declare' ds e)
-                | Fby(le1,le2) -> let le1' = accum_le le1 in
-                                  let le2' = accum_le le2 in
-                                  Fby(le1',le2')
-                | When(le1,e2) -> let le1' = accum_le le1 in
-                                  let (ds2,e2') = aux e2 in
-                                  When(le1',declare' ds2 e2')
-                | Merge(le1,le2,e3) -> let le1' = accum_le le1 in
-                                       let le2' = accum_le le2 in
-                                       let (ds3,e3') = aux e3 in
-                                       Merge(le1',le2',declare' ds3 e3')
-            in
-            let eqs' = List.map (fun (p,le) -> 
-                                       p, accum_le le) eqs in
-            
-                [], E_equations(p,eqs')
+            [],E_pause (l,declare' ds1 e1')
         | E_sig_get _ -> 
             [],e
         | E_emit(x,e1) ->
@@ -365,6 +503,16 @@ let accum f (e:e) =   (* : ((x * ty * e) list * e)*)
         | E_sig_create e1 -> 
             let ds1,e1' = aux e1 in
             ds1, E_sig_create(e1')
+        | E_loop(e1) ->
+            let ds1,e1' = aux e1 in
+            [],E_loop(declare' ds1 e1')
+        | E_trap _ -> [],e
+        | E_exit(x,e1) ->
+            let ds1,e1' = aux e1 in
+            ds1,E_exit(x,e1')
+        | E_suspend(e1,x) ->
+            let ds1,e1' = aux e1 in
+            [],E_suspend(declare' ds1 e1',x)
     ) 
   in 
   aux e

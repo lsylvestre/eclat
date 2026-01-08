@@ -146,11 +146,11 @@ let pp_exp (fmt:fmt) (e:e) : unit =
             | Some e -> fprintf fmt "@,| _ -> %a" (pp_e ~paren:false) e) eo
   | E_letIn(p,ty,e1,e2) ->
       parenthesize ~paren (fun fmt () ->
-        fprintf fmt "@[<v>@[<v 2>let %a : %a =@,%a in@]@,%a@]"
+        fprintf fmt "@[<v>@[<v 2>(let %a : %a =@,%a in@]@,%a)@]"
           pp_pat p
           Types.pp_ty ty
           (pp_e ~paren:false) e1
-          (pp_e ~paren:false) e2) fmt ()
+          (pp_e ~paren:true) e2) fmt ()
   | E_app(e1,e2) ->
       parenthesize ~paren (fun fmt () ->
         fprintf fmt "@[<v>%a %a@]"
@@ -160,7 +160,7 @@ let pp_exp (fmt:fmt) (e:e) : unit =
         pp_tuple fmt (pp_e ~paren:false) es
   | E_reg((p,tyB,e1), e0,l) ->
       parenthesize ~paren (fun fmt () ->
-        fprintf fmt "@[<v>reg[%s] (fun %a : %a -> %a) last %a@]" l
+        fprintf fmt "@[<v>reg[%s] (fun %a : %a -> %a) init %a@]" l
           pp_pat p
           Types.pp_tyB tyB
           (pp_e ~paren:false) e1 (pp_e ~paren:false) e0) fmt ()
@@ -218,16 +218,17 @@ let pp_exp (fmt:fmt) (e:e) : unit =
         ~pp_sep:(fun fmt () -> fprintf fmt " || ")
           (pp_e ~paren:false) fmt es;
       fprintf fmt ")"
-  | E_for(x,e_st1,e_st2,e3,_) ->
+  | E_for(x,sz1,sz2,e3,_) ->
       fprintf fmt "for %s = %a to %a do %a done" x 
-        (pp_e ~paren:false) e_st1
-        (pp_e ~paren:false) e_st2
+        pp_size sz1
+        pp_size sz2
         (pp_e ~paren:false) e3
-  | E_generate((p,ty,e1),e2,e_st3,_) ->
-      fprintf fmt "generate %a %a ~depth:%a"
+  | E_generate((p,ty,e1),e2,sz3,sz4,_) ->
+      fprintf fmt "generate %a %a from %a to %a"
         (pp_e ~paren:true) (E_fun(p,ty,e1))
         (pp_e ~paren:true) e2
-        (pp_e ~paren:true) e_st3
+        pp_size sz3
+        pp_size sz4
   | E_vector(es) ->
       pp_vector fmt (pp_e ~paren:false) es
   | E_vector_mapi(is_par,(p,(tyB1,tyB2),e1),e2,_) ->
@@ -237,35 +238,27 @@ let pp_exp (fmt:fmt) (e:e) : unit =
                           (pp_e ~paren:true) e2
   | E_run(i,e,_) ->
       fprintf fmt "run %s(%a)" i (pp_e ~paren:false) e
-  | E_pause e -> fprintf fmt "pause %a"  (pp_e ~paren:true) e
-  | E_equations(p,eqs) ->
-      let rec pp_le ~paren fmt le =
-        parenthesize ~paren (fun fmt () ->
-          match le with
-          | Exp e1 -> pp_e ~paren fmt e1
-          | Fby(le1,le2) -> fprintf fmt "%a fby %a" 
-                              (pp_le ~paren:true) le1
-                              (pp_le ~paren:true) le2
-          | When(le1,e2) -> fprintf fmt "%a when %a" 
-                              (pp_le ~paren:true) le1
-                              (pp_e ~paren:true) e2
-          | Merge(le1,le2,e3) -> fprintf fmt "merge %a and %a with %a" 
-                                  (pp_le ~paren:false) le1
-                                  (pp_le ~paren:false) le2
-                                  (pp_e ~paren:true) e3
-        ) fmt ()
-      in
-      fprintf fmt "@[<v 2>(%a where@," pp_pat p;
-      pp_print_list
-        ~pp_sep:(fun fmt () -> fprintf fmt "@,and ")
-        (fun fmt (p,e) -> fprintf fmt "%a = %a" pp_pat p (pp_le ~paren:false) e) fmt eqs;
-      fprintf fmt ")@]"
+  | E_pause (_,e) -> fprintf fmt "pause %a"  (pp_e ~paren:true) e
   | E_sig_get(x) -> 
       fprintf fmt "?%a" pp_ident x
   | E_emit(x,e1) ->
-      fprintf fmt "emit %a %a" pp_ident x (pp_e ~paren:true) e1
+      parenthesize ~paren (fun fmt () ->
+        fprintf fmt "emit %a %a" pp_ident x (pp_e ~paren:true) e1) fmt ()
   | E_sig_create e1 ->
-      fprintf fmt "signal %a" (pp_e ~paren:true) e1
+      parenthesize ~paren (fun fmt () ->
+        fprintf fmt "signal %a" (pp_e ~paren:true) e1) fmt ()
+  | E_loop(e1) ->
+      fprintf fmt "loop %a end" (pp_e ~paren:false) e1
+  | E_trap _ ->
+      parenthesize ~paren (fun fmt () ->
+        fprintf fmt "trap()") fmt ()
+  | E_exit(x,e1) ->
+      parenthesize ~paren (fun fmt () ->
+        fprintf fmt "exit %a %a" pp_ident x (pp_e ~paren:true) e1) fmt ()
+  | E_suspend(e1,x) ->
+      parenthesize ~paren (fun fmt () ->
+        fprintf fmt "suspend %a when %a" (pp_e ~paren:false) e1 pp_ident x) fmt ()
+  
   in
   fprintf fmt "@[<v 0>%a@]" (pp_e ~paren:false) e
 

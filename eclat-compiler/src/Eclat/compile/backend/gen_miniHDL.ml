@@ -53,7 +53,7 @@ let gen_external_id =
     TODO(enhancement): use an enumeration type instead. *)
 let id_size = 12 ;;
 
-let contain_return s =
+let contains_return s =
   let rec aux s =
   match s with
   | S_continue q ->
@@ -104,7 +104,7 @@ let rec insert_kont ~is_zero w ~idle ~x s =
                                (* would be possible with physical equality ? *)
                                k = k') tt ->
                aux k
-            | _ ->
+            | _ -> assert ((1 lsl id_size) > List.length l);
                S_case(NameC.instance_id_of_fun rq0,
                    (List.map (fun (m,k) ->
                               [mk_int m id_size], aux k
@@ -143,8 +143,9 @@ let rec to_c ~sums = function
     let n,arg_size,ty_n = find_ctor x sums in
     CTuple[n;C_encode(to_c ~sums c,arg_size)]
 | Ast.Inj _ -> assert false (* no partial application in the generated code *)
-| Ast.(Op _ | V_loc _) -> assert false
-
+| Ast.(Op op) ->
+    Format.(fprintf std_formatter "-->%a" Ast_pprint.pp_op op);  assert false
+| Ast.V_loc _ -> assert false
 
 let to_op = function
 | Ast.TyConstr ty -> TyConstr (MiniHDL_typing.translate_ty ty)
@@ -211,6 +212,14 @@ let rec conjonction_atoms alist =
   | a1::alist' -> let a2 = conjonction_atoms alist' in 
                   A_call(Runtime (External_fun("Bool.land",Types.new_ty_unknown())), A_tuple([a1;a2]))
 
+let rec disjonction_traps vlist =
+  match vlist with
+  | [] -> A_const (Bool false)
+  | [s1;s2] -> A_call(Runtime (External_fun("Bool.lor",Types.new_ty_unknown())), A_tuple([A_var s1;A_var s2]))
+  | s1::vlist' -> let a2 = disjonction_traps vlist' in 
+                  A_call(Runtime (External_fun("Bool.lor",Types.new_ty_unknown())), A_tuple([A_var s1;a2]))
+ 
+
 let replace_arg e =
   match e with
   | Ast.E_fix(f,(P_var x,_,e1)) -> Ast_subst.subst_e x (E_var (NameC.formal_param_of_fun f)) e1
@@ -223,12 +232,12 @@ let [@warning "-26"] show q w =
                         Printf.printf "]}\n") w
 
 
-(** [to_s ~is_zero ~statics ~externals gs e x k] translates expression [e] 
+(** [to_s ~endloop ~traps ~is_zero ~statics ~externals gs e x k] translates expression [e] 
     to a target instruction setting a result in variable [x], 
     then executing instruction [k].
     [gs] is the names of the functions accessible 
     from [e] by a tail-call *)
-let rec to_s ~is_zero ~statics ~externals ~sums gs e x k =
+let rec to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums gs e x k =
   let return_ s = seq_ s k in
   if Instantaneous.combinational ~externals e then 
     SMap.empty,SMap.empty,return_ (set_ x (to_a ~externals ~sums e)) 
@@ -236,7 +245,8 @@ let rec to_s ~is_zero ~statics ~externals ~sums gs e x k =
   match e with
   | Ast.E_if(a,e1,e2) ->
       (** [IF] *)
-      let optimizable () =
+      let optimizable () = (** NB: if the result is true, e1 and/or e2 
+                               must not contain free exit statements **)
         k <> S_skip (** <- needed to ensure termination *)
          && (is_zero || ( Instantaneous.instantaneous ~externals e1 
                          && Instantaneous.instantaneous ~externals e2))
@@ -246,11 +256,11 @@ let rec to_s ~is_zero ~statics ~externals ~sums gs e x k =
             in both [e1] and [e2]: avoiding the duplication 
             of the continuation *)
         let k_cut = S_skip in
-        let w,ts,s = to_s ~is_zero ~statics ~externals ~sums gs e x k_cut in
+        let w,ts,s = to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums gs e x k_cut in
         w,ts,seq_ s k
       else
-        let w1,ts1,s1 = to_s ~is_zero ~statics ~externals ~sums gs e1 x k in
-        let w2,ts2,s2 = to_s ~is_zero ~statics ~externals ~sums gs e2 x k in
+        let w1,ts1,s1 = to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums gs e1 x k in
+        let w2,ts2,s2 = to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums gs e2 x k in
         let z = Ast.gensym () in
         (w1++>w2),(ts1 ++ ts2),S_letIn(z,to_a ~externals ~sums a,S_if(z,s1,Some s2))
   | E_case(a,hs,e_els) ->
@@ -265,17 +275,17 @@ let rec to_s ~is_zero ~statics ~externals ~sums gs e x k =
             in each expression [ei] in [hs]: avoiding the duplication 
             of the continuation *)
         let k_cut = S_skip in
-        let w,ts,s = to_s ~is_zero ~statics ~externals ~sums gs e x k_cut in
+        let w,ts,s = to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums gs e x k_cut in
         w,ts,seq_ s k
         (* ************************** *)  
       else
       let ws,tss,hs' = Prelude.map_split3 (fun (cs,e) ->
-                         let w,ts,s = to_s ~is_zero ~statics ~externals ~sums gs e x k in
+                         let w,ts,s = to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums gs e x k in
                          w,ts,(List.map (to_c ~sums) cs,s)
                        ) hs
       in
       let ts = List.fold_left (++) SMap.empty tss in
-      let w1,ts1,s1 = to_s ~is_zero ~statics ~externals ~sums gs e_els x k in
+      let w1,ts1,s1 = to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums gs e_els x k in
       let w' = List.fold_left (++>) w1 ws in
       w',ts1 ++ ts,let z = Ast.gensym () in
       S_letIn(z,to_a ~externals ~sums a, S_case(z,hs',Some s1))
@@ -289,7 +299,7 @@ let rec to_s ~is_zero ~statics ~externals ~sums gs e x k =
         (* ************************** *)
         (* optimization avoiding the duplication of the continuation *)
         let k_cut = S_skip in
-        let w,ts,s = to_s ~is_zero ~statics ~externals ~sums gs e x k_cut in
+        let w,ts,s = to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums gs e x k_cut in
         assert (SMap.is_empty ts);
         w,ts,seq_ s k
         (* ************************** *)
@@ -297,7 +307,7 @@ let rec to_s ~is_zero ~statics ~externals ~sums gs e x k =
       let z2 = Ast.gensym () in
       let ws,tss,hs' = Prelude.map_split3 (fun (inj,(py,e)) ->
                          let y = match py with Ast.P_var y -> y | _ -> assert false in
-                         let w,ts,s = to_s ~is_zero ~statics ~externals ~sums gs e x k in
+                         let w,ts,s = to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums gs e x k in
                          let n,_,ty_n = find_ctor inj sums in
                          w,ts,([n],(seq_ (set_ y (A_decode(z2,ty_n))) @@ s))
                        ) hs
@@ -307,7 +317,7 @@ let rec to_s ~is_zero ~statics ~externals ~sums gs e x k =
                                 (* Some skip rather than None because
                                    the number of cases in the generated code
                                    must be a power of 2 *)
-                      | Some e -> let w,ts,s = to_s ~is_zero ~statics ~externals ~sums gs e x k in
+                      | Some e -> let w,ts,s = to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums gs e x k in
                                   (w,ts,Some s)
       in
       let ts = List.fold_left (++) tsn tss in
@@ -319,30 +329,71 @@ let rec to_s ~is_zero ~statics ~externals ~sums gs e x k =
             S_letIn(z2,A_call((to_op @@ (GetTuple{pos=1;arity=2}),A_var z)),
 
             S_case(z1,hs',so))))
-  | E_letIn(P_var y,_,E_sig_create(ey),e1) ->
-      let w1,ts1,s1 = to_s ~is_zero ~statics ~externals ~sums gs e1 x k in
-      w1,ts1,seq_ (S_sig_set(y,to_a ~externals ~sums ey)) s1
 
+  | E_letIn(P_var y,_,E_sig_create(ey),e1) ->
+      let w1,ts1,s1 = to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums gs e1 x k in
+      w1,ts1,(* seq_ (S_sig_set(y,to_a ~externals ~sums ey))*) s1
+
+  | E_letIn(P_var f,_,E_trap _,e2) ->
+      let pi = Ast.{statics;externals;sums;main=e2} in
+      let rdy,res,idle,(ts,s2) = compile ~endloop ~traps:(f::traps) ~is_zero pi in
+      let id = Ast.gensym ~prefix:"id" () in
+      let s2' = S_fsm(id,rdy,res,idle,ts,s2) in
+      let q = Ast.gensym ~prefix:"q" () in
+      let s3 = let_plug_s (disjonction_traps traps) (fun z' ->
+                S_if(z', seq_ (set_ f (A_const (Bool false))) (set_ x (A_const Unit)), Some (
+               let_plug_s (disjonction_traps [rdy;f]) (fun z ->
+               S_if(z, return_ (seq_ (set_ f (A_const (Bool false))) (set_ x (A_const Unit))),Some(S_continue q)))))) in
+      SMap.empty,SMap.singleton q (seq_ s2' s3), seq_ (S_in_fsm(id,s2)) s3
+  | E_exit(f,a) ->
+      SMap.empty, SMap.empty, (S_set(f,A_const (Bool true)))
+  | E_suspend(e1,y) ->
+      let pi = Ast.{statics;externals;sums;main=e1} in
+      let rdy,res,idle,(ts,s1) = compile ~endloop ~traps ~is_zero pi in
+      let id = Ast.gensym ~prefix:"id" () in
+      let q = Ast.gensym ~prefix:"q" () in
+      (* suspend *)
+      let s2 = let_plug_s (A_sig_get(y)) @@ fun z ->
+                   S_if(z, S_continue q,Some (
+                    seq_ (S_in_fsm(id,s1)) @@
+                    S_if(rdy, return_ (set_ x (A_var res)),
+                    Some (S_continue q)))) in
+      (* let s2 =  seq_ (S_in_fsm(id,s1)) @@
+                S_if(rdy, return_ (set_ x (A_var res)),
+                Some (S_continue q)) in *)
+      let s3 = let_plug_s (A_sig_get(y)) @@ fun z ->
+                   S_if(z, S_continue q,Some (
+                    S_if(rdy, return_ (set_ x (A_var res)),
+                    Some (S_fsm(id,rdy,res,idle,ts,S_skip))))) in
+      SMap.empty,(SMap.singleton q s3), s2
+  | E_loop(e1) ->
+      let e1' = Instantiate.instantiate ~with_pauses:false @@ Ast_rename.rename_trap_and_signals ~statics:(List.map fst statics) e1 in
+      Ast_pprint.pp_exp Format.std_formatter e1;
+      Ast_pprint.pp_exp Format.std_formatter e1';
+      let z = Ast.gensym ~prefix:"z" () in
+      let w2,ts2,s2 = to_s ~endloop:true ~traps ~is_zero:false ~statics ~externals ~sums gs e1' z S_skip in
+      let w1,ts1,s1 = to_s ~endloop ~traps ~is_zero:false ~statics ~externals ~sums gs e1 x s2 in
+      w1++>w2,ts1++ts2, s1
   | E_letIn(P_var f,_,(E_fix(h,(p,_,e1)) as phi),e2) ->
      assert (f = h);
      let e1 = replace_arg phi in
      let f' = NameC.mark_return f in
-     let w1,ts1,s1 = to_s ~is_zero ~statics ~externals ~sums (f::gs) e1 (NameC.result_of_fun f) (S_continue f') in
-     let w2,ts2,s2 = to_s ~is_zero ~statics ~externals ~sums gs e2 x k in
+     let w1,ts1,s1 = to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums (f::gs) e1 (NameC.result_of_fun f) (S_continue f') in
+     let w2,ts2,s2 = to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums gs e2 x k in
      (w1++>w2),(SMap.add f s1 ts1)++ts2,s2
   | E_letIn(P_unit,_,e1,e2) ->
       (* [SEQ] *)
-      let w2,ts2,s2 = to_s ~is_zero ~statics ~externals ~sums gs e2 x k in
+      let w2,ts2,s2 = to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums gs e2 x k in
       if Instantaneous.combinational ~externals e1 then (* todo: emit a warning ? *) (w2,ts2,s2) else
-      let w1,ts1,s1 = to_s ~is_zero ~statics ~externals ~sums gs e1 (Ast.gensym ()) s2 in
+      let w1,ts1,s1 = to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums gs e1 (Ast.gensym ()) s2 in
       w1++>w2,ts2++ts1,s1
   | E_letIn(P_var y,_,e1,e2) ->
       (* [LET] *)
-      let w2,ts2,s2 = to_s ~is_zero ~statics ~externals ~sums gs e2 x k in
+      let w2,ts2,s2 = to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums gs e2 x k in
       if Instantaneous.combinational ~externals e1 then
         w2,ts2,seq_ (set_ y (to_a ~externals ~sums e1)) s2
       else
-        let w1,ts1,s1 = to_s ~is_zero ~statics ~externals ~sums gs e1 y s2 in
+        let w1,ts1,s1 = to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums gs e1 y s2 in
         w1++>w2,ts2++ts1,s1
   | E_app(E_var f,a) ->
       if List.mem f gs then
@@ -383,7 +434,7 @@ let rec to_s ~is_zero ~statics ~externals ~sums gs e x k =
        | E_var y ->
           let q_wait = Ast.gensym ~prefix:"get_wait" () in
           let q1 = Ast.gensym ~prefix:"get_pause" () in
-          let w,ts,s = to_s ~is_zero ~statics ~externals ~sums gs (E_const Unit) x k in
+          let w,ts,s = to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums gs (E_const Unit) x k in
           let s0 = S_if(y^"_lock", 
                        S_continue q_wait, Some(seq_ (set_ (y^"_lock") (A_const (Bool true))) @@
                         seq_ (set_ y (to_a ~externals ~sums a)) @@ (S_continue q1))) in
@@ -392,7 +443,7 @@ let rec to_s ~is_zero ~statics ~externals ~sums gs e x k =
        | _ -> assert false) else
       (match ay with
        | E_var y ->
-          let w,ts,s = to_s ~is_zero ~statics ~externals ~sums gs (E_const Unit) x k in
+          let w,ts,s = to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums gs (E_const Unit) x k in
           (w, ts, seq_ (set_ y (to_a ~externals ~sums a)) s)
        | _ -> assert false)
   | E_array_get(y,idx) ->
@@ -470,13 +521,32 @@ let rec to_s ~is_zero ~statics ~externals ~sums gs e x k =
       let s = S_write_start(y,a,a_upd) in
       (SMap.empty, SMap.empty, return_ s)
   | E_reg((p,_,e1),e0,l) ->
-      let y = match p with
+     let rec is_default e = 
+       let exception Found in 
+       try let c = Ast.e2c e in
+       let rec w_c = function
+                    | Ast.Unit -> ()
+		    | Ast.Int (0,_) -> () 
+                    | Ast.Bool false -> ()
+                    | Ast.C_tuple cs | Ast.C_vector cs -> List.iter w_c cs
+                    | _ -> raise Found in  w_c c ; true with Ast.Not_a_constant | Found -> false
+in
+let y = match p with
               | P_var y -> y 
               | _ -> assert false 
-      in
+in
+if  is_default e0 then 
+	      let w1,ts1,s1 = to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums [] e1 y S_skip in
+	      assert (SMap.is_empty w1 (* && SMap.is_empty ts1)*));
+	      (SMap.empty, ts1,
+	      seq_ s1 @@
+	      return_ @@ set_ x (A_var y))
 
-      let w1,ts1,s1 = to_s ~is_zero ~statics ~externals ~sums [] e1 y S_skip in
-      let w0,ts0,s0 = to_s ~is_zero ~statics ~externals ~sums [] e0 y S_skip in
+else
+
+
+      let w1,ts1,s1 = to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums [] e1 y S_skip in
+      let w0,ts0,s0 = to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums [] e0 y S_skip in
       assert (SMap.is_empty w1 (* && SMap.is_empty ts1)*));
       assert (SMap.is_empty w0 (* && SMap.is_empty ts0)*));
       (SMap.empty, ts1++ts0,
@@ -486,7 +556,7 @@ let rec to_s ~is_zero ~statics ~externals ~sums gs e x k =
   | E_exec(e1,e0,eo,l) ->
       (* assume e0 is combinational *)
       let pi = Ast.{statics;externals;sums;main=e1} in
-      let rdy,res,idle,(ts,s1) = compile ~is_zero:false (* ~result:x*) pi in
+      let rdy,res,idle,(ts,s1) = compile ~endloop ~traps ~is_zero:false (* ~result:x*) pi in
       let id = Ast.gensym ~prefix:"id" () in
       let s1' = S_fsm(id,rdy,res,idle,ts,s1) in
       let s2 = seq_ (S_if(rdy, S_skip, Some (set_ res (to_a ~externals ~sums e0)))) @@
@@ -504,25 +574,26 @@ let rec to_s ~is_zero ~statics ~externals ~sums gs e x k =
           (SMap.empty, SMap.empty, s5))
   | E_par(es) ->
       let id_s = List.map (fun _ -> Ast.gensym ~prefix:"id" ()) es in
-      let pi_s = List.map (fun e -> compile ~is_zero:false @@ Ast.{statics;externals;sums;main=e}) es in
-      if List.for_all (function (_,_,_,([],_)) -> true | _ -> false) pi_s then
+      let pi_s = List.map (fun e -> compile ~endloop ~traps ~is_zero:false @@ Ast.{statics;externals;sums;main=e}) es in
+      (* optimization: posible if no week abort *)
+      (* if List.for_all (function (_,_,_,([],_)) -> true | _ -> false) pi_s then
         let xs = List.map (fun (_,res_i,_,_) -> A_var res_i) pi_s in
         let s_list = List.map2 (fun id_i (rdy_i,res_i,idle_i,(ts_i,s_i)) -> 
                         S_fsm(id_i,rdy_i,res_i,idle_i,ts_i,s_i)) id_s pi_s
         in
         SMap.empty,SMap.empty,seq_ (seq_ (seq_list_ s_list) (set_ x (A_tuple xs))) k
-      else
+      else *)
       let q = Ast.gensym ~prefix:"par" () in
       let rdys = List.map (fun (rdy_i,_,_,_) -> A_var rdy_i) pi_s in
       let ress = List.map (fun (_,res_i,_,_) -> A_var res_i) pi_s in
-      let end_s = let_plug_s (conjonction_atoms rdys) (fun z ->
-                  S_if(z, (seq_ (S_set(x,(A_tuple ress))) @@ k),Some (S_continue q))) in
+      let end_s = let_plug_s (disjonction_traps traps) (fun z' ->
+                  S_if(z',S_skip,Some (
+                  let_plug_s (conjonction_atoms rdys) (fun z ->
+                  S_if(z, (seq_ (S_set(x,(A_tuple ress))) @@ k),Some (S_continue q)))))) in
       let ts = SMap.singleton q (
-        let s_fin = end_s
-        in
         let s_list' = List.map2 (fun id_i (rdy_i,res_i,idle_i,(ts_i,s_i)) -> 
                         S_fsm(id_i,rdy_i,res_i,idle_i,ts_i,S_skip)) id_s pi_s
-        in seq_ (seq_list_ s_list') s_fin
+        in seq_ (seq_list_ s_list') end_s
       ) in
       let s_inFsm_list = List.map2 (fun id_i (rdy_i,res_i,idle_i,(ts_i,s_i)) -> 
                                    (S_in_fsm(id_i,s_i))) id_s pi_s in
@@ -617,127 +688,18 @@ let rec to_s ~is_zero ~statics ~externals ~sums gs e x k =
         | None -> assert false (* ill-typed *)
       end
  
-  | E_pause e1 -> 
-      let q = Ast.gensym ~prefix:"pause" () in
-      let w1,ts1,s1 = to_s ~is_zero ~statics ~externals ~sums gs e1 x (S_continue q) in
-      (w1, SMap.add q k ts1, s1)
-  | E_equations(p,eqs) ->
-      let ws,tss,list_s = Prelude.map_split3 (fun (Ast.P_var y,Ast.Exp e) ->
-                         let z = Ast.gensym () in
-                         let w,ts,s = to_s ~is_zero ~statics ~externals ~sums gs e z S_skip in
-                         w,ts,seq_ s (S_sig_set(y^"%signal",A_var z))
-                       ) eqs
-      in
-      let ts = List.fold_left (++) SMap.empty tss in
-      let w1,ts1,s1 = to_s ~is_zero ~statics ~externals ~sums gs (Pattern.pat2exp p) x k in
-      let w' = List.fold_left (++>) w1 ws in
-      let s' = List.fold_right seq_ list_s s1 in
-      let s_with_init = List.fold_right (fun (Ast.P_var y,_) s -> seq_ (set_ y (A_sig_get(y^"%signal"))) s) eqs s' in
-      w',ts ++ ts1,s_with_init
-     
-      (* let acc = ref [] in
-      let rec compile_le clks p x le =
-        let rec aux p ax = 
-          match p with
-          | Ast.P_var z -> set_ z ax
-          | P_tuple ps -> 
-              let n = List.length ps in
-              seq_list_ @@ List.mapi (fun i p -> aux p (A_call(GetTuple (i,n,new_tvar()), ax))) ps
-          | P_unit -> S_skip
-        in 
-        match le with
-        | Ast.Exp e1 -> let w1,ts1,s1 = to_s ~is_zero ~statics ~externals ~sums [] e1 x (aux p (A_var x)) in
-                    assert (SMap.is_empty w1);    
-                    assert (SMap.is_empty ts1);
-                    s1
-        | Fby(le1, le2) -> let x_init = Ast.gensym ~prefix:(x^"init") () in
-                           let x_mem = Ast.gensym ~prefix:(x^"mem") () in
-                           let s1 = compile_le clks p x le1 in
-                           let s2 = compile_le clks p x_mem le2 in
-                           acc := (clks,s2)::!acc;
-                           S_if(x_init, S_skip, (* (aux p (A_var x_mem)),*)
-                                     Some(seq_ (set_ x_init (A_const (Bool true))) @@ s1))
-        | When(le1, e2) -> let_plug_s (to_a ~externals ~sums e2) @@ fun z -> 
-                            let s1 = compile_le (z::clks) p x le1 in
-                            S_if(z,s1,None)
-        | Merge(le1, le2, e3) -> let s1 = compile_le clks p x le1 in
-                                 let s2 = compile_le clks p x le2 in
-                                 let_plug_s (to_a ~externals ~sums e3) @@ fun z ->
-                                 seq_ (S_if(z,s1,Some(s2))) (aux p (A_var x))
-      in
-      let ss = List.map (fun (p,le) ->
-                  let y = Ast.gensym () in
-                  compile_le [] p y le
-                  ) eqs
-      in SMap.empty,SMap.empty, seq_ (seq_list_ ss) (seq_ (set_ x (to_a ~externals ~sums  (Pattern.pat2exp p))) @@ 
-      seq_ (seq_list_  
-      (List.map (fun (clks,s) -> 
-            let_plug_s (conjonction_atoms (List.map (fun clk -> A_var clk) clks))
-            @@ fun z -> S_if(z,s,None)) !acc)) k)
-      (* let p_tuple = Ast.P_tuple (List.map fst eqs) in
-      let eqs' = eqs (* List.map (fun (p,e) -> let p' = Ast_rename.rename_pat ~statics:(List.map fst statics) p in p',e) eqs*) in
-      let rec aux p1 p2 = 
-        match p1,p2 with
-        | Ast.P_var x1, Ast.P_var x2 -> set_ x1 (A_var x2)
-        | P_tuple ps1, P_tuple ps2 -> seq_list_ @@ List.map2 aux ps1 ps2
-        | P_unit,P_unit -> S_skip
-        | _ -> assert false
-      in
-      (* let s_init = aux p_tuple_pre p_tuple in *)
-      let rec assign_p_p' p p' = match p,p' with 
-      | Ast.P_var z1,Ast.P_var z2 -> set_ z1 (A_var z2)
-      | Ast.P_tuple ps', Ast.P_var z2 -> 
-          let n = List.length ps' in 
-          seq_list_ (List.mapi (fun i p -> 
-              (* assume p is a variable *)
-              match p with
-              | Ast.P_var zp ->
-                 set_ zp (to_a ~externals ~sums @@ Matching.get_tuple i n (E_var z2))) ps')
-      | Ast.P_tuple ps, Ast.P_tuple ps' -> seq_list_ (List.map2 assign_p_p' ps ps')
-      | Ast.P_unit,Ast.P_unit -> S_skip
-      | _ -> assert false in
-      let s' = List.fold_right  (fun (pi,ei) s ->
-        let z' = Ast.gensym () in
-        let _w,_ts,s' = to_s ~is_zero ~statics ~externals ~sums [] ei (* (Ast_subst.subst_p_e p_tuple (Pattern.pat2exp p_tuple_pre) ei) *) z' S_skip in
-        assert (SMap.is_empty _w);
-        assert (SMap.is_empty _ts);
-        seq_ s' @@
-        seq_ (assign_p_p' pi (P_var z')) s) eqs' (seq_list_ (List.map2 (fun (p,_) (p',_) -> 
-            assign_p_p' p p'
-          ) eqs eqs')) in
-      SMap.empty,SMap.empty,seq_ (seq_ S_skip (seq_ s' (set_ x (to_a ~externals ~sums @@ Pattern.pat2exp p))))
-                                 k 
-                                 *)
-                                 
-                                 (* (aux p_tuple p_tuple_pre)*)
-*)
-    (*let p_tuple = Ast.P_tuple (List.map fst eqs) in
-      let p_tuple_pre = Ast_rename.rename_pat ~statics:(List.map fst statics) p_tuple in
-      let rec aux p1 p2 = 
-        match p1,p2 with
-        | Ast.P_var x1, Ast.P_var x2 -> set_ x1 (A_var x2)
-        | P_tuple ps1, P_tuple ps2 -> seq_list_ @@ List.map2 aux ps1 ps2
-        | P_unit,P_unit -> S_skip
-        | _ -> assert false
-      in
-      let s_init = aux p_tuple_pre p_tuple in
-      let s' = List.fold_right  (fun (pi,ei) s ->
-        match pi with
-        | Ast.P_var z ->
-            let _w,_ts,s' = to_s ~is_zero ~statics ~externals ~sums [] ei (* (Ast_subst.subst_p_e p_tuple (Pattern.pat2exp p_tuple_pre) ei) *) z S_skip in
-            assert (SMap.is_empty _w);
-            assert (SMap.is_empty _ts);
-            seq_ s' s) eqs S_skip in
-      SMap.empty,SMap.empty,seq_ (seq_ S_skip (seq_ s' (set_ x (to_a ~externals ~sums @@ Pattern.pat2exp p))))
-                                 k (* (aux p_tuple p_tuple_pre)*)
-*)
+  | E_pause(l,e1) ->
+      let w1,ts1,s1 = to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums gs e1 x (S_continue l) in
+      let ts1' = if endloop then ts1 else SMap.add l k ts1 in
+      (w1,ts1', s1)
+
   | E_emit(x,ey) ->
        SMap.empty,SMap.empty,return_ @@ S_sig_set(x,to_a ~externals ~sums ey)
   | e -> Ast_pprint.pp_exp Format.std_formatter e; assert false (* todo *)
 
 (* takes a program and translates it into an FSM *)
 
-and compile ?(result=(Ast.gensym ~prefix:"result" ())) ~is_zero pi =
+and compile ~endloop ?(traps=[]) ?(result=(Ast.gensym ~prefix:"result" ())) ~is_zero pi =
   let open Ast in
   
   let statics = pi.statics in
@@ -754,7 +716,7 @@ and compile ?(result=(Ast.gensym ~prefix:"result" ())) ~is_zero pi =
   let e_ren = Ast_subst.subst_p_e py (Pattern.pat2exp pz) e in
   
   let k = seq_ (set_ rdy (A_const (Bool true))) (S_continue idle) in
-  let w0,ts0,s0 = to_s ~is_zero ~statics ~externals ~sums [idle] e_ren x k in
+  let w0,ts0,s0 = to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums [idle] e_ren x k in
   let s0 = List.fold_left2 (fun s y z -> seq_ (set_ z (A_var y)) s) s0 ys zs in
 
   let wmain = SMap.add idle IMap.empty w0 in
@@ -763,7 +725,7 @@ and compile ?(result=(Ast.gensym ~prefix:"result" ())) ~is_zero pi =
   let rec loop ts_res =
     let has_changed = ref false in
     let ts_res = List.filter_map (fun (q_aux,s) ->
-                  if contain_return s then (
+                  if contains_return s then (
                     (* has_changed := true; *)
                     (match insert_kont ~is_zero wmain ~idle ~x s with
                     | Some s2 -> Some(q_aux,s2)

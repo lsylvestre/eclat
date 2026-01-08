@@ -4,9 +4,12 @@ open Ast_rename
 
 let gen_label () = gensym ~prefix:"label" ()
 
-let rec instantiate e =
+let rec instantiate ?(with_pauses=false) e =
   match e with
   | E_run(f,e1,_) -> E_run(f,instantiate e1,gen_label ())
+  | E_pause (l,e1) -> 
+      let l' = if with_pauses then gen_label () else l in
+      E_pause (l',instantiate e1)
   | E_exec(e1,e2,eo,_) ->
       E_exec(instantiate e1,instantiate e2,Option.map instantiate eo,gen_label ())
   | E_reg((p,tyB,e1),e0,_) ->

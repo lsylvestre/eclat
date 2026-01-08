@@ -20,6 +20,7 @@ let as_ident ex =
   | _ -> Ast_pprint.pp_exp Format.std_formatter ex; assert false (* todo: better error message *)
 
 let subst_e x ex e =
+  assert (not @@ SMap.mem x (Free_vars.fv ex));
   let rec ss e =
     match e with
     | E_var y ->
@@ -62,33 +63,30 @@ let subst_e x ex e =
     | E_array_set_immediate(y, e1, e2) ->
         let z = if x <> y then y else as_ident ex in
         E_array_set_immediate(z, ss e1, ss e2)   
-    | E_for(y, e_st1, e_st2, e3, loc) ->
-       E_for(y,ss e_st1,ss e_st2,
+    | E_for(y, sz1, sz2, e3, loc) ->
+       E_for(y,sz1,sz2,
              (if x = y then e3 else ss e3),loc)
-    | E_generate((p, ty, e1), e2, e_st3, loc) ->
+    | E_generate((p, ty, e1), e2, sz3, sz4, loc) ->
         let e1' = if pat_mem x p then e1 else ss e1 in
-        E_generate((p, ty, e1'), ss e2, ss e_st3, loc)
+        E_generate((p, ty, e1'), ss e2, sz3, sz4, loc)
     | E_vector_mapi(is_par, (p, typ, e1), e2, ty) ->
         let e1' = if pat_mem x p then e1 else ss e1 in
         E_vector_mapi(is_par, (p, typ, e1'), ss e2, ty)
-    | E_equations(p,eqs) ->
-        let rec ss_le le =
-          match le with
-          | Exp e' -> Exp(ss e')
-          | Fby(le1, le2) -> Fby(ss_le le1, ss_le le2)
-          | When(le1, e2) -> When(ss_le le1, ss e2)
-          | Merge(le1, le2, e3) -> Merge(ss_le le1, ss_le le2, ss e3)
-        in
-        let p_tuple = P_tuple (p :: List.map (fun (p,_) -> p) eqs) in 
-        let eqs' = if pat_mem x p_tuple then eqs else
-                   List.map (fun (p,ei) -> p, ss_le ei) eqs in
-        E_equations(p,eqs')
     | E_sig_get(y) ->
         let z = if x <> y then y else as_ident ex in
         E_sig_get(z)
     | E_emit(y,e1) ->
         let z = if x <> y then y else as_ident ex in
         E_emit(z, ss e1)
+    | E_loop(e1) ->
+        E_loop(ss e1)
+    | E_trap _ -> e
+    | E_exit(y,e1) -> 
+        let z = if x <> y then y else as_ident ex in
+        E_exit(z, ss e1)
+    | E_suspend(e1,y) ->
+        let z = if x <> y then y else as_ident ex in
+        E_suspend(ss e1, z)
     | e -> Ast_mapper.map ss e
   in
   ss e

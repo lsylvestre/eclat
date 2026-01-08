@@ -3,6 +3,15 @@ open Ast_subst
 
 let has_changed = ref false
 
+let eval_size ~loc sz =
+  match Types.canon_size sz with
+  | Types.Sz_lit n -> Printf.printf "=======================> %d\n\n" n; (n,Types.new_size_unknown())
+  | _ -> let open Prelude.Errors in
+         error ~loc (fun fmt ->
+         Format.fprintf fmt
+           "@[<v>Cannot statically determine size %a@]" 
+               Types.pp_size sz)
+
 let eval_static_exp_int ~loc ~statics e =
   let exception Cannot in 
   let rec eval e =
@@ -37,28 +46,39 @@ let eval_static_exp_int ~loc ~statics e =
 
 let rec expand ~statics e =
   match e with
-    | E_generate((p,tyB,e1),init,e_st3,loc) ->
+    | E_generate((p,(ty,tyB),e1),init,sz3,sz4,loc) ->
         expand ~statics @@ (
+        Matching.matching @@ Anf.anf (
         has_changed := true;
-        let (n,w) = eval_static_exp_int ~loc ~statics e_st3 in
+        let (n0,w) = eval_size ~loc sz3 in
+        let (n,w) = eval_size ~loc sz4 in
         let rec loop i =
-          if i < n then
-            E_letIn(p,Types.new_ty_unknown(),E_tuple[E_const (Int(i,w)); loop(i+1)],e1)
+          if i >= n0 then
+            E_letIn(p,Types.new_ty_unknown(),E_tuple[E_const (Int(i,w)); loop(i-1)],e1)
           else init
-         in loop 0)
+         in loop n))
+       (* let rec loop (i,acc) =
+          if i <= n then
+            E_letIn(p,Types.new_ty_unknown(),E_tuple[E_const (Int(i,w)); acc],
+                    loop(i+1,e1))
+          else let idx = gensym () in
+               let x = gensym () in
+               E_letIn(P_tuple[P_var idx;P_var x], ty, Pattern.pat2exp p, E_var x)
+         in loop (n0,init)))*)
 
-    | E_for(x,e_st1,e_st2,e3,loc) ->
-        expand ~statics @@ (
+    | E_for(x,sz1,sz2,e3,loc) -> 
+      expand ~statics @@ (
+        Matching.matching @@ Anf.anf  (
         has_changed := true;
-        let (n,w) = eval_static_exp_int ~loc ~statics e_st1 in
-        let (m,w') = eval_static_exp_int ~loc ~statics e_st2 in
+        let (n,w) = eval_size ~loc sz1 in
+        let (m,w') = eval_size ~loc sz2 in
         (* assert(w = w'); *)
         let ignore = gensym () in
         E_letIn(P_var ignore,Types.new_ty_unknown(),
                 (let es = List.init (m-n+1) (fun i -> 
                    E_letIn(P_var x,Types.new_ty_unknown(),E_const (Int(n+i,w)),e3)) in
                 E_par(es)),
-                E_const Unit))
+                E_const Unit)))
 
   (*
   | E_generate((p,e1),init,e_st3,loc) ->

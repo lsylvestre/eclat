@@ -280,20 +280,15 @@ let globalize_e (e:e) : ((x * _ * e) list * e) =
                       | Some e3 -> let ds3,e3' = glob e3 in
                     ds3,Some e3 in
         ds0@ds3,E_exec(declare ds1 e1',e0',eo',l)
-    | E_for(x,e_st1,e_st2,e3,loc) ->
-        let ds1,e_st1' = glob e_st1 in
-        let ds2,e_st2' = glob e_st2 in
+    | E_for(x,sz1,sz2,e3,loc) ->
         let ds3,e3' = glob e3 in
-        [],E_for(x,declare ds1 e_st1',
-                   declare ds2 e_st2',
-                   declare ds3 e3',loc)
+        [],E_for(x,sz1,sz2,declare ds3 e3',loc)
          (* NB: definitions in [e_st1] and [e_st2] and [e3]
             are *not* globalized *)
-    | E_generate((p,tysig,e1),e2,e_st3,loc) ->
+    | E_generate((p,tysig,e1),e2,sz3,sz4,loc) ->
       let ds1,e1' = glob e1 in
       let ds2,e2' = glob e2 in
-      let ds3,e_st3' = glob e_st3 in
-      ds2,E_generate((p,tysig,declare ds1 e1'),e2',declare ds3 e_st3',loc)
+      ds2,E_generate((p,tysig,declare ds1 e1'),e2',sz3,sz4,loc)
       (* NB: definitions in [e_st1] are *not* globalized *)
 
     | E_vector es ->
@@ -306,34 +301,27 @@ let globalize_e (e:e) : ((x * _ * e) list * e) =
     | E_run(x,e,l) ->
       let ds,e' = glob e in
       ds,E_run(x,e',l)
-    | E_pause e ->
+    | E_pause (l,e) ->
       let ds,e' = glob e in
-      ds,E_pause e'
-    | E_equations(p,eqs) ->
-        let rec glob_le le =
-          match le with
-          | Exp e1 -> let ds,e1' = glob e1 in (ds, Exp e1')
-          | Fby(le1, le2) -> let ds1,le1' = glob_le le1 in
-                            let ds2,le2' = glob_le le2 in
-                            (ds1@ds2, Fby(le1', le2'))
-          | When(le1, e2) -> let ds1,le1' = glob_le le1 in
-                            let ds2,e2' = glob e2 in
-                            (ds1@ds2, When(le1', e2'))
-          | Merge(le1, le2, e3) -> let ds1,le1' = glob_le le1 in
-                                  let ds2,le2' = glob_le le2 in
-                                  let ds3,e3' = glob e3 in
-                                  (ds1@ds2@ds3, Merge(le1', le2', e3'))
-        in
-        let dss,eqs' = List.split @@ List.map (fun (p,le) -> let ds,le' = glob_le le in ds,(p,le')) eqs in
-        List.concat dss, E_equations(p,eqs') 
+      ds,E_pause (l,e')
     | E_sig_get _ ->
         [], e
     | E_emit(x,e1) ->
-      let ds1,e1' = glob e1 in
-      ds1,E_emit(x,e1')
+        let ds1,e1' = glob e1 in
+        ds1,E_emit(x,e1')
     | E_sig_create(e1) ->
-      let ds1,e1' = glob e1 in
-      ds1,E_sig_create(e1')
+        let ds1,e1' = glob e1 in
+        ds1,E_sig_create(e1')
+    | E_loop(e1) ->
+        let ds1,e1' = glob e1 in
+        [],E_loop(declare ds1 e1')
+    | E_trap _ -> [],e
+    | E_exit(x,e1) ->
+        let ds1,e1' = glob e1 in
+        ds1,E_exit(x,e1')
+    | E_suspend(e1,x) ->
+        let ds1,e1' = glob e1 in
+        [],E_suspend(declare ds1 e1',x)
   in glob e
 
 

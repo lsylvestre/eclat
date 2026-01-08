@@ -91,7 +91,7 @@ let int2bin ~int_size =
     Bytes.to_string buf
 
 (* lock-based support for concurrent memory accesses *)
-let ptr_taken x = "$"^x^"_lock" 
+let ptr_taken x = MiniHDL_typing.ptr_taken x
 
 let decl_locks ?(init=false) fmt x =
   (* if !single_read_write_lock_flag then *)

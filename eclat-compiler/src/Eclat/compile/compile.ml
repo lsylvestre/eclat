@@ -24,7 +24,7 @@ let compile ?(vhdl_comment="") ?(prop_fsm=true) arg_list name ty fmt pi =
 
   let pi = Rename_main_arg.rename_main_arg_pi pi in
 
-  let (rdy,result,idle,fsm) = Gen_miniHDL.compile ~is_zero:true pi in
+  let (rdy,result,idle,fsm) = Gen_miniHDL.compile ~endloop:false ~is_zero:true pi in
 
   Count_externals.count_externals_fsm fsm;
 
@@ -57,6 +57,8 @@ let compile ?(vhdl_comment="") ?(prop_fsm=true) arg_list name ty fmt pi =
 
   (* let fsm = Remove_assigned_but_not_read_vars.clean_fsm ~rdy ~result fsm _typing_env in *)
   let typing_env = MiniHDL_typing.typing_circuit ~externals:pi.externals ~statics ty (rdy,result,fsm) in
+
+  ignore(MiniHDL_causality.check fsm);
 
   let gen = if !Flag_mealy.mealy_flag then  Gen_vhdl.pp_component 
             else Gen_vhdl_moore.pp_component in

@@ -2,6 +2,8 @@ open MiniHDL_syntax
 
 let emit_warning_flag = ref false
 
+let ptr_taken x = "$"^x^"_lock" 
+
 (** [canon t] put the type [t] in canonical form by replacing
   instantiated variables free in [t] by their definition,
   themselves put in canonical form. *)
@@ -150,15 +152,17 @@ let rec translate_tyB =
   and translate_size = 
     let open Types in
   let hvar = Hashtbl.create 10 in
-  function
-  | Sz_lit n -> TSize n
-  | Sz_var r -> 
-     if Hashtbl.mem hvar r then Hashtbl.find hvar r else
-      (let t = TVar(ref @@ match !r with
-                   | Unknown n -> V (string_of_int n)
-                   | Is sz -> T (translate_size sz)) in
-      Hashtbl.add hvar r t;
-      t)
+  function sz -> 
+    match Types.canon_size sz with
+    | Sz_lit n -> TSize n
+    | Sz_var r -> 
+      if Hashtbl.mem hvar r then Hashtbl.find hvar r else
+        (let t = TVar(ref @@ match !r with
+                    | Unknown n -> V (string_of_int n)
+                    | Is sz -> T (translate_size sz)) in
+        Hashtbl.add hvar r t;
+        t)
+    | _ -> assert false
 
 let rec translate_ty =
   let hvar = Hashtbl.create 10 in
@@ -179,6 +183,7 @@ let rec translate_ty =
   | Ty_ref tyB -> translate_tyB tyB
   | Ty_array(sz,tyB) -> TStatic{elem=translate_tyB tyB;size=translate_size sz}
   | Ty_signal(tyB) -> TSig(translate_tyB tyB)
+  | Ty_trap _ -> assert false
   | Ty_fun _ -> assert false
 
 let rec typing_c = function
@@ -310,7 +315,9 @@ let rec typing_s ~externals ~result h s =
       add_typing_env h x (TSig(t))
   | S_acquire_lock(l) 
   | S_release_lock(l) ->
-      ()
+      add_typing_env h (ptr_taken l) (TBool) 
+      (* add lock variable in the typing environment
+         (required for VHDL code generation) *)
   | S_read_start(x,idx) ->
       let telem = new_tvar () in
       let tz = new_tvar () in

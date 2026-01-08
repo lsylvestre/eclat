@@ -5,6 +5,7 @@ src/Eclat/compile/backend/gen_miniHDL.cmo : \
     src/Eclat/compile/backend/naming_convention.cmo \
     src/miniHDL/miniHDL_typing.cmo \
     src/miniHDL/miniHDL_syntax.cmo \
+    src/Eclat/compile/middle_end/normalize/instantiate.cmo \
     src/Eclat/compile/instantaneous.cmo \
     src/Eclat/syntax/free_vars.cmo \
     src/miniHDL/compile/flag_mealy.cmo \
@@ -19,6 +20,7 @@ src/Eclat/compile/backend/gen_miniHDL.cmx : \
     src/Eclat/compile/backend/naming_convention.cmx \
     src/miniHDL/miniHDL_typing.cmx \
     src/miniHDL/miniHDL_syntax.cmx \
+    src/Eclat/compile/middle_end/normalize/instantiate.cmx \
     src/Eclat/compile/instantaneous.cmx \
     src/Eclat/syntax/free_vars.cmx \
     src/miniHDL/compile/flag_mealy.cmx \
@@ -33,6 +35,7 @@ src/Eclat/compile/compile.cmo : \
     src/miniHDL/miniHDL_typing.cmo \
     src/miniHDL/miniHDL_syntax.cmo \
     src/miniHDL/optim/miniHDL_propagation.cmo \
+    src/miniHDL/miniHDL_causality.cmo \
     src/Eclat/compile/middle_end/middle_end.cmo \
     src/miniHDL/compile/list_machines.cmo \
     src/Eclat/compile/middle_end/transform/inline.cmo \
@@ -51,6 +54,7 @@ src/Eclat/compile/compile.cmx : \
     src/miniHDL/miniHDL_typing.cmx \
     src/miniHDL/miniHDL_syntax.cmx \
     src/miniHDL/optim/miniHDL_propagation.cmx \
+    src/miniHDL/miniHDL_causality.cmx \
     src/Eclat/compile/middle_end/middle_end.cmx \
     src/miniHDL/compile/list_machines.cmx \
     src/Eclat/compile/middle_end/transform/inline.cmx \
@@ -107,7 +111,6 @@ src/Eclat/compile/middle_end/check_tail_call.cmx : \
 src/Eclat/compile/middle_end/middle_end.cmo : \
     src/Eclat/compile/middle_end/transform/unroll.cmo \
     src/Eclat/typing/typing.cmo \
-    src/Eclat/compile/middle_end/transform/specialize_ref.cmo \
     src/Eclat/compile/middle_end/transform/specialize.cmo \
     src/Eclat/syntax/rename_fix.cmo \
     src/Eclat/compile/middle_end/normalize/propagation.cmo \
@@ -131,7 +134,6 @@ src/Eclat/compile/middle_end/middle_end.cmo : \
 src/Eclat/compile/middle_end/middle_end.cmx : \
     src/Eclat/compile/middle_end/transform/unroll.cmx \
     src/Eclat/typing/typing.cmx \
-    src/Eclat/compile/middle_end/transform/specialize_ref.cmx \
     src/Eclat/compile/middle_end/transform/specialize.cmx \
     src/Eclat/syntax/rename_fix.cmx \
     src/Eclat/compile/middle_end/normalize/propagation.cmx \
@@ -155,15 +157,17 @@ src/Eclat/compile/middle_end/middle_end.cmx : \
 src/Eclat/compile/middle_end/monomorphize.cmo : \
     src/Eclat/typing/typing.cmo \
     src/Eclat/typing/types.cmo \
-    src/Eclat/compile/middle_end/transform/inline.cmo \
-    src/Eclat/syntax/ast_undecorated.cmo \
+    src/Eclat/syntax/rename_fix.cmo \
+    src/prelude.cmo \
+    src/Eclat/syntax/ast_rename.cmo \
     src/Eclat/syntax/ast_mapper.cmo \
     src/Eclat/syntax/ast.cmo
 src/Eclat/compile/middle_end/monomorphize.cmx : \
     src/Eclat/typing/typing.cmx \
     src/Eclat/typing/types.cmx \
-    src/Eclat/compile/middle_end/transform/inline.cmx \
-    src/Eclat/syntax/ast_undecorated.cmx \
+    src/Eclat/syntax/rename_fix.cmx \
+    src/prelude.cmx \
+    src/Eclat/syntax/ast_rename.cmx \
     src/Eclat/syntax/ast_mapper.cmx \
     src/Eclat/syntax/ast.cmx
 src/Eclat/compile/middle_end/normalize/anf.cmo : \
@@ -222,38 +226,18 @@ src/Eclat/compile/middle_end/normalize/let_floating.cmx : \
     src/Eclat/syntax/ast_undecorated.cmx \
     src/Eclat/syntax/ast_subst.cmx \
     src/Eclat/syntax/ast.cmx
-src/Eclat/compile/middle_end/normalize/lustre_scheduling.cmo : \
-    src/Eclat/syntax/pattern.cmo \
-    src/Eclat/syntax/free_vars.cmo \
-    src/Eclat/syntax/ast_mapper.cmo \
-    src/Eclat/syntax/ast.cmo
-src/Eclat/compile/middle_end/normalize/lustre_scheduling.cmx : \
-    src/Eclat/syntax/pattern.cmx \
-    src/Eclat/syntax/free_vars.cmx \
-    src/Eclat/syntax/ast_mapper.cmx \
-    src/Eclat/syntax/ast.cmx
 src/Eclat/compile/middle_end/normalize/move_down_gfun_under_exec_and_par.cmo : \
     src/Eclat/typing/types.cmo \
     src/Eclat/syntax/free_vars.cmo \
     src/Eclat/syntax/ast_subst.cmo \
+    src/Eclat/syntax/ast_rename.cmo \
     src/Eclat/syntax/ast_mapper.cmo \
     src/Eclat/syntax/ast.cmo
 src/Eclat/compile/middle_end/normalize/move_down_gfun_under_exec_and_par.cmx : \
     src/Eclat/typing/types.cmx \
     src/Eclat/syntax/free_vars.cmx \
     src/Eclat/syntax/ast_subst.cmx \
-    src/Eclat/syntax/ast_mapper.cmx \
-    src/Eclat/syntax/ast.cmx
-src/Eclat/compile/middle_end/normalize/propagation-.cmo : \
-    src/Eclat/typing/types.cmo \
-    src/Eclat/compile/instantaneous.cmo \
-    src/Eclat/syntax/ast_subst.cmo \
-    src/Eclat/syntax/ast_mapper.cmo \
-    src/Eclat/syntax/ast.cmo
-src/Eclat/compile/middle_end/normalize/propagation-.cmx : \
-    src/Eclat/typing/types.cmx \
-    src/Eclat/compile/instantaneous.cmx \
-    src/Eclat/syntax/ast_subst.cmx \
+    src/Eclat/syntax/ast_rename.cmx \
     src/Eclat/syntax/ast_mapper.cmx \
     src/Eclat/syntax/ast.cmx
 src/Eclat/compile/middle_end/normalize/propagation.cmo : \
@@ -284,7 +268,8 @@ src/Eclat/compile/middle_end/transform/expand.cmo : \
     src/Eclat/syntax/ast_rename.cmo \
     src/Eclat/syntax/ast_pprint.cmo \
     src/Eclat/syntax/ast_mapper.cmo \
-    src/Eclat/syntax/ast.cmo
+    src/Eclat/syntax/ast.cmo \
+    src/Eclat/compile/middle_end/normalize/anf.cmo
 src/Eclat/compile/middle_end/transform/expand.cmx : \
     src/Eclat/typing/types.cmx \
     src/prelude.cmx \
@@ -293,7 +278,8 @@ src/Eclat/compile/middle_end/transform/expand.cmx : \
     src/Eclat/syntax/ast_rename.cmx \
     src/Eclat/syntax/ast_pprint.cmx \
     src/Eclat/syntax/ast_mapper.cmx \
-    src/Eclat/syntax/ast.cmx
+    src/Eclat/syntax/ast.cmx \
+    src/Eclat/compile/middle_end/normalize/anf.cmx
 src/Eclat/compile/middle_end/transform/globalize_arrays.cmo : \
     src/Eclat/typing/types.cmo \
     src/Eclat/syntax/ast_subst.cmo \
@@ -350,14 +336,12 @@ src/Eclat/compile/middle_end/transform/lambda_lifting.cmx : \
     src/Eclat/syntax/ast.cmx
 src/Eclat/compile/middle_end/transform/matching.cmo : \
     src/Eclat/typing/types.cmo \
-    src/Eclat/syntax/pattern.cmo \
     src/Eclat/syntax/map_pi.cmo \
     src/Eclat/syntax/ast_subst.cmo \
     src/Eclat/syntax/ast_mapper.cmo \
     src/Eclat/syntax/ast.cmo
 src/Eclat/compile/middle_end/transform/matching.cmx : \
     src/Eclat/typing/types.cmx \
-    src/Eclat/syntax/pattern.cmx \
     src/Eclat/syntax/map_pi.cmx \
     src/Eclat/syntax/ast_subst.cmx \
     src/Eclat/syntax/ast_mapper.cmx \
@@ -372,24 +356,6 @@ src/Eclat/compile/middle_end/transform/specialize.cmo : \
     src/Eclat/syntax/ast_mapper.cmo \
     src/Eclat/syntax/ast.cmo
 src/Eclat/compile/middle_end/transform/specialize.cmx : \
-    src/Eclat/typing/types.cmx \
-    src/Eclat/compile/middle_end/normalize/propagation.cmx \
-    src/Eclat/syntax/pattern.cmx \
-    src/Eclat/compile/middle_end/normalize/let_floating.cmx \
-    src/Eclat/compile/middle_end/transform/inline.cmx \
-    src/Eclat/syntax/ast_rename.cmx \
-    src/Eclat/syntax/ast_mapper.cmx \
-    src/Eclat/syntax/ast.cmx
-src/Eclat/compile/middle_end/transform/specialize_ref.cmo : \
-    src/Eclat/typing/types.cmo \
-    src/Eclat/compile/middle_end/normalize/propagation.cmo \
-    src/Eclat/syntax/pattern.cmo \
-    src/Eclat/compile/middle_end/normalize/let_floating.cmo \
-    src/Eclat/compile/middle_end/transform/inline.cmo \
-    src/Eclat/syntax/ast_rename.cmo \
-    src/Eclat/syntax/ast_mapper.cmo \
-    src/Eclat/syntax/ast.cmo
-src/Eclat/compile/middle_end/transform/specialize_ref.cmx : \
     src/Eclat/typing/types.cmx \
     src/Eclat/compile/middle_end/normalize/propagation.cmx \
     src/Eclat/syntax/pattern.cmx \
@@ -530,11 +496,13 @@ src/Eclat/syntax/ast_rename.cmx : \
     src/Eclat/syntax/ast.cmx
 src/Eclat/syntax/ast_subst.cmo : \
     src/Eclat/syntax/pattern.cmo \
+    src/Eclat/syntax/free_vars.cmo \
     src/Eclat/syntax/ast_pprint.cmo \
     src/Eclat/syntax/ast_mapper.cmo \
     src/Eclat/syntax/ast.cmo
 src/Eclat/syntax/ast_subst.cmx : \
     src/Eclat/syntax/pattern.cmx \
+    src/Eclat/syntax/free_vars.cmx \
     src/Eclat/syntax/ast_pprint.cmx \
     src/Eclat/syntax/ast_mapper.cmx \
     src/Eclat/syntax/ast.cmx
@@ -575,17 +543,13 @@ src/Eclat/typing/types.cmx : \
 src/Eclat/typing/typing.cmo : \
     src/Eclat/typing/types.cmo \
     src/prelude.cmo \
-    src/Eclat/syntax/pattern.cmo \
     src/operators.cmo \
-    src/Eclat/syntax/ast_undecorated.cmo \
     src/Eclat/syntax/ast_pprint.cmo \
     src/Eclat/syntax/ast.cmo
 src/Eclat/typing/typing.cmx : \
     src/Eclat/typing/types.cmx \
     src/prelude.cmx \
-    src/Eclat/syntax/pattern.cmx \
     src/operators.cmx \
-    src/Eclat/syntax/ast_undecorated.cmx \
     src/Eclat/syntax/ast_pprint.cmx \
     src/Eclat/syntax/ast.cmx
 src/main.cmo : \
@@ -706,6 +670,12 @@ src/miniHDL/count_externals.cmo : \
     src/miniHDL/miniHDL_syntax.cmo
 src/miniHDL/count_externals.cmx : \
     src/miniHDL/miniHDL_syntax.cmx
+src/miniHDL/miniHDL_causality.cmo : \
+    src/miniHDL/miniHDL_syntax.cmo \
+    src/Eclat/syntax/ast.cmo
+src/miniHDL/miniHDL_causality.cmx : \
+    src/miniHDL/miniHDL_syntax.cmx \
+    src/Eclat/syntax/ast.cmx
 src/miniHDL/miniHDL_syntax.cmo : \
     src/operators.cmo \
     src/Eclat/syntax/ast_pprint.cmo

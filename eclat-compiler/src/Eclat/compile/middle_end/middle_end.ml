@@ -7,13 +7,14 @@ let normalize (pi:pi) : pi =
   (** ensure that each long-running sub-expression is bound to a [let] *)
   let pi = Anf.anf_pi pi in
   display_pi Anf pi;
+  
   (** ensure each function called within an [exec], or [( || )] construct
       is defined locally in this construct *)
   let pi = Move_down_gfun_under_exec_and_par.move_down_gfun_under_exec_and_par_pi pi in
 
   (* assign a fresh label to each [reg] and [exec] construct *)
   let pi = Instantiate.instantiate_pi pi in
-  display_pi Lambda_lifting pi;
+
   let pi = Monomorphize.monomorphize pi in
   display_pi Specialize pi;
   (** renaming all bindings in the source program *)
@@ -61,9 +62,10 @@ let compile ?globalize
   let _ = Typing.typing_with_argument pi arg_list in
 
   let pi = Inline.inl_pi pi in
+  
   let pi = Ast_rename.rename_pi pi in
   display_pi Inline pi;
-  
+
   let _ = Typing.typing_with_argument pi arg_list in
  
   let pi = Specialize.specialize_pi pi in
@@ -72,9 +74,7 @@ let compile ?globalize
 
   (** inline non-recursive functions *)
   let rec loop pi =
-    (* let pi = Ast_rename.rename_pi pi in*)
     let pi = Inline.inl_pi pi in
-    let pi = Specialize.specialize_pi pi in
     let pi = Anf.anf_pi pi in
     if !Inline.has_changed || !Specialize.has_changed then loop pi 
     else pi
@@ -82,24 +82,20 @@ let compile ?globalize
   let pi = loop pi in
   display_pi Inline pi;
 
- let _ = Typing.typing_with_argument pi arg_list in
+  let _ = Typing.typing_with_argument pi arg_list in
 
-  let pi = Specialize_ref.specialize_ref pi in
-  display_pi Specialize_ref pi;
-
-  (** compile pattern matching *)
-
-  (* Check_exec_mem.check_pi pi; *)
   Check_exec_mem_reset.check_pi pi;
-
   let pi = Insert_bound_checking.insert_pi pi in
-
+  (** compile pattern matching *)
   let pi = Matching.matching_pi pi in
   display_pi Matching pi;
 
   let _ = Typing.typing_with_argument pi [] in
+
   (** normalization *)
+  
   let pi = normalize pi in
+  
   (** optimization *)
 
   let pi = if propagation then Propagation.propagation_pi pi else pi in

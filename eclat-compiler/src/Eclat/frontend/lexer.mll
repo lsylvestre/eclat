@@ -59,6 +59,8 @@
        "macro_for", MACRO_FOR;
        "parfor", PARFOR;
        "macro_generate", MACRO_GENERATE;
+       "generate", MACRO_GENERATE;
+       "iterate", MACRO_GENERATE;
        "immediate", IMMEDIATE;
        "array_create",ARRAY_CREATE;
        "init_tuple",INIT_TUPLE;
@@ -83,6 +85,9 @@
        "pause", PAUSE;
        "emit", EMIT;
        "signal", SIGNAL;
+       "end",   END;
+       "trap", TRAP;
+       "exit",EXIT;
        (* "vect_of_tuple", VECT_OF_TUPLE*)
      ]
 
@@ -100,7 +105,7 @@ let get_loc lexbuf =
 }
 
 (* let tvar_ident = [''']['a'-'z'] ['a'-'z''A'-'Z''0'-'9''_''A'-'Z'''']* *)
-let ident = ['a'-'z''_'] ['a'-'z''0'-'9''_']*[''']*
+let ident = ['a'-'z''_'] ['a'-'z''A'-'Z''0'-'9''_']*[''']*
 let up_ident = ['A'-'Z']['a'-'z''A'-'Z''0'-'9''_''A'-'Z']*
 let tvar_ident = ['''] ['a'-'z''A'-'Z''0'-'9''_''A'-'Z']*
 let tyB_var_ident = ['`''~'] ['a'-'z''A'-'Z''0'-'9''_''A'-'Z']*
@@ -134,6 +139,8 @@ rule token = parse
 | "[|"                { LBRACKET_PIPE }
 | "{"                { LCUR }
 | "}"                { RCUR }
+| "["                { LBRACKET }
+| "]"                { RBRACKET }
 | '@'                 { AT }
 | "@@"                { AT_AT }
 | ','                 { COMMA }
@@ -163,9 +170,12 @@ rule token = parse
 | "!=" | "<>"         { NEQ }
 | "&&"                { AMP_AMP }
 | "&"                 { AMP }
-| "%"                 { PERCENT }
+(* | "%"                 { PERCENT }*)
 | "^"                 { HAT }
 | ".length"           { DOT_LENGTH }
+| "%loop"             { LOOP }
+| "%suspend"          { SUSPEND }
+| "%when"             { WHEN }
 | ['"']([^'"']* as s)['"'] { STRING_LIT s }
 | ['\n' '\r']         { (Lexing.new_line lexbuf) ; (token lexbuf) }
 | [' ' '\t']          { token lexbuf }

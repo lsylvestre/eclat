@@ -183,12 +183,12 @@ let rec anf (e:e) : e =
       E_absLabel(l,anf e1)
   | E_appLabel(e1,l,lc) ->
       E_appLabel(anf e1,l,lc)*)
-  | E_for(x,e_st1,e_st2,e3,loc) ->
-      E_for(x,anf e_st1,anf e_st2,anf e3,loc)
+  | E_for(x,sz1,sz2,e3,loc) ->
+      E_for(x,sz1,sz2,anf e3,loc)
       (* NB: [e_st1] and [e_st2] are *not* moved up with `plug` *)
-  | E_generate((p,ty,e1),e2,e_st3,loc) ->
+  | E_generate((p,ty,e1),e2,sz3,sz4,loc) ->
       plug (anf e2) @@ fun xc ->
-      E_generate((p,ty,anf e1),xc,anf e_st3,loc) 
+      E_generate((p,ty,anf e1),xc,sz3,sz4,loc) 
       (* NB: [e_st3] is *not* moved up with `plug` 
 *)
   | E_vector(es) ->
@@ -200,16 +200,8 @@ let rec anf (e:e) : e =
   | E_run(f,e1,l) ->
       plug (anf e1) @@ fun xc ->
       E_run(f,xc,l) 
-  | E_pause e -> E_pause (anf e)
-  | E_equations(p,eqs) ->
-      let rec anf_le le =
-        match le with
-        | Exp e1 -> Exp (anf e1)
-        | Fby(le1, le2) -> Fby(anf_le le1, anf_le le2)
-        | When(le1, e2) -> When(anf_le le1, anf e2)
-        | Merge(le1, le2, e3) -> Merge(anf_le le1, anf_le le2, anf e3)
-      in
-      E_equations(p,List.map (fun (p,le) -> p, anf_le le) eqs)
+  | E_pause (l,e1) ->
+      E_pause (l,anf e1)
   | E_sig_get _ ->
       e
   | E_emit(x,e1) ->
@@ -218,6 +210,14 @@ let rec anf (e:e) : e =
   | E_sig_create(e1) ->
       plug (anf e1) @@ fun xc ->
       E_sig_create(xc)
+  | E_loop(e1) ->
+      E_loop (anf e1)
+  | E_trap _ -> e
+  | E_exit(x,e1) ->
+      plug (anf e1) @@ fun xc ->
+      E_exit(x,xc)
+  | E_suspend(e1,x) ->
+      E_suspend(anf e1,x)
   in 
   glob e ;;
 

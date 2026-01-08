@@ -193,6 +193,8 @@ and pp_a typing_env externals fmt = function
 | A_decode(y,ty) ->
    fprintf fmt "Bitvector.decode !%a"
      pp_ident y
+| A_sig_get(x) -> assert false (* todo *)
+
 
 let pp_a2 typing_env x externals fmt a =
   fprintf fmt "%a := %a" 
@@ -226,6 +228,9 @@ let rec pp_s typing_env externals ~st fmt = function
         (pp_s typing_env externals ~st) s) so;
     fprintf fmt ")@]";
 | S_set(x,a) -> 
+    fprintf fmt "%a" 
+      (pp_a2 typing_env x externals) a
+| S_sig_set(x,a) ->
     fprintf fmt "%a" 
       (pp_a2 typing_env x externals) a
 | S_acquire_lock(l) ->
@@ -345,6 +350,7 @@ let rec default_zero t =
        Obj.magic "()"
   | TVect _ ->
       "Bitvector.dummy"
+  | TSig _ -> assert false (* todo *)
 
 let type_state_var fmt state_var idle xs =
   fprintf fmt "type %s = %a " state_var pp_state idle;

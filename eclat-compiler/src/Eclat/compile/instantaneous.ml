@@ -15,7 +15,7 @@ let const_combinational ~externals (c:c) : bool =
 	match c with
   | _ -> true
 
-let rec combinational ~externals (e:e) : bool =
+let rec combinational ?(with_sig_get=true) ~externals (e:e) : bool =
   match e with
 	| E_deco(e1,loc) ->
       combinational ~externals e1
@@ -58,22 +58,25 @@ let rec combinational ~externals (e:e) : bool =
 	| E_array_get_end _
 	| E_array_set_immediate _ ->
 	    false (* side effect *)
-	| E_for(_,e_st1,e_st2,e3,_) ->
-	   combinational ~externals e_st1 && combinational ~externals e_st2 && combinational ~externals e3
-	| E_generate((_,_,e1),e2,e_st3,_) ->
-	    combinational ~externals e1 && combinational ~externals e2 && combinational ~externals e_st3
+	| E_for(_,_,_,e3,_) ->
+	   combinational ~externals e3
+	| E_generate((_,_,e1),e2,_,_,_) ->
+	    combinational ~externals e1 && combinational ~externals e2
 	| E_vector es -> List.for_all (combinational ~externals) es
 	| E_vector_mapi(is_par,(_,_,e1),e2,_) ->
 	    not(is_par) && combinational ~externals e1 && combinational ~externals e2
   | E_run _ -> false (* sometimes true, sometimes false, depending on the type *)
   | E_pause _ -> false
-  | E_equations(_,_) -> false (* List.for_all (fun (_,e) -> combinational ~externals e) eqs *)
-  | E_sig_get _ -> true
+  | E_sig_get _ -> with_sig_get
   | E_emit _ -> false
   | E_sig_create _ -> false
+  | E_loop _
+  | E_trap _
+  | E_exit _ 
+  | E_suspend _ -> false
 (* same as combinational, but may contain cas/match, registers or even exec blocks *)
 
-let rec instantaneous ~externals (e:e) : bool =
+let rec instantaneous ?(with_sig=true) ~externals (e:e) : bool =
   match e with
 	| E_deco(e1,loc) ->
       instantaneous ~externals e1
@@ -118,16 +121,19 @@ let rec instantaneous ~externals (e:e) : bool =
 	| E_array_get_end _
 	| E_array_set_immediate _ ->
 	    false (* side effect *)
-	| E_for(_,e_st1,e_st2,e3,_) ->
-	   instantaneous ~externals e_st1 && instantaneous ~externals e_st2 && instantaneous ~externals e3
-	| E_generate((_,_,e1),e2,e_st3,_) ->
-	    instantaneous ~externals e1 && instantaneous ~externals e2 && instantaneous ~externals e_st3
+	| E_for(_,_,_,e3,_) ->
+	   instantaneous ~externals e3
+	| E_generate((_,_,e1),e2,_,_,_) ->
+	    instantaneous ~externals e1 && instantaneous ~externals e2
 	| E_vector es -> List.for_all (instantaneous ~externals)es
 	| E_vector_mapi(is_par,(_,_,e1),e2,_) ->
 	    not(is_par) && instantaneous ~externals e1 && instantaneous ~externals e2
   | E_run _ -> false (* sometimes true, sometimes false, depending on the type *)
   | E_pause _ -> false
-  | E_equations _ -> true
-  | E_sig_get _
-  | E_emit _
+  | E_sig_get _ 
+  | E_emit _ -> with_sig
   | E_sig_create _ -> true
+  | E_loop _ -> false
+  | E_trap _ -> true
+  | E_exit _ -> false (* depends on the continuation *)
+  | E_suspend(e1,_) -> instantaneous ~externals e1
