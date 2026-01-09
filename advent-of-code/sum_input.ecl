@@ -46,12 +46,12 @@ let main () =
                default ()
         in ((),true)
     else
-      (*** si c'est pas fini, on continue à avancer pas à pas ***)
+      (*** si ce n'est pas fini, on continue à avancer pas à pas ***)
       exec
         print_string "lecture du fichier `input.txt`";
         print_newline ();
         let _ : char array<'N> = tab in
-        let by = (input_file() : bytes<'N>) in
+        let by = (input_file("../advent-of-code/input.txt") : bytes<'N>) in
         bytes_print by;
 
         load_tab(by);

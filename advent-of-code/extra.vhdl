@@ -100,17 +100,27 @@ use std.textio.all;
 
 package InputFile is
   alias t is std_logic_vector;
-  impure function read_file(signal clk:std_logic;sa,sr : integer; arg: t) return t;
+  impure function read_file(signal clk:std_logic;sa,sr : integer; name: t) return t;
 end package;
 package body InputFile is
-  impure function read_file(signal clk:std_logic;sa,sr : integer; arg: t) return t is
+  
+  function to_string(arg: t) return string is
+    variable s : string (0 to arg'length / 8);
+  begin
+    for i in 0 to arg'length/8-1 loop
+      s(i) := Character'val(to_integer(unsigned(arg(i*8 to i*8+7))));
+    end loop;
+    return s;
+  end;
+
+  impure function read_file(signal clk:std_logic;sa,sr : integer; name: t) return t is
      type char_file_t is file of character;     
   file infile : char_file_t;
-   variable c: character;
-   variable i : integer := 0;
-  variable res : t(0 to sr - 1) := (others => '0');
-begin        
-    file_open(infile, "../advent-of-code/input.txt", read_mode);
+    variable c: character;
+    variable i : integer := 0;
+    variable res : t(0 to sr - 1) := (others => '0');
+  begin        
+    file_open(infile, to_string(name), read_mode);
     while not endfile (infile) loop
       read(infile, c);
       res(i*8 to i*8+7) := t(to_unsigned(Character'pos(c),8));
@@ -118,6 +128,6 @@ begin
     end loop;
     file_close(infile);
     return res;
-end;
-    
+  end;
+   
 end InputFile;

@@ -10,7 +10,7 @@ operator Bytes.len : bytes<'s> => int ;;
 operator%with_sizes Bytes.get : (bytes<'s> * int) => char ;;
 operator Bytes.print : bytes<'s> => unit  @impure ;;
 
-operator%with_sizes InputFile.read_file : unit => bytes<'s> @impure ;;
+operator%with_sizes InputFile.read_file : string => bytes<'s> @impure ;;
 
 let char_code = Char.code ;;
 let char_chr = Char.chr ;;
@@ -21,5 +21,6 @@ let bytes_length = Bytes.len ;;
 let bytes_get = Bytes.get ;;
 let bytes_print = Bytes.print ;;
 
-let input_file () = 
-  InputFile.read_file () ;;
+let input_file = InputFile.read_file ;;
+
+let gen_mif = Ram_init.gen_mif ;;

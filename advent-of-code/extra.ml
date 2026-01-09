@@ -22,8 +22,8 @@ end
 
 
 module Eclat_InputFile = struct
-  let read_file_ (_sz_arg,sz_res) () =
-    let ic = open_in "../../advent-of-code/input.txt" in
+  let read_file_ (_sz_arg,sz_res) name =
+    let ic = open_in name in
     let s = In_channel.input_all ic in
     close_in ic;
     let res = Bytes.create (sz_res/8) in
