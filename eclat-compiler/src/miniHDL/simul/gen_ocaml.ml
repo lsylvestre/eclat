@@ -169,6 +169,9 @@ let rec pp_call externals typing_env res fmt (op,a) =
   | Runtime(Print_int) -> 
       fprintf fmt "Print.int_ (%a)"
         (pp_a typing_env externals) a
+  | Runtime(Print) -> 
+      fprintf fmt "Print.value_ (%a)"
+        (pp_a typing_env externals) a
   | Runtime p ->
       Operators.gen_op ~externals fmt p (fun fmt a -> 
         fprintf fmt "(%a)" 

@@ -49,6 +49,7 @@ module Print = struct
   let int_ n = print_int (Int64.to_int n)
   let string_ = print_string
   let newline_ = print_newline
+  let value_ _v = print_string "<value>"
 end
 
 module Vect = struct

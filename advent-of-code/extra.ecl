@@ -10,7 +10,8 @@ operator Bytes.len : bytes<'s> => int ;;
 operator%with_sizes Bytes.get : (bytes<'s> * int) => char ;;
 operator Bytes.print : bytes<'s> => unit  @impure ;;
 
-operator%with_sizes InputFile.read_file : string => bytes<'s> @impure ;;
+operator%with_sizes IOFile.read_file : string => bytes<'s> @impure ;;
+operator IOFile.write_file : (string * bytes<'s>) => unit @impure ;;
 
 let char_code = Char.code ;;
 let char_chr = Char.chr ;;
@@ -21,6 +22,17 @@ let bytes_length = Bytes.len ;;
 let bytes_get = Bytes.get ;;
 let bytes_print = Bytes.print ;;
 
-let input_file = InputFile.read_file ;;
+let input_file = IOFile.read_file ;;
+let output_file = IOFile.write_file ;;
 
-let gen_mif = Ram_init.gen_mif ;;
+(* print in standard output .mif initialization file for array of n-bit values *)
+let gen_mif (bytes,n) = 
+  print_string "WIDTH="; print_int n; print_string ";"; print_newline ();
+  print_string "DEPTH="; print_int ((bytes_length bytes / n) * 8); print_string ";"; print_newline ();
+  print_string "ADDRESS_RADIX=DEC;"; print_newline (); print_string "DATA_RADIX=BIN;"; print_newline ();
+  print_string "CONTENT BEGIN"; 
+  for i = 0 to bytes_length bytes - 1 do
+    print_int i; print_string ":"; print (bytes_get (bytes,i)); print_string ";"; print_newline ()
+  done;
+  print_string "END;"; print_newline () 
+;;

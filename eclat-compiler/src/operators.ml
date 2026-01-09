@@ -170,15 +170,15 @@ let gen_op ~externals fmt (op:op) pp a : unit =
   | Size_of_val _ ->
       assert false (* special case *)
   | Print ->
-      skip_when !flag_no_print fmt procall "work.Print.print_value"
+      skip_when !flag_no_print fmt procall "Print.print_value"
   | Print_string ->
-      skip_when !flag_no_print fmt procall "work.Print.print_string"
+      skip_when !flag_no_print fmt procall "Print.print_string"
   | Print_int ->
-      skip_when !flag_no_print fmt procall "work.Int.print"
+      skip_when !flag_no_print fmt procall "Int.print"
   | Print_newline ->
-      skip_when !flag_no_print fmt procall "work.Print.print_newline"
+      skip_when !flag_no_print fmt procall "Print.print_newline"
   | Assert ->
-      skip_when !flag_no_assert fmt funcall "work.Assertion.ok"
+      skip_when !flag_no_assert fmt funcall "Assertion.ok"
   | String_length ->
       procall fmt "eclat_string_length"
   | Bvect_of_int -> funcall fmt "eclat_bvect_of_int"
@@ -187,8 +187,8 @@ let gen_op ~externals fmt (op:op) pp a : unit =
       (match List.assoc_opt x (snd externals) with
        | Some (t,(_,_,is_imp)) ->
           if is_imp 
-          then procall fmt (Printf.sprintf "work.%s" x)
-          else funcall fmt (Printf.sprintf "work.%s" x)
+          then procall fmt (Printf.sprintf "%s" x)
+          else funcall fmt (Printf.sprintf "%s" x)
        | None -> Prelude.Errors.raise_error ~msg:("unbound operator "^x) ())
 
       

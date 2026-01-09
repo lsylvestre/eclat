@@ -98,11 +98,13 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use std.textio.all;
 
-package InputFile is
+package IOFile is
   alias t is std_logic_vector;
-  impure function read_file(signal clk:std_logic;sa,sr : integer; name: t) return t;
+  function to_string(arg: t) return string;
+  impure function read_file(signal clk:std_logic; sa,sr : integer; name: t) return t;
+  impure function write_file(signal clk:std_logic; name, content: t) return t;
 end package;
-package body InputFile is
+package body IOFile is
   
   function to_string(arg: t) return string is
     variable s : string (0 to arg'length / 8);
@@ -129,5 +131,16 @@ package body InputFile is
     file_close(infile);
     return res;
   end;
+
+  impure function write_file(signal clk:std_logic; name, content: t) return t is
+    type char_file_t is file of character;     
+    file outfile : char_file_t;
+    begin        
+      file_open(outfile, to_string(name), write_mode);
+      for i in 0 to content'length / 8 - 1 loop
+        write(outfile, Character'val(to_integer(unsigned(content(i*8 to i*8+7)))));
+      end loop;
+      return "0";
+    end;
    
-end InputFile;
+end IOFile;

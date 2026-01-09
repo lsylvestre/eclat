@@ -241,7 +241,7 @@ and pp_call externals fmt (op,a) =
             (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt ", ") (pp_a externals)) aa
       | _ -> fprintf fmt "@[%a)@]" (pp_a externals) a);
       fprintf fmt "@]"
-  | Runtime p -> Operators.gen_op ~externals fmt p (pp_a externals) a
+  | Runtime p -> fprintf fmt "work."; Operators.gen_op ~externals fmt p (pp_a externals) a
   | _ -> fprintf fmt "@[%a(%a)@]" pp_op op (pp_a externals) a
 
 (** code generator for operator *)

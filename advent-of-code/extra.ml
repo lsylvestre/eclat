@@ -11,7 +11,7 @@ module Eclat_char = struct
   let print_ c = output_char stdout c
 end
 module Eclat_bytes = struct
-  let make_ (_sz_arg,sz_res) (n) = Bytes.create (sz_res/8)
+  let make_ (_sz_arg,sz_res) (c) = Bytes.make (sz_res/8) c
   let len_ b = Int64.of_int @@ Bytes.length b
   let get_ _ (by,i) = Bytes.get by (Int64.to_int i)
   let print_ by = 
@@ -21,16 +21,21 @@ module Eclat_bytes = struct
 end
 
 
-module Eclat_InputFile = struct
+module Eclat_IOFile = struct
   let read_file_ (_sz_arg,sz_res) name =
-    let ic = open_in name in
+    let ic = open_in ("../"^name) in
     let s = In_channel.input_all ic in
     close_in ic;
     let res = Bytes.create (sz_res/8) in
     String.iteri (fun i c -> Bytes.set res i c) s;
     res
+
+  let write_file_ (name,by) =
+    let oc = open_out ("../"^name) in
+    let s = Out_channel.output_bytes oc by in
+    close_out oc
 end
 
 module Char = Eclat_char
 module Bytes = Eclat_bytes
-module InputFile = Eclat_InputFile
+module IOFile = Eclat_IOFile

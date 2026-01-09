@@ -57,7 +57,7 @@ let propagation ~externals e =
                                   && (SMap.cardinal (linear_bindings e) <= 1) else
     simple_atom e
   in
-  let propagable2 x e1 e2 =
+  let _propagable2 x e1 e2 =
     let b = if !flag_propagate_combinational_linear then
       (Instantaneous.combinational ~with_sig_get:false ~externals e1
       && linear_bindings2 x e2) || simple_atom e1 else
@@ -78,7 +78,10 @@ let propagation ~externals e =
                   (List.combine ps ts) es e2
     | E_letIn(P_var x as p,ty,e1,e2) ->
         let e1' = prop e1 in
-        if  propagable2 x e1' e2 (* simple_atom e1'*)
+        if simple_atom e1' (* _propagable2 x e1' e2 *)
+              (* _propagable2 is true if x occurs only once in e2:
+                 the problem is that the substitution of non atomic expressions
+                 can result in a loss of type annotations (especially for sizes) *)
         then let e3 = (subst_p_e p e1' e2) in
         (*Format.(fprintf std_formatter "[%a\nGIVE:LET %s = %a IN\n%a]\n\n\n\n\n\n\n" Ast_pprint.pp_exp e x Ast_pprint.pp_exp e1' Ast_pprint.pp_exp e3);*)
              (prop e3)

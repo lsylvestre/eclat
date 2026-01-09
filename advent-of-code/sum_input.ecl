@@ -53,11 +53,18 @@ let main () =
         let _ : char array<'N> = tab in
         let by = (input_file("../advent-of-code/input.txt") : bytes<'N>) in
         bytes_print by;
+        
+        (* gen_mif(by,8);  (* ~> à placer dans tab.mif pour initialiser 
+                                le tableau tab (en mode synthèse) *) *)
 
         load_tab(by);
         let n = sum_tab(tab) in
         print_newline ();
-        print_string "sommes des caractères: ";
+        print_string "somme des caractères: ";
         print_int n;
+        print_newline ();
+        print_string "écrit le caractère numéro 42 dans `output.txt`";
+        let x : bytes<1> = bytes_make(char_chr 42) in
+        output_file("../advent-of-code/output.txt",x);
         print_newline ()
       default ()) init ((),false) ;;
