@@ -177,7 +177,7 @@ rule token = parse
 | "%suspend"          { SUSPEND }
 | "%when"             { WHEN }
 | ['"']([^'"']* as s)['"'] { STRING_LIT s }
-| ['\n' '\r']         { (Lexing.new_line lexbuf) ; (token lexbuf) }
+| ['\r']['\n'] | ['\n']| ['\r'] { (Lexing.new_line lexbuf) ; (token lexbuf) }
 | [' ' '\t']          { token lexbuf }
 | ';'                 { SEMI }
 | '.'                 { DOT }
@@ -189,7 +189,7 @@ rule token = parse
 
 and comment = parse
 | "(*"                { incr nested_comment_depth; comment lexbuf }
-| ['\n' '\r' ]        { (Lexing.new_line lexbuf) ; (comment lexbuf) }
+| ['\r']['\n'] | ['\n']| ['\r'] { (Lexing.new_line lexbuf) ; (comment lexbuf) }
 | "*)"                { decr nested_comment_depth;
                         if !nested_comment_depth <= 0 (* comments can be nested *)
                         then token lexbuf

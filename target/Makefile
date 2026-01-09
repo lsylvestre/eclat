@@ -12,7 +12,7 @@ RUNTIME=runtime.vhdl stdlib.vhdl
 
 NS=2000
 
-vhdl.run: $(RUNTIME) $(MAIN) tb_$(NAME).vhdl
+vhdl.run: $(RUNTIME) $(MAIN) tb_$(NAME).vhdl $(EXTERNALS)
 	$(GHDL) -a $(GHDLOPTS) $(RUNTIME) $(EXTERNALS)
 	$(GHDL) -a $(GHDLOPTS) $(MAIN)
 	$(GHDL) -a $(GHDLOPTS) tb_$(NAME).vhdl

@@ -709,6 +709,7 @@ src/miniHDL/optim/remove_assigned_but_not_read_vars.cmo : \
 src/miniHDL/optim/remove_assigned_but_not_read_vars.cmx : \
     src/miniHDL/miniHDL_syntax.cmx
 src/miniHDL/simul/gen_ocaml.cmo : \
+    src/Eclat/typing/types.cmo \
     src/prelude.cmo \
     src/operators.cmo \
     src/miniHDL/miniHDL_typing.cmo \
@@ -716,6 +717,7 @@ src/miniHDL/simul/gen_ocaml.cmo : \
     src/miniHDL/compile/list_machines.cmo \
     src/Eclat/syntax/ast.cmo
 src/miniHDL/simul/gen_ocaml.cmx : \
+    src/Eclat/typing/types.cmx \
     src/prelude.cmx \
     src/operators.cmx \
     src/miniHDL/miniHDL_typing.cmx \

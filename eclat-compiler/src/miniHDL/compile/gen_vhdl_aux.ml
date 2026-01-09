@@ -222,21 +222,26 @@ and pp_call externals fmt (op,a) =
         | TyB_var{contents=Is v} -> extract_tyB v
         | _ -> []
       in*)
-      let extra = match Types.canon_ty ty with
+      fprintf fmt "@[work.%s(" x;
+      (match List.assoc_opt x (snd externals) with
+       | Some (t,(_,_,is_imp)) -> if is_imp then  fprintf fmt "clk," else ()
+       | None -> Prelude.Errors.raise_error ~msg:("unbound operator "^x) ()
+      );
+      if annot_with_sizes then (
+               let extra = match Types.canon_ty ty with
                   | Ty_fun(Ty_base tyB1,_,tyB2) -> 
                        [size_ty MiniHDL_typing.(translate_tyB tyB1)  
                        ;size_ty MiniHDL_typing.(translate_tyB tyB2)  ]
                   | _ -> assert false
-      in
-      fprintf fmt "@[work.%s(" x;
-      if annot_with_sizes then List.iter (fun n -> fprintf fmt "%d, " n) extra;
+               in
+               List.iter (fun n -> fprintf fmt "%d, " n) extra);
       (match a with
       | A_tuple aa when arity > 1 -> 
          fprintf fmt "@[%a)@]"
             (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt ", ") (pp_a externals)) aa
       | _ -> fprintf fmt "@[%a)@]" (pp_a externals) a);
       fprintf fmt "@]"
-  | Runtime p -> Operators.gen_op fmt p (pp_a externals) a
+  | Runtime p -> Operators.gen_op ~externals fmt p (pp_a externals) a
   | _ -> fprintf fmt "@[%a(%a)@]" pp_op op (pp_a externals) a
 
 (** code generator for operator *)

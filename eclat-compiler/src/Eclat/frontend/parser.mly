@@ -241,6 +241,7 @@ type_alias: /* todo: avoid side effect, which depends on the left-to-right evalu
 %inline rest_abstract:
 | SEMI_SEMI? { None }
 | AT op=IDENT SEMI_SEMI? { Some (op,[]) }
+| AT op=INT_LIT SEMI_SEMI? { Some (string_of_int op,[]) }
 | op=IDENT LBRACKET intl=separated_nonempty_list(COMMA,INT_LIT) RBRACKET SEMI_SEMI?
    { Some (op,intl) } 
 
@@ -770,7 +771,6 @@ aexp_desc:
 
 | PARFOR x=IDENT EQ sz1=size TO sz2=size DO e=exp DONE 
       { E_for(x,sz1,sz2,e,with_file $loc) }
-
 
 match_case_const:
 | cs=separated_nonempty_list(PIPE,const) RIGHT_ARROW e=exp PIPE { (cs,e) }

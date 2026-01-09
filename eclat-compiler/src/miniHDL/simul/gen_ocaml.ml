@@ -141,7 +141,21 @@ let rec pp_call externals typing_env res fmt (op,a) =
           but add caracter '_' for ensuring [x_] is a valid 
           qualified identifier in OCaml
           e.g. VHDL function Int.lor becomes OCaml value Int.lor_ *)
-      fprintf fmt "%s_ (%a)" x
+      let annot_with_sizes,arity = match List.assoc_opt x (snd externals) with
+                                   | Some (_,(b,n,_)) -> (b,n)
+                                   | None -> false,1 in
+      fprintf fmt "%s_ " x;
+      if annot_with_sizes then (let extra = match Types.canon_ty ty with
+                                | Ty_fun(Ty_base tyB1,_,tyB2) -> 
+                                     [size_ty MiniHDL_typing.(translate_tyB tyB1)  
+                                     ;size_ty MiniHDL_typing.(translate_tyB tyB2)  ]
+                                | _ -> assert false
+                                in
+                                fprintf fmt "(";
+                                (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt ", ") 
+                                    (fun fmt d -> fprintf fmt "%d" d)) fmt extra;
+                                fprintf fmt ")");
+      fprintf fmt "(%a)"
         (pp_a typing_env externals) a
   | Runtime(Assert) -> 
       fprintf fmt "assert (%a)"
@@ -156,7 +170,7 @@ let rec pp_call externals typing_env res fmt (op,a) =
       fprintf fmt "Print.int_ (%a)"
         (pp_a typing_env externals) a
   | Runtime p ->
-      Operators.gen_op fmt p (fun fmt a -> 
+      Operators.gen_op ~externals fmt p (fun fmt a -> 
         fprintf fmt "(%a)" 
           (pp_a typing_env externals) a
         ) a
@@ -336,13 +350,13 @@ let rec default_zero t =
         (chop_size size)
   | TAbstract(_,[],[]) -> "0L"
   | TAbstract(x,[size],[t]) -> 
-      Printf.sprintf "(Array.make %d %s)"
+      Printf.sprintf "(Array.make %d (%s))"
         (chop_size size)
         (default_zero t)
   | TAbstract(x,_,_) ->
       (** assume the user provides a function [default_x : unit -> x] 
           for the given abstract type [x] *)
-      Printf.sprintf "default_%s ()" x
+      Printf.sprintf "(default_%s ())" x
   | TSize _ -> assert false (* already removed *)
   | TVar _ -> 
        (** replace unknown by a dummy constant 

@@ -139,7 +139,7 @@ let pp_op fmt (op:op) : unit =
 
 
 (** code generator for operators *)
-let gen_op fmt (op:op) pp a : unit =
+let gen_op ~externals fmt (op:op) pp a : unit =
   let open Format in
   let funcall fmt s = fprintf fmt "%s(%a)" s pp a in
   let procall fmt s = fprintf fmt "%s(clk,%a)" s pp a in
@@ -183,4 +183,12 @@ let gen_op fmt (op:op) pp a : unit =
       procall fmt "eclat_string_length"
   | Bvect_of_int -> funcall fmt "eclat_bvect_of_int"
   | Int_of_bvect -> funcall fmt "eclat_int_of_bvect"
-  | External_fun (x,_) -> funcall fmt (Printf.sprintf "work.%s" x)
+  | External_fun (x,_) ->
+      (match List.assoc_opt x (snd externals) with
+       | Some (t,(_,_,is_imp)) ->
+          if is_imp 
+          then procall fmt (Printf.sprintf "work.%s" x)
+          else funcall fmt (Printf.sprintf "work.%s" x)
+       | None -> Prelude.Errors.raise_error ~msg:("unbound operator "^x) ())
+
+      

@@ -56,7 +56,7 @@ let rec size_ty =
         | Some ("only_size_sum",_,_) -> List.fold_left (+) 0 (List.map size_ty ns)
         | Some ("mul",_,_) -> prod_ns * sum_ts
         | Some ("only_size",_,_) -> prod_ns
-        | _ -> assert false (* todo *))
+        | Some (degit,_,_) -> int_of_string degit * (List.fold_left (+) 0 (List.map size_ty ns)))
    | TSig t -> size_ty t
 
 let rec string_of_ty = function

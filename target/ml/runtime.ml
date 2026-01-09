@@ -51,22 +51,22 @@ module Print = struct
   let newline_ = print_newline
 end
 
-module Vector = struct
+module Vect = struct
   type 'a t = 'a array
   let make_ (n,v0) = Array.make n v0
-  let length_ x = Array.length x
-  let nth_ (x,n) = Array.get x (Int.to_int_ n)
-  let copy_with_ (x,n,v) = 
+  let create_ (sz_arg,sz_res) n = Array.make (sz_res/sz_arg) (Obj.magic 0)
+  let nth_ _ (x,n) = Array.get x (Int.to_int_ n)
+  let copy_with_ _ (x,n,v) = 
     let a = Array.copy x in
     a.(Int.to_int_ n) <- v;
     a
-  let infos_ (v : 'a) = 
+  let infos_ _ (v : 'a) = 
     let size = Array.length v in
     assert (size > 0);
     let witness = Array.get v 0 in
     (Int.of_int_ size,witness)
 end
-module Vect = Vector
+module Vector = Vect
 
 module Lock : sig
   type t

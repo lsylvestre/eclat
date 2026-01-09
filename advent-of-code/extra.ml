@@ -1,0 +1,36 @@
+
+(* type char = char *)
+let default_char () = '0' ;;
+
+type bytes = string ref ;;
+let default_bytes () = Bytes.create 0 ;;
+
+module Eclat_char = struct
+  let code_ c = Int64.of_int @@ Char.code c
+  let chr_ n = Char.chr @@ Int64.to_int n
+  let print_ c = output_char stdout c
+end
+module Eclat_bytes = struct
+  let make_ (_sz_arg,sz_res) (n) = Bytes.create (sz_res/8)
+  let len_ b = Int64.of_int @@ Bytes.length b
+  let get_ _ (by,i) = Bytes.get by (Int64.to_int i)
+  let print_ by = 
+    for i = 0 to Bytes.length by - 1 do
+      Eclat_char.print_ (Bytes.get by i)
+    done 
+end
+
+
+module Eclat_InputFile = struct
+  let read_file_ (_sz_arg,sz_res) () =
+    let ic = open_in "../../advent-of-code/input.txt" in
+    let s = In_channel.input_all ic in
+    close_in ic;
+    let res = Bytes.create (sz_res/8) in
+    String.iteri (fun i c -> Bytes.set res i c) s;
+    res
+end
+
+module Char = Eclat_char
+module Bytes = Eclat_bytes
+module InputFile = Eclat_InputFile
