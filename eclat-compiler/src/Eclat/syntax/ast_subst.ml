@@ -19,12 +19,12 @@ let as_ident ex =
   | E_var z -> z
   | _ -> Ast_pprint.pp_exp Format.std_formatter ex; assert false (* todo: better error message *)
 
-let subst_e x ex e =
+let subst_e ?(when_var=(fun x -> x)) x ex e =
   assert (not @@ SMap.mem x (Free_vars.fv ex));
   let rec ss e =
     match e with
     | E_var y ->
-        if y = x then ex else e
+        if y = x then when_var ex else e
     | E_letIn(p, ty, e1, e2) ->
         if pat_mem x p then E_letIn(p, ty, ss e1, e2)
         else E_letIn(p, ty, ss e1, ss e2)
@@ -95,8 +95,8 @@ let rec map_subst_p (ss : (x -> e -> 'a -> 'a)) (p:p) (ep:e) (o:'a) : 'a =
   let m = bindings p ep in
   SMap.fold (fun x ex o -> ss x ex o) m o
 
-let subst_p_e p ep o =
-  map_subst_p subst_e p ep o
+let subst_p_e ?when_var p ep o =
+  map_subst_p (subst_e ?when_var) p ep o
 
 
 (* 

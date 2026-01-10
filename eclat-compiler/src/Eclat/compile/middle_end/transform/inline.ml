@@ -82,6 +82,20 @@ let fv_type_in ?(s=Types.Vs.empty) e =
         | C_appInj(x,c,tyB) -> 
             ss_const c;
             r := !r ++ free_vars_of_type (Vs.empty,Ty_base tyB)
+        | Op(op) -> (match op with
+                     | TyConstr ty -> r := !r ++ free_vars_of_type (Vs.empty,ty)
+                     | Runtime prim ->
+                        (match prim with 
+                         | Resize_int sz ->
+                              r := !r ++ free_vars_of_type (Vs.empty,Ty_base(TyB_int sz))
+                         | Size_of_val(ty,sz) ->
+                              r := !r ++ free_vars_of_type (Vs.empty,ty);
+                              r := !r ++ free_vars_of_type (Vs.empty,Ty_base(TyB_int sz))
+                         | Vector_create sz ->
+                             r := !r ++ free_vars_of_type (Vs.empty,Ty_base(TyB_int sz))
+                         | External_fun (op,ty) -> r := !r ++ free_vars_of_type (Vs.empty,ty)
+                         | _ -> ())
+                      | op -> ())
         in ss_const c
     | e -> Ast_mapper.iter ss e
   in
@@ -148,7 +162,7 @@ let inline_with_statics ~statics e =
         (match p,e1 with
         | P_var x,E_fun _ -> 
             has_changed := true;
-            inline @@ subst_e ~when_var:(fun ex -> subst_ty (Types.copy_ty ty) ex) x e1 e2
+            inline @@ subst_e ~when_var:(subst_ty ty) x e1 e2
         | _ -> E_letIn(p,ty,inline e1,inline e2))
 
     | E_app(E_fun(p,(ty,tyB),e1),e2) ->

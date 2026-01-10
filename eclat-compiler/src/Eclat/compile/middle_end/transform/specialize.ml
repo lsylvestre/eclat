@@ -178,8 +178,8 @@ let rec list_update (x,v) = function
 
 let normalize pi =
   let pi = Ast_rename.rename_pi pi in (* seems needed *)
-  let pi = Let_floating.float_pi pi in
 
+  let pi = Let_floating.float_pi pi in
   let pi = Propagation.propagation_pi pi  in 
   (*Format.(fprintf std_formatter "PROPAGATED: %a\n\n\n\n\n\n\n" Ast_pprint.pp_exp pi.main); *)pi
   ;;
@@ -191,7 +191,6 @@ let rec specialize_pi pi =
   let pi_norm = normalize pi in
   let main = specialize [] pi_norm.main in
   let pi_res = { pi_norm with main } in 
-  (* Format.fprintf Format.std_formatter "==> %a \n" Ast_pprint.pp_exp pi_res.main; *)
   flush stdout;
   (* if !oo > 10 then   assert false else incr oo; *)
   if !has_changed then specialize_pi pi_res else normalize pi_res
