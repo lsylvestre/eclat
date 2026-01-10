@@ -82,7 +82,7 @@ let propagation ~externals e =
               (* _propagable2 is true if x occurs only once in e2:
                  the problem is that the substitution of non atomic expressions
                  can result in a loss of type annotations (especially for sizes) *)
-        then let e3 = (subst_p_e p e1' e2) in
+        then let e3 = subst_e ~when_var:(Inline.subst_ty ty) x e1' e2 in
         (*Format.(fprintf std_formatter "[%a\nGIVE:LET %s = %a IN\n%a]\n\n\n\n\n\n\n" Ast_pprint.pp_exp e x Ast_pprint.pp_exp e1' Ast_pprint.pp_exp e3);*)
              (prop e3)
         else E_letIn(p,ty,e1',prop e2)
@@ -90,8 +90,6 @@ let propagation ~externals e =
         E_letIn(p,ty,prop e1,prop e2)
     | E_app(E_const(Op(GetTuple{pos;arity})),E_tuple vs) ->
         prop (List.nth vs pos)
-    | E_app(e1,e2) ->
-        E_app(prop e1,prop e2)
     | e -> Ast_mapper.map prop e
     in (*(Format.(fprintf std_formatter "[<==================\n%a---->\n%a==============>]\n\n\n\n\n\n\n\n\n\n\n" Ast_pprint.pp_exp e Ast_pprint.pp_exp e'); e')*)
    prop e 

@@ -178,7 +178,6 @@ let rec list_update (x,v) = function
 
 let normalize pi =
   let pi = Ast_rename.rename_pi pi in (* seems needed *)
-
   let pi = Let_floating.float_pi pi in
   let pi = Propagation.propagation_pi pi  in 
   (*Format.(fprintf std_formatter "PROPAGATED: %a\n\n\n\n\n\n\n" Ast_pprint.pp_exp pi.main); *)pi

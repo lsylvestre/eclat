@@ -55,13 +55,12 @@ OBJS= $(SRC_DIR)/prelude.cmx \
       $(SRC_DIR)/Eclat/compile/middle_end/check_exec_mem_reset.cmx \
       $(SRC_DIR)/Eclat/compile/middle_end/normalize/fun_assign_name.cmx \
       \
-      $(SRC_DIR)/Eclat/compile/middle_end/normalize/propagation.cmx \
-      \
       $(SRC_DIR)/Eclat/compile/middle_end/normalize/anf.cmx \
       $(SRC_DIR)/Eclat/compile/middle_end/normalize/let_floating.cmx \
       $(SRC_DIR)/Eclat/compile/middle_end/transform/insert_bound_checking.cmx \
       $(SRC_DIR)/Eclat/compile/middle_end/transform/globalize_arrays.cmx \
       $(SRC_DIR)/Eclat/compile/middle_end/transform/inline.cmx \
+      $(SRC_DIR)/Eclat/compile/middle_end/normalize/propagation.cmx \
       $(SRC_DIR)/Eclat/compile/middle_end/transform/specialize.cmx \
       $(SRC_DIR)/Eclat/compile/middle_end/transform/lambda_lifting.cmx \
       $(SRC_DIR)/Eclat/compile/middle_end/transform/unroll.cmx \

@@ -243,12 +243,14 @@ src/Eclat/compile/middle_end/normalize/move_down_gfun_under_exec_and_par.cmx : \
 src/Eclat/compile/middle_end/normalize/propagation.cmo : \
     src/Eclat/typing/types.cmo \
     src/Eclat/compile/instantaneous.cmo \
+    src/Eclat/compile/middle_end/transform/inline.cmo \
     src/Eclat/syntax/ast_subst.cmo \
     src/Eclat/syntax/ast_mapper.cmo \
     src/Eclat/syntax/ast.cmo
 src/Eclat/compile/middle_end/normalize/propagation.cmx : \
     src/Eclat/typing/types.cmx \
     src/Eclat/compile/instantaneous.cmx \
+    src/Eclat/compile/middle_end/transform/inline.cmx \
     src/Eclat/syntax/ast_subst.cmx \
     src/Eclat/syntax/ast_mapper.cmx \
     src/Eclat/syntax/ast.cmx

@@ -52,13 +52,14 @@ let compile ?globalize
   let pi = Anf.anf_pi pi in
   display_pi Anf pi;
   let _ = Typing.typing_with_argument pi arg_list in
+
   let pi = Specialize.specialize_pi pi in
   display_pi Specialize pi;
-
   (** make explicit all lexical environments *)
   (* let pi = Ast_rename.rename_pi pi in *)
   let pi = Lambda_lifting.lambda_lifting_pi ?globalize pi in
   display_pi Lambda_lifting pi;
+
   let _ = Typing.typing_with_argument pi arg_list in
 
   let pi = Inline.inl_pi pi in
