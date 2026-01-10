@@ -9,6 +9,8 @@ package values is
   constant val_unit : t(0 to 0)  := "1";
   function val_int(arg: t) return t;
   function last_bit(arg:t) return std_logic;
+  function size(arg:t) return t;
+  function equal(arg1,arg2:t) return t;
 end package;
 
 package body values is
@@ -16,6 +18,19 @@ package body values is
     begin return arg; end;
    function last_bit(arg:t) return std_logic is
       begin return arg(arg'length - 1); end;
+   function size(arg:t) return t is
+      begin 
+        return std_logic_vector(to_unsigned(arg'length,32)); 
+      end;
+   function equal(arg1,arg2:t) return t is
+        variable b : boolean := true;
+      begin
+        assert (arg1'length = arg2'length);
+        for i in 0 to arg1'length - 1 loop 
+          b := b and (arg1(i) = arg2(i));
+        end loop;
+        if b then return "0"; else return "1"; end if;
+      end; 
 end;
 
 library ieee; 

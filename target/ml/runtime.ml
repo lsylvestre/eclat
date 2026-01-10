@@ -2,6 +2,13 @@
 
 let id_ x = x
 
+exception UnsupportedPrimitive 
+
+module Values = struct
+  let size_ _ = raise UnsupportedPrimitive
+  let equal = (=) 
+end
+
 module Bool = struct
   let land_ (a,b) = a && b
   let lor_ (a,b) = a || b
@@ -49,7 +56,7 @@ module Print = struct
   let int_ n = print_int (Int64.to_int n)
   let string_ = print_string
   let newline_ = print_newline
-  let value_ _v = print_string "<value>"
+  let value_ _ = raise UnsupportedPrimitive
 end
 
 module Vect = struct

@@ -45,6 +45,8 @@ package Bytes is
   function len(arg: t) return t;
   function get(sa,sr : integer; arg1,arg2:t) return t;
   impure function print(signal clk:std_logic;arg:t) return t;
+  function to_vect(arg: t) return t;
+  function from_vect(arg: t) return t;
 end package;
 package body Bytes is 
   function make(sa,sr : integer; arg: t) return t is
@@ -91,6 +93,10 @@ package body Bytes is
       end if;
       return "0";
     end;
+  function to_vect(arg: t) return t is 
+    begin return arg; end;
+  function from_vect(arg: t) return t is
+    begin return arg; end;
 end Bytes;
 
 library ieee; 

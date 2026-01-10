@@ -1,6 +1,12 @@
-(* **************** *)
+operator Values.size : `a => int<32> ;;
+operator Values.eq : (`a * `a) => bool ;;
 
-(* bool *)
+let size_val = Values.size;;
+let equal = Values.eq;;
+
+(*******************************)
+(************ bool *************)
+(*******************************)
 
 operator Bool.print : bool => unit @impure ;;
 
@@ -9,7 +15,9 @@ operator Bool.lor :  (bool * bool) => bool ;;
 operator Bool.land : (bool * bool) => bool ;;
 operator Bool.lxor : (bool * bool) => bool ;;
 
-(* **************** *)
+(*******************************)
+(************* int *************)
+(*******************************)
 
 (* int<'N> *)
 
@@ -48,7 +56,9 @@ let max(a,b) =
 let min(a,b) =
   if a > b then b else a ;;
 
-(* **************** *)
+(********************************)
+(************* uint *************)
+(********************************)
 
 type uint<'N> ;;
 
@@ -68,6 +78,10 @@ operator Uint.lt :     (uint<'N> * uint<'N>) => bool ;;
 operator Uint.le :     (uint<'N> * uint<'N>) => bool  ;;
 operator Uint.gt :     (uint<'N> * uint<'N>) => bool ;;
 operator Uint.ge :     (uint<'N> * uint<'N>) => bool ;;
+
+(*******************************)
+(************ vect *************)
+(*******************************)
 
 type `a vect<'b> ;;
 
@@ -97,7 +111,12 @@ let vect_tail v = Vect.tail v ;;
 let vect_split v = Vect.split v ;;
 let vect_concat v = Vect.concat v ;;
 
-(*
+let vect_forall (f,v) =
+  let _ : 'a vect<'N> = v in
+  generate<1 to 'N>(fun (i,acc) -> acc & vect_nth(v,i)) init false ;; 
+
+
+(********************************
 type `a matrix<'d1,'d2> ;;
 
 operator%with_sizes Matrix.create : `a => `a matrix<'d1,'d2> ;;
@@ -133,7 +152,6 @@ let matrix_iter(f,m) =
     done
   done ;;
 
-
 type fixed_point<'sf,'exp>@only_size_sum ;;
 
 operator%with_sizes FixedPoint.create : int<'sf> => fixed_point<'sf,'exp> ;;
@@ -149,14 +167,14 @@ let print_fixed_point (f) =
   let y = FixedPoint.exponent f in
   Uint.print x; print_string " * 2^{"; 
   Uint.print y; print_string "}" ;; 
-*)
+***************************)
+
+
+(********************************)
+(* Esterel derivated constructs *)
+(********************************)
 
 operator%with_sizes Default.create : unit => 'a ;; (* unsafe *)
-
-
-let vect_forall (f,v) =
-  let _ : 'a vect<'N> = v in
-  generate<1 to 'N>(fun (i,acc) -> acc & vect_nth(v,i)) init false ;; 
 
 let halt() =
   %loop pause end ;;
@@ -180,7 +198,6 @@ let await_immediate s =
 let suspend_when_immediate(f,s) =
   %suspend (if ?s then pause; f()) %when s ;;
 
-
 (*
 let do_every(p,s) = 
   await s; loop p() each s
@@ -194,8 +211,9 @@ let abcro(a,b,c,r,o) =
   let t = signal<> in 
   [ abro(a,b,r,t) || abro(t,c,r,o) ] ;;
 
-
-(* Lustre *)
+(*******************************)
+(******* Lustre encoding *******)
+(*******************************)
 
 let absent () =
   let s = signal <> 
@@ -214,18 +232,15 @@ let fby(x,y) =
             end default () in
   ?pre_s ;;
 
-
-(*
-
-
+(**
 let fby (x, y) =
   let shift (_, o) = (o, y) in
   let (o, _) = reg shift init (absent(), x)
   in o ;;
-*)
+**)
+
 let mux(a, b, c) = 
   if a then b else c ;;
-
 
 let when(f, clk) =
   if clk then f() else absent() ;;

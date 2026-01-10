@@ -18,6 +18,10 @@ module Eclat_bytes = struct
     for i = 0 to Bytes.length by - 1 do
       Eclat_char.print_ (Bytes.get by i)
     done 
+  let form_vect_ v =
+    Bytes.init (Array.length v) (fun i -> Array.get v i) ;;
+  let to_vect_ b =
+    Array.init (Bytes.length b) (fun i -> Bytes.get b i) ;;
 end
 
 
@@ -32,7 +36,7 @@ module Eclat_IOFile = struct
 
   let write_file_ (name,by) =
     let oc = open_out ("../"^name) in
-    let s = Out_channel.output_bytes oc by in
+    Out_channel.output_bytes oc by;
     close_out oc
 end
 

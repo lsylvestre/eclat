@@ -6,8 +6,8 @@ $ ./eclat ../advent-of-code/extra.ecl ../advent-of-code/sum_input.ecl -arg="()" 
 $ cd ../target
 $ make EXTERNALS=../advent-of-code/extra.vhdl NS=50000
 $ cd ml
-$ /* ajouter "open Extra ;;" en tête de main_step.ml */
-$ ocamlopt -I=../../advent-of-code runtime.ml ../../advent-of-code/extra.ml main_step.ml 
+$ sed -i '' '1s/^/open Extra;;\n/' main_step.ml
+$ ocamlopt -I=../../advent-of-code runtime.ml ../../advent-of-code/extra.ml main_step.ml
 $ ./a.out -run 500
 =============================================================== *)
 
@@ -54,8 +54,8 @@ let main () =
         let by = (input_file("../advent-of-code/input.txt") : bytes<'N>) in
         bytes_print by;
         
-        (* gen_mif(by,8);  (* ~> à placer dans tab.mif pour initialiser 
-                                le tableau tab (en mode synthèse) *) *)
+        (*bytes2mif(by);   (* ~> placer le contenu de `input.txt` dans un fichier tab.mif 
+                                 pour initialiser le tableau tab (en mode synthèse) *) *)
 
         load_tab(by);
         let n = sum_tab(tab) in
