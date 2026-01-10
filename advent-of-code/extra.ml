@@ -18,10 +18,20 @@ module Eclat_bytes = struct
     for i = 0 to Bytes.length by - 1 do
       Eclat_char.print_ (Bytes.get by i)
     done 
-  let form_vect_ v =
+  let from_vect_ v =
     Bytes.init (Array.length v) (fun i -> Array.get v i) ;;
   let to_vect_ b =
     Array.init (Bytes.length b) (fun i -> Bytes.get b i) ;;
+  let to_hex_ b =
+    let char_to_hex c = match c with
+    | '0' .. '9' -> Char.code c - 48
+    | 'A' .. 'F' -> Char.code c - 55
+    | _ -> 0 in 
+    let r = ref 0 in
+    for i = 0 to Bytes.length b - 1 do
+      r := !r * 16 + char_to_hex (Bytes.get b i)
+    done;
+    Int64.of_int !r ;;
 end
 
 

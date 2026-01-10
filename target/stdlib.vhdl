@@ -553,6 +553,9 @@ package vect is
   function nth (sa,sr : integer; arg1: t; arg2 : t) return t;
   function copy_with (sa,sr : integer; arg1: t;arg2 : t; arg3 : t) return t;
   function infos (sa,sr : integer; arg: t) return t;
+  function head (sa,sr : integer; arg: t) return t;
+  function tail (sa,sr : integer; arg: t) return t;
+  function cons (arg1,arg2: t) return t;
 end package;
 
 package body vect is
@@ -565,13 +568,16 @@ package body vect is
       end loop;
       return r;
     end function;
+  -- knowing argument size and result size is not sufficient to
+  -- find the number of element of a vector,
+  -- hence this auxiliary function 
   function infos (sa,sr : integer; arg: t) return t is
     constant zero : t(0 to sr-16-1) := (others => '0');
     begin
       return t(to_unsigned(sa/(sr-16),16))&zero;
     end function;
   
-  -- 'a vect<'N> * int<16> => 'a
+  -- `a vect<'N> * int<16> => `a
   function nth (sa,sr : integer; arg1: t; arg2 : t) return t is
     constant i : natural := to_integer(unsigned(arg2));
     variable r : t(0 to sr-1);
@@ -582,9 +588,9 @@ package body vect is
         r(j) := u(sr * i + j);
       end loop;
       return t(r);
-    end function;
+    end;
   
-  -- 'a vect<'N> * int<16> * 'a => 'a vect<'N>
+  -- `a vect<'N> * int<16> * `a => `a vect<'N>
   function copy_with (sa,sr : integer; arg1: t;arg2 : t; arg3 : t) return t is
     constant size_elem : integer := arg3'length;
     constant i : natural := to_integer(unsigned(arg2));
@@ -597,7 +603,30 @@ package body vect is
         end if;
       end loop;
       return r;
-  end function;
+  end;
+
+  -- `a vect<'N+1> => `a
+  function head (sa,sr : integer; arg: t) return t is
+    variable res : t(0 to sr - 1);
+  begin
+    res := arg(0 to sr - 1);
+    return res;
+  end;
+  -- `a vect<'N+1> => `a vect<'N>
+  function tail (sa,sr : integer; arg: t) return t is
+    variable res : t(0 to sr - 1);
+  begin
+    res := arg(sa-sr to sa - 1);
+    return res;
+  end;
+  -- (`a * `a vect<'N>) => `a vect<'N+1>
+  function cons (arg1,arg2: t) return t is
+    variable res : t(0 to arg1'length + arg2'length - 1);
+  begin
+    res(0 to arg1'length - 1) := arg1;
+    res(arg1'length to arg1'length + arg2'length - 1) := arg2;
+    return res;
+  end;
 end vect;
 
 

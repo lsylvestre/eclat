@@ -29,6 +29,7 @@ operator%with_sizes Bytes.get : (bytes<'s> * int) => char ;;
 operator            Bytes.print : bytes<'s> => unit  @impure ;;
 operator            Bytes.to_vect : bytes<'s> => char vect<'s> ;;
 operator            Bytes.from_vect : char vect<'s> => bytes<'s> ;;
+operator            Bytes.to_hex : bytes<'s> => int<2*2*'s> ;;
 
 let char_code = Char.code ;;
 let char_chr = Char.chr ;;
@@ -41,7 +42,20 @@ let bytes_get = Bytes.get ;;
 let bytes_print = Bytes.print ;;
 let bytes_to_vect = Bytes.to_vect ;;
 let bytes_from_vect = Bytes.from_vect ;;
+let bytes_to_hex = Bytes.to_hex ;;
 
+let bytes_vect_map ((f,b):(char vect<'s1> => char vect<'s2>) * bytes<'s1>) : bytes<'s2> = 
+  bytes_from_vect(f(bytes_to_vect b));;
+
+let bytes_cons ((x,b):char * bytes<'s>) : bytes<'s+1> =
+  let cons (v:char vect<'s1>) : char vect<'s1+1> = vect_cons(x,v) in  
+  bytes_from_vect(cons(bytes_to_vect b));;
+
+let bytes_tail (b:bytes<'s+1>) : bytes<'s> = 
+  bytes_vect_map(vect_tail,b);;
+
+let print_char = char_print ;;
+let print_bytes = bytes_print ;;
 (**************************************************)
 (************** file manipulations ****************)
 (**************************************************)

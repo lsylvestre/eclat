@@ -47,6 +47,7 @@ package Bytes is
   impure function print(signal clk:std_logic;arg:t) return t;
   function to_vect(arg: t) return t;
   function from_vect(arg: t) return t;
+  function to_hex(arg: t) return t;
 end package;
 package body Bytes is 
   function make(sa,sr : integer; arg: t) return t is
@@ -97,6 +98,34 @@ package body Bytes is
     begin return arg; end;
   function from_vect(arg: t) return t is
     begin return arg; end;
+  function to_hex(arg: t) return t is
+      variable n : integer;
+      variable res : t(0 to arg'length / 8 * 4 - 1);
+    begin
+      for i in 0 to arg'length / 8 - 1 loop
+        n := to_integer(unsigned(arg(i*8 to i*8 + 7)));
+        case n is
+        when 48 => res(i*4 to i*4+3) := "0000"; -- 0
+        when 49 => res(i*4 to i*4+3) := "0001"; -- 1
+        when 50 => res(i*4 to i*4+3) := "0010"; -- 2
+        when 51 => res(i*4 to i*4+3) := "0011"; -- 3
+        when 52 => res(i*4 to i*4+3) := "0100"; -- 4
+        when 53 => res(i*4 to i*4+3) := "0101"; -- 5
+        when 54 => res(i*4 to i*4+3) := "0110"; -- 6
+        when 55 => res(i*4 to i*4+3) := "0111"; -- 7
+        when 56 => res(i*4 to i*4+3) := "1000"; -- 8
+        when 57 => res(i*4 to i*4+3) := "1001"; -- 9
+        when 65 => res(i*4 to i*4+3) := "1010"; -- A
+        when 66 => res(i*4 to i*4+3) := "1011"; -- B
+        when 67 => res(i*4 to i*4+3) := "1100"; -- C
+        when 68 => res(i*4 to i*4+3) := "1101"; -- D
+        when 69 => res(i*4 to i*4+3) := "1110"; -- E
+        when 70 => res(i*4 to i*4+3) := "1111"; -- F
+        when others => res := "0000";
+        end case;
+      end loop;
+      return res;
+    end;
 end Bytes;
 
 library ieee; 

@@ -73,6 +73,10 @@ module Vect = struct
     assert (size > 0);
     let witness = Array.get v 0 in
     (Int.of_int_ size,witness)
+  let head_ _ a = Array.get a 0
+  let tail_ _ a = Array.sub a 1 (Array.length a - 1)
+  let cons (x,a) = Array.append [|x|] a 
+
 end
 module Vector = Vect
 

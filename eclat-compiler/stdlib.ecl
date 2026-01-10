@@ -92,7 +92,7 @@ operator%with_sizes Vect.copy_with : (`a vect<'size> * int<16> * `a) => `a vect<
 
 operator%with_sizes Vect.infos : `a vect<'size> => int<16> * `a;;
 
-operator%with_sizes Vect.cons : (`a * `a vect<'size>) => `a vect<'size+1>;;
+operator Vect.cons : (`a * `a vect<'size>) => `a vect<'size+1>;;
 operator%with_sizes Vect.head : (`a vect<'size+1>) => `a;;
 operator%with_sizes Vect.tail : (`a vect<'size+1>) => `a vect<'size>;;
 operator Vect.split : (`a vect<2*'size>) => (`a vect<'size>*`a vect<'size>);;
