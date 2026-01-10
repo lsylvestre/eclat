@@ -74,6 +74,15 @@ let fv_type_in ?(s=Types.Vs.empty) e =
         r := !r ++ free_vars_of_type (Vs.empty,Ty_base(TyB_int(sz)));
         ss e1;
         ss e2
+    | E_const c ->
+        let rec ss_const = function
+        | Unit | Bool _ | String _ | V_loc _ | C_size _ | Inj _ -> ()
+        | Int (_,sz) -> r := !r ++ free_vars_of_type (Vs.empty,Ty_base(TyB_int sz))
+        | C_tuple cs | C_vector cs -> List.iter ss_const cs
+        | C_appInj(x,c,tyB) -> 
+            ss_const c;
+            r := !r ++ free_vars_of_type (Vs.empty,Ty_base tyB)
+        in ss_const c
     | e -> Ast_mapper.iter ss e
   in
   ss e;
@@ -83,8 +92,8 @@ let subst_ty ty e =
   let open Types in
   let vs = (* fv_type_in e*) free_vars_of_type (Vs.empty,ty) in
   let unknowns = Hashtbl.create (Vs.cardinal vs) in
-  (* Ast_pprint.pp_exp Format.std_formatter e;
-   Vs.iter (fun n ->Printf.printf "=======>%d" n; Hashtbl.add unknowns n (new_unknown_generic())) vs; *)
+  (* Ast_pprint.pp_exp Format.std_formatter e; *)
+   Vs.iter (fun n -> Hashtbl.add unknowns n (new_unknown_generic())) vs;
   
   let rec ss e =
     let open Operators in
@@ -100,18 +109,26 @@ let subst_ty ty e =
         E_fix(f, (p, (rename_ty unknowns ty, rename_tyB unknowns tyB), ss e1))
     | E_reg((p,tyB, e1),e0,l) ->
         E_reg((p, rename_tyB unknowns tyB, ss e1),ss e0,l) 
-    | E_app(E_const(Op(TyConstr ty)),e) ->
-        E_app(E_const(Op(TyConstr (rename_ty unknowns ty))),ss e)
-    | E_app(E_const(Op(Runtime (op))),e) ->
-        let op' = (match op with 
-                  | Resize_int sz -> Resize_int (rename_size unknowns sz)
-                  | Size_of_val(ty,sz) -> Size_of_val(rename_ty unknowns ty,rename_size unknowns sz)
-                  | Vector_create sz -> Vector_create (rename_size unknowns sz)
-                  | External_fun (op,ty) -> External_fun(op,(rename_ty unknowns ty))
-                  | op -> op) in
-        E_app(E_const(Op(Runtime (op'))),ss e)
     | E_array_create(sz,deco) -> E_array_create(rename_size unknowns sz,deco)
     | E_array_make(sz,c,deco) -> E_array_make(rename_size unknowns sz,c,deco)
+    | E_const c ->
+        let rec ss_const = function
+        | Unit | Bool _ | String _ | V_loc _ | C_size _ | Inj _ as c -> c
+        | Int (n,sz) -> Int (n,rename_size unknowns sz)
+        | C_tuple cs -> C_tuple (List.map ss_const cs)
+        | C_vector cs -> C_vector (List.map ss_const cs)
+        | C_appInj(x,c,tyB) -> C_appInj(x,ss_const c,rename_tyB unknowns tyB)
+        | Op(op) -> Op(match op with
+                       | TyConstr ty' -> TyConstr (rename_ty unknowns ty')
+                       | Runtime prim ->
+                          Runtime(match prim with 
+                          | Resize_int sz -> Resize_int (rename_size unknowns sz)
+                          | Size_of_val(ty,sz) -> Size_of_val(rename_ty unknowns ty,rename_size unknowns sz)
+                          | Vector_create sz -> Vector_create (rename_size unknowns sz)
+                          | External_fun (op,ty) -> External_fun(op,(rename_ty unknowns ty))
+                          | _ -> prim)
+                        | op -> op)
+        in E_const (ss_const c)
     | e -> Ast_mapper.map ss e
   in
   let e'= ss e in
@@ -131,7 +148,7 @@ let inline_with_statics ~statics e =
         (match p,e1 with
         | P_var x,E_fun _ -> 
             has_changed := true;
-            inline @@ subst_e x (subst_ty ty e1) e2
+            inline @@ subst_e ~when_var:(fun ex -> subst_ty (Types.copy_ty ty) ex) x e1 e2
         | _ -> E_letIn(p,ty,inline e1,inline e2))
 
     | E_app(E_fun(p,(ty,tyB),e1),e2) ->
