@@ -2370,7 +2370,7 @@ let _menhir_action_064 =
   fun _endpos_e2_ _startpos_e1_ e1 e2 ->
     let op = 
 # 847 "src/Eclat/frontend/parser.mly"
-             ( External_fun("Int.eq",new_ty_unknown ()) )
+             ( External_fun("Values.eq",new_ty_unknown ()) )
 # 2375 "src/Eclat/frontend/parser.ml"
      in
     let _endpos = _endpos_e2_ in
@@ -2388,7 +2388,7 @@ let _menhir_action_065 =
   fun _endpos_e2_ _startpos_e1_ e1 e2 ->
     let op = 
 # 847 "src/Eclat/frontend/parser.mly"
-             ( External_fun("Int.eq",new_ty_unknown ()) )
+             ( External_fun("Values.eq",new_ty_unknown ()) )
 # 2393 "src/Eclat/frontend/parser.ml"
      in
     let _endpos = _endpos_e2_ in
@@ -3102,7 +3102,7 @@ let _menhir_action_129 =
   fun () ->
     let op = 
 # 847 "src/Eclat/frontend/parser.mly"
-             ( External_fun("Int.eq",new_ty_unknown ()) )
+             ( External_fun("Values.eq",new_ty_unknown ()) )
 # 3107 "src/Eclat/frontend/parser.ml"
      in
     (
@@ -3115,7 +3115,7 @@ let _menhir_action_130 =
   fun () ->
     let op = 
 # 847 "src/Eclat/frontend/parser.mly"
-             ( External_fun("Int.eq",new_ty_unknown ()) )
+             ( External_fun("Values.eq",new_ty_unknown ()) )
 # 3120 "src/Eclat/frontend/parser.ml"
      in
     (

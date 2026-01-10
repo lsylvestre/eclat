@@ -844,7 +844,7 @@ const:
 | GT         { External_fun("Int.gt",new_ty_unknown ()) }
 | LE         { External_fun("Int.le",new_ty_unknown ()) }
 | GE         { External_fun("Int.ge",new_ty_unknown ()) }
-| EQ | EQ_EQ { External_fun("Int.eq",new_ty_unknown ()) }
+| EQ | EQ_EQ { External_fun("Values.eq",new_ty_unknown ()) }
 | NEQ        { External_fun("Int.neq",new_ty_unknown ()) }
 | AMP        { External_fun("Bool.land",new_ty_unknown ()) }
 | XOR        { External_fun("Bool.lxor",new_ty_unknown ()) }
