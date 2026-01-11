@@ -702,7 +702,7 @@ aexp_desc:
 | LPAREN e=exp RPAREN { e }
 | LPAREN e=exp COL ty=ty RPAREN { ty_annot ~ty e }
 (* | LPAREN RPAREN { E_const Unit } *)
-| c=const { E_const c }
+| c=const_exp { c }
 
 | RESIZE_INT LT k=size GT { E_const (Op(Runtime(Resize_int k))) }
 | TUPLE_OF_INT LT k=INT_LIT GT { E_const (Op(Runtime(Tuple_of_int k))) }
@@ -772,6 +772,11 @@ aexp_desc:
 | PARFOR x=IDENT EQ sz1=size TO sz2=size DO e=exp DONE 
       { E_for(x,sz1,sz2,e,with_file $loc) }
 
+const_exp:
+c=const_without_vect { E_const c}
+| LBRACKET es=separated_nonempty_list(COMMA,lexp) RBRACKET
+    { E_vector es }
+
 match_case_const:
 | cs=separated_nonempty_list(PIPE,const) RIGHT_ARROW e=exp PIPE { (cs,e) }
 
@@ -808,6 +813,11 @@ apat:
 *)
 
 const:
+| c=const_without_vect {c}
+| LBRACKET cs=separated_nonempty_list(COMMA,const) RBRACKET
+    { C_vector cs }
+
+const_without_vect:
 | LPAREN RPAREN { Unit }
 | b=BOOL_LIT    { Bool b }
 | n=INT_LIT {
@@ -824,8 +834,6 @@ const:
 | x=OPERATOR_IDENT { Op(Runtime(External_fun(x,new_ty_unknown()))) }
 | x=UP_IDENT             { Inj x }
 | LPAREN op=binop RPAREN { Op(Runtime(op)) }
-| LCUR cs=separated_nonempty_list(COMMA,const) RCUR
-    { C_vector cs }
 
 
 %inline binop:
@@ -854,4 +862,3 @@ const:
 | LSL        { External_fun("Int.lsl",new_ty_unknown ()) }
 | LSR        { External_fun("Int.lsr",new_ty_unknown ()) }
 | ASR        { External_fun("Int.asr",new_ty_unknown ()) }
-
