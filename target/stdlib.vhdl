@@ -29,7 +29,7 @@ package body values is
         for i in 0 to arg1'length - 1 loop 
           b := b and (arg1(i) = arg2(i));
         end loop;
-        if b then return "0"; else return "1"; end if;
+        if b then return "1"; else return "0"; end if;
       end; 
 end;
 

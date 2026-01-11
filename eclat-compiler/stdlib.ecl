@@ -1,8 +1,8 @@
 operator Values.size : `a => int<32> ;;
-operator Values.eq : (`a * `a) => bool ;;
+operator Values.equal : (`a * `a) => bool ;;
 
 let size_val = Values.size;;
-let equal = Values.eq;;
+let equal = Values.equal;;
 
 (*******************************)
 (************ bool *************)
