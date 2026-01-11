@@ -556,6 +556,8 @@ package vect is
   function head (sa,sr : integer; arg: t) return t;
   function tail (sa,sr : integer; arg: t) return t;
   function cons (arg1,arg2: t) return t;
+  function concat (arg1,arg2: t) return t;
+  function split (arg: t) return t;
 end package;
 
 package body vect is
@@ -626,6 +628,14 @@ package body vect is
     res(0 to arg1'length - 1) := arg1;
     res(arg1'length to arg1'length + arg2'length - 1) := arg2;
     return res;
+  end;
+  function concat (arg1,arg2: t) return t is
+  begin
+    return arg1 & arg2;
+  end;
+  function split (arg: t) return t is
+  begin
+    return arg;
   end;
 end vect;
 
