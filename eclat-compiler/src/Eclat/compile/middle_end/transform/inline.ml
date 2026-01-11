@@ -102,9 +102,11 @@ let fv_type_in ?(s=Types.Vs.empty) e =
   ss e;
   !r
 
-let subst_ty ty e =
+(* instanciate type annotation in expression [e]
+   while preserving sharing *)
+let subst_ty _ty e = (* todo: rename this function and remove the unused parameter *)
   let open Types in
-  let vs = (* fv_type_in e*) free_vars_of_type (Vs.empty,ty) in
+  let vs = fv_type_in e in
   let unknowns = Hashtbl.create (Vs.cardinal vs) in
   (* Ast_pprint.pp_exp Format.std_formatter e; *)
    Vs.iter (fun n -> Hashtbl.add unknowns n (new_unknown_generic())) vs;
