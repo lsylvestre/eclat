@@ -85,6 +85,10 @@ let rec prop_s env s =
      prop_ident_s env x1 @@ fun x1' ->
      let a2' = prop env a2 in
      S_array_set(l,x1',a2')
+  | S_array_from_file(y,a) ->
+      prop_ident_s env y @@ fun y' ->
+      let a' = prop env a in
+      S_array_from_file(y',a')
   | S_seq(s1,s2) -> S_seq(prop_s env s1,prop_s env s2)
   | S_letIn(x,a1,s1) ->
       let a1' = prop env a1 in

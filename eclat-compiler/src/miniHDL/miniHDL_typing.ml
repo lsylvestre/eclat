@@ -103,7 +103,7 @@ let rec unify t1 t2 =
   | TVar ({contents=V _} as r),t | t,TVar ({contents=V _} as r) ->
     r := T t
   | TString tz,TString tz' ->
-      (* unify tz tz'*) ()
+      unify tz tz'
   | TStatic{elem=te;size=tz},TStatic{elem=te';size=tz'} ->
       unify te te';
       unify tz tz'
@@ -346,6 +346,17 @@ let rec typing_s ~externals ~result h s =
   | S_write_stop(x) ->
       let t = new_tvar () in
       add_typing_env h x t 
+  | S_array_from_file(y,a) ->
+      let telem = new_tvar() in
+      let tz = new_tvar () in
+      add_typing_env h y (TStatic{elem=telem;size=tz});
+      let tname = typing_a ~externals h a in
+      let tz2 = new_tvar () in
+      unify tname (TString tz2);
+      (* ***************************************** *)
+      add_typing_env h ("$"^y^"_from_file") TBool;
+      add_typing_env h ("$"^y^"_file_name") (TString tz2)
+      (* ***************************************** *)
   | S_if(x,s,so) ->
       add_typing_env h x TBool;
       typing_s ~externals ~result h s;

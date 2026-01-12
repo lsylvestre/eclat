@@ -19,8 +19,10 @@ let as_ident ex =
   | E_var z -> z
   | _ -> Ast_pprint.pp_exp Format.std_formatter ex; assert false (* todo: better error message *)
 
-let subst_e ?(when_var=(fun x -> x)) x ex e =
-  assert (not @@ SMap.mem x (Free_vars.fv ex));
+let subst_e ?(warning=true) ?(when_var=(fun x -> x)) x ex e = 
+  if warning && SMap.mem x (Free_vars.fv ex) then
+     Prelude.Errors.warning ~loc:Prelude.dloc (fun fmt ->
+        Format.fprintf fmt "capture suspected in substitution");
   let rec ss e =
     match e with
     | E_var y ->
@@ -63,6 +65,9 @@ let subst_e ?(when_var=(fun x -> x)) x ex e =
     | E_array_set_immediate(y, e1, e2) ->
         let z = if x <> y then y else as_ident ex in
         E_array_set_immediate(z, ss e1, ss e2)   
+    | E_array_from_file(y,e1) ->
+        let z = if x <> y then y else as_ident ex in
+        E_array_from_file(z, ss e1)
     | E_for(y, sz1, sz2, e3, loc) ->
        E_for(y,sz1,sz2,
              (if x = y then e3 else ss e3),loc)

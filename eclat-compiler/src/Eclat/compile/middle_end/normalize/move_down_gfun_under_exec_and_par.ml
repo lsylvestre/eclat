@@ -79,7 +79,7 @@ let rec map_under_exec_and_par e =
   in
   let rec aux env e =
     match e with
-    | E_letIn(P_var f,ty,(E_fix(g,(p,(ty1,tyB2),e1)) as phi),e2) ->
+    | E_letIn(P_var f,ty,E_fix(g,(p,(ty1,tyB2),e1)),e2) ->
         let e1' = aux env e1 in (* assume [env] disjoint of [g] and [p] *)
         let phi' = E_fix(g,(p,(ty1,tyB2),(* aux env*) e1')) in   (* was [aux env e1'] before: a bug ? *)
         E_letIn(P_var f,Types.new_ty_unknown(),phi',aux ((f,phi')::env) e2)

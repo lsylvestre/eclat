@@ -60,6 +60,7 @@ type e =                      (** expression     [e]                       *)
   | E_array_get_start of x * e
   | E_array_get_end of x
   | E_array_set_immediate of x * e * e
+  | E_array_from_file of x * e (** only for simulation *)
   | E_ref of e
   | E_get of e
   | E_set of e * e

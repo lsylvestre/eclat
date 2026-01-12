@@ -497,12 +497,14 @@ src/Eclat/syntax/ast_rename.cmx : \
     src/Eclat/syntax/ast_mapper.cmx \
     src/Eclat/syntax/ast.cmx
 src/Eclat/syntax/ast_subst.cmo : \
+    src/prelude.cmo \
     src/Eclat/syntax/pattern.cmo \
     src/Eclat/syntax/free_vars.cmo \
     src/Eclat/syntax/ast_pprint.cmo \
     src/Eclat/syntax/ast_mapper.cmo \
     src/Eclat/syntax/ast.cmo
 src/Eclat/syntax/ast_subst.cmx : \
+    src/prelude.cmx \
     src/Eclat/syntax/pattern.cmx \
     src/Eclat/syntax/free_vars.cmx \
     src/Eclat/syntax/ast_pprint.cmx \

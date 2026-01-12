@@ -27,6 +27,7 @@ let rec count_s s =
   | S_write_start _
   | S_write_stop _
   | S_array_set _ 
+  | S_array_from_file _
   | S_sig_set _ -> ()
   | S_seq(s1,s2) -> count_s s1; count_s s2
   | S_letIn(_,_,s) ->

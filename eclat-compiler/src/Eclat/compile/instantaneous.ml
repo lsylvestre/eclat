@@ -56,7 +56,8 @@ let rec combinational ?(with_sig_get=true) ~externals (e:e) : bool =
 	| E_array_set _ 
 	| E_array_get_start _ 
 	| E_array_get_end _
-	| E_array_set_immediate _ ->
+	| E_array_set_immediate _ 
+	| E_array_from_file _ ->
 	    false (* side effect *)
 	| E_for(_,_,_,e3,_) ->
 	   combinational ~externals e3
@@ -119,7 +120,8 @@ let rec instantaneous ?(with_sig=true) ~externals (e:e) : bool =
 	| E_array_set _ 
 	| E_array_get_start _ 
 	| E_array_get_end _
-	| E_array_set_immediate _ ->
+	| E_array_set_immediate _
+	| E_array_from_file _ ->
 	    false (* side effect *)
 	| E_for(_,_,_,e3,_) ->
 	   instantaneous ~externals e3

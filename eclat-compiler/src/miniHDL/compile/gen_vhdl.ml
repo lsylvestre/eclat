@@ -33,7 +33,7 @@ let rec pp_s externals ~st fmt = function
       Option.iter (fun s ->
         fprintf fmt "@[<v 2>when others =>@,%a@]@," (pp_s externals ~st) s) so;
       fprintf fmt "@]end case;")
-| S_set(x,((A_call(Runtime(((Print|Print_string|Print_int|Print_newline))),_)) as a))->
+| S_set(x,((A_call(Runtime(((Print|Print_ascii|Print_string|Print_int|Print_newline))),_)) as a))->
    fprintf fmt "%a;@," (pp_a externals) a
 | S_set(x,a) -> fprintf fmt "@[<v>%a := %a;@]" pp_ident x (pp_a externals) a
 | S_sig_set(x,a) -> fprintf fmt "@[<v>%a <= %a;@]" pp_ident x (pp_a externals) a
@@ -98,10 +98,15 @@ let rec pp_s externals ~st fmt = function
      let (st2,_,_) = List.assoc id !List_machines.extra_machines in
      pp_s externals ~st:st2 fmt s
 | S_array_set(x,y,a) ->
-    fprintf fmt "@[%a(to_integer(unsigned(%a&\"000\"))) := %a@]"
+    fprintf fmt "@[%a(to_integer(unsigned(%a&\"000\"))) := %a;@]"
       pp_ident x
       pp_ident y
       (pp_a externals) a
+| S_array_from_file(y,a) ->
+    if !Operators.flag_no_print then () else (
+    fprintf fmt "@[%a := %a;@,%a := %a;@,@]"
+        pp_ident ("$"^y^"_from_file") (pp_a externals) (A_const (Bool true))
+        pp_ident ("$"^y^"_file_name") (pp_a externals) a)
 | S_call(op,a) ->
    fprintf fmt "%a;@," (pp_call externals) (Runtime(op),a)
 | S_external_run(f,l,res,rdy,a) ->
@@ -293,6 +298,31 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
   ArrayType.iter (fun n _ ->
       fprintf fmt "type array_value_%d is array (natural range <>) of value(0 to %d);@," n (n-1)) arty;
 
+  if !Operators.flag_no_print then () else (
+  ArrayType.iter (fun n _ ->
+      fprintf fmt 
+"@,@,procedure array_from_file(signal x : inout array_value_%d; name : in std_logic_vector) is
+    type char_file_t is file of character;
+    file infile : char_file_t;
+    variable c: character;
+    variable i : integer := 0;
+    variable tmp : std_logic_vector(0 to ((%d+7)/8)*8-1) := (others => '0');
+  begin        
+    file_open(infile, work.IOFile.to_string(name), read_mode);
+    while not endfile (infile) and i < x'length loop
+      for k in 0 to tmp'length/8 - 1 loop
+        read(infile, c);
+        tmp(k*8 to k*8+7) := std_logic_vector(to_unsigned(Character'pos(c),8));
+      end loop;
+      x(i) <= tmp(0 to %d-1);
+      i := i + 1;
+    end loop;
+    file_close(infile);
+    for j in i to x'length-1 loop
+      x(j) <= (others => '0');
+    end loop;
+  end;@,@," n n n) arty);
+
 
   List.iter (fun (x,st) ->
     match st with
@@ -357,7 +387,7 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
             begin
             if rising_edge(clk) then
                  if %a = '1' then
-                    %a(%a) <= %a;
+                    %a(%a) <= %a;%a
                  end if;
                  %a <= %a(%a);
             end if;
@@ -366,6 +396,12 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
           pp_ident x
           pp_ident ("$"^x^"_ptr_write")
           pp_ident ("$"^x^"_write")
+          (fun fmt () -> 
+              if !Operators.flag_no_print then () else (
+                fprintf fmt "@,             elsif %a(0) = '1' then@,               array_from_file(%a,%a);" 
+                            pp_ident ("$"^x^"_from_file%next")
+                            pp_ident x
+                            pp_ident ("$"^x^"_file_name%next"))) ()
           pp_ident ("$"^x^"_value")
           pp_ident x
           pp_ident ("$"^x^"_ptr");
@@ -516,11 +552,23 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
      fprintf fmt "%a := %a;@," pp_ident x pp_ident (x^"%now");
   ) variables;
   
-    fprintf fmt "%a := %a;@," pp_ident state_var pp_ident (state_var^"%now");
+  fprintf fmt "%a := %a;@," pp_ident state_var pp_ident (state_var^"%now");
 
   List.iter (fun (_,(sv,_,_)) ->
      fprintf fmt "%a := %a;@," pp_ident sv pp_ident (sv^"%now");
   ) !List_machines.extra_machines;
+
+  
+  if !Operators.flag_no_print then () else (
+      List.iter (fun (x,st) ->
+    match st with
+    | Static_array_of _
+    | Static_array _ ->
+        fprintf fmt "@[%a := %a;@,@]" (* avoid reading at each clock tick *)
+        pp_ident ("$"^x^"_from_file") (pp_a externals) (A_const (Bool false))
+    ) statics
+  );
+  
 
   (* fprintf fmt "@,rdy <= \"1\";"; 
   fprintf fmt "@,%a := \"0\";@," pp_ident rdy;*)

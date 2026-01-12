@@ -68,7 +68,8 @@ let contains_return s =
   | S_call _
   | S_set _
   | S_sig_set _
-  | S_array_set _ -> false
+  | S_array_set _ 
+  | S_array_from_file _ -> false
   | S_letIn(_,_,s1) -> aux s1
   | S_seq(s1,s2) -> aux s1 || aux s2
   | S_if(_,s1,so2) -> aux s1 || (match so2 with None -> false | Some s -> aux s)
@@ -127,7 +128,8 @@ let rec insert_kont ~is_zero w ~idle ~x s =
     | S_set _
     | S_external_run _ 
     | S_array_set _ 
-    | S_sig_set _ -> s
+    | S_sig_set _
+    | S_array_from_file _ -> s
   in
   Some (aux s)
 
@@ -520,6 +522,21 @@ let rec to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums gs e x k =
       let a_upd = to_a ~externals ~sums e_upd in
       let s = S_write_start(y,a,a_upd) in
       (SMap.empty, SMap.empty, return_ s)
+  | E_array_from_file(y,e1) ->
+      let a = to_a ~externals ~sums e1 in
+      (* ***************************************** *)
+      let s0 = return_ @@ S_array_from_file(y,a) in
+      (* ***************************************** *)
+      let q1 = Ast.gensym ~prefix:"pause_array_from_file" () in
+      let ts = SMap.add q1 (seq_ (S_release_lock(y)) @@
+                                 (return_ @@ seq_ (set_ x (A_const Unit)) s0)) 
+               SMap.empty  in
+      let s = (S_continue q1) in
+      let q_wait = Ast.gensym ~prefix:"q_wait" () in
+      let s' = let_plug_s (A_ptr_taken(y)) @@ fun z ->
+                 S_if(z, (S_continue q_wait),
+                           Some (seq_ (S_acquire_lock(y)) @@ s)) in
+      (SMap.empty, SMap.add q_wait s' ts, s')
   | E_reg((p,_,e1),e0,l) ->
      let rec is_default e = 
        let exception Found in 

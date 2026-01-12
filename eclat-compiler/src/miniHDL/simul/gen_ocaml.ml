@@ -278,6 +278,7 @@ let rec pp_s typing_env externals ~st fmt = function
         pp_ident x 
         pp_ident idx 
         (pp_a typing_env externals) a
+  | S_array_from_file _ -> assert false (* not supported yet *)
 | ( S_seq(S_skip,s) 
   | S_seq(s,S_skip) ) -> 
       pp_s typing_env externals ~st fmt s

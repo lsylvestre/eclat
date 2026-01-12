@@ -105,6 +105,9 @@ let rec lfloat (e:e) : e =
       let ds1,e1' = glob e1 in
       let ds2,e2' = glob e2 in
       ds1@ds2,E_array_set_immediate(x,e1',e2')
+  | E_array_from_file(x,e1) ->
+      let ds1,e1' = glob e1 in
+      ds1,E_array_from_file(x,e1')
   | E_par(es) ->
       [],E_par(List.map lfloat es)
   | E_for(x,sz1,sz2,e3,loc) ->

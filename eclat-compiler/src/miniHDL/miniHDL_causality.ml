@@ -51,7 +51,8 @@ let rec can sigs s =
   | S_acquire_lock _ | S_release_lock _
   | S_read_start _ | S_read_stop _ 
   | S_write_start _  | S_write_stop _ 
-  | S_array_set _ -> SMap.empty
+  | S_array_set _ 
+  | S_array_from_file _ -> SMap.empty
 
 
 

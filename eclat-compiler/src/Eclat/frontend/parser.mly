@@ -335,7 +335,8 @@ tyB_next:
 | tyB=tyB_ident { tyB }
 | LPAREN tyB=tyB RPAREN { tyB }
 | x=IDENT szs=size_list
-     { match x with
+     { if szs = [] then TyB_abstract(x,[Sz_lit 1],[]) else (
+       match x with
        | "_" -> (new_tyB_unknown ())
        | "int" -> (match szs with 
                    | sz::[] -> 
@@ -344,7 +345,7 @@ tyB_next:
        | ("array" (* | "vect"*)) -> 
             Prelude.Errors.raise_error ~loc:(with_file $loc)
                  ~msg:("type parameter expected for type constructor "^x) ()
-       | _ -> TyB_abstract(x,szs,[]) }
+       | _ -> TyB_abstract(x,szs,[])) }
 | tyBs=tyB_list x=IDENT szs=size_list
      { match x with
        | "array" -> Prelude.Errors.raise_error ~loc:(with_file $loc) ()
@@ -357,7 +358,9 @@ tyB_next:
        (* Prelude.Errors.raise_error ~loc:(with_file $loc) ()
                  ~msg:("unknown type constructor "^x) *) }
 
+
 size_list:
+| {[]}
 | sz=size { [sz] }
 | LT szs=separated_nonempty_list(COMMA,size) GT { szs }
 
@@ -367,21 +370,17 @@ size_list:
 
 
 ty:
-| ty=ty_next TIMES tys=separated_nonempty_list(TIMES,ty_next) 
-    { Ty_tuple (ty::tys) }
-| ty=ty_next {ty}
-
+ts= separated_nonempty_list(TIMES,ty_next) 
+{ match ts with
+  | [] -> assert false
+  | [ty] -> ty 
+  | _ -> Ty_tuple ts }
 
 ty_next:
 | x=TVAR_IDENT { decl_ty_var x }
-| tyB=tyB_next ARRAY LT sz=size GT { Ty_array(sz,tyB) }
+| ty=ty_next ARRAY LT sz=size GT 
+    { Ty_array(sz,Types.as_tyB ~loc:(with_file $loc) ty) }
 | ty=ty_ident { ty }
-/*| ty_tyB=ty_next x=IDENT LT sz=size GT 
-     { let tyB = as_tyB ~loc:(with_file $loc) ty_tyB in
-       match x with
-       | x -> Ty_base (TyB_abstract(x,[sz],[tyB]))
-       (* | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc) ()
-                 ~msg:("unknown type constructor "^x)  *) }*/
 | ty=ty_next RIGHT_ARROW tyB=tyB { Ty_fun(ty,Dur_one,tyB) } 
 | ty=ty_next QUESTION_MARK RIGHT_ARROW tyB=tyB { Ty_fun(ty,new_dur_unknown(),tyB) } 
 | ty=ty_next IMPLY tyB=tyB { Ty_fun(ty,Dur_zero,tyB) } 
@@ -722,6 +721,7 @@ aexp_desc:
             | "abs" -> E_const (Op(Runtime(External_fun("Int.absv",new_ty_unknown ()))))
             | "not" -> E_const (Op(Runtime(External_fun("Bool.lnot",new_ty_unknown ()))))
             | "print" -> E_const (Op(Runtime(Print)))
+            | "print_ascii" -> E_const (Op(Runtime(Print_ascii)))
             | "print_string" -> E_const (Op(Runtime(Print_string)))
             | "print_int" -> E_const (Op(Runtime(Print_int)))
             | "print_newline" -> E_const (Op(Runtime(Print_newline)))
@@ -738,7 +738,13 @@ aexp_desc:
             (* | "vect_size" -> E_const (Op(Runtime(Vector_length (Types.new_size_unknown()))))
             | "vect_nth" -> E_const (Op(Runtime(Vector_get (Types.new_tyB_unknown()))))
             | "vect_copy_with" -> E_const (Op(Runtime(Vector_update (Types.new_tyB_unknown(),Types.new_size_unknown()))))
-            *)| "_" -> Prelude.Errors.raise_error ~loc:(with_file $loc)
+            *)
+
+            | "array_from_file" -> let arr = gensym() in
+                                   let name = gensym() in 
+                                   E_fun(P_tuple[P_var arr;P_var name],(Types.new_ty_unknown(),Types.new_tyB_unknown()),
+                                     E_array_from_file(arr,E_var name))
+            | "_" -> Prelude.Errors.raise_error ~loc:(with_file $loc)
                          ~msg:"wildcard \"_\" not expected." ()
             | _ -> E_var x }
 | SHARP_PIPE_LBRACKET separated_list(COMMA,app_exp) PIPE_RBRACKET

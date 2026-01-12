@@ -625,6 +625,13 @@ let rec typ_exp ?(collect_sig=false) ~statics ~externals ~sums ~ctors ?(toplevel
     unify_ty ~loc ty2 (Ty_base tyB);
     unify_ty ~loc (Ty_array(new_size_unknown(),tyB)) tyx;
     (Ty_base TyB_unit, (Dur_max(d1,d2)))
+  | E_array_from_file(x,e1) ->
+      let tyx = typ_ident ~loc g x in
+      let ty1,_d1 = typ_exp ~collect_sig ~statics ~externals ~sums ~ctors ~toplevel:false ~loc g e1 in
+      unify_ty ~loc:(loc_of e1) (Ty_base(TyB_string(new_size_unknown()))) ty1;
+      unify_ty ~loc (Ty_array(new_size_unknown(),new_tyB_unknown())) tyx;
+      (Ty_base TyB_unit, Dur_one)
+
   | E_for(x,_,_,e3,_) ->
     let g' = env_extend ~loc g (P_var x) (Ty_base (TyB_int (new_size_unknown()))) in
     let (ty3,d3) = typ_exp ~collect_sig ~statics ~externals ~sums ~ctors ~toplevel:false ~loc g' e3 in (* todo *)

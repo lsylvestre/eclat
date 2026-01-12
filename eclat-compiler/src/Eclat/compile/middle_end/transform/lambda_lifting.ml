@@ -265,6 +265,9 @@ let globalize_e (e:e) : ((x * _ * e) list * e) =
         let ds1,e1' = glob e1 in
         let ds2,e2' = glob e2 in
         ds1@ds2,E_array_set_immediate(x,e1',e2')
+    | E_array_from_file(x,e1) ->
+        let ds1,e1' = glob e1 in
+        ds1,E_array_from_file(x,e1')
     | E_par(es) ->
         let ds,es' = globalize_list es in
         ds,E_par(es')

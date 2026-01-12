@@ -71,6 +71,9 @@ let rec map f e =
       let e1' = f e1 in
       let e2' = f e2 in
       E_array_set_immediate(x, e1', e2')
+  | E_array_from_file(x,e1) ->
+      let e1' = f e1 in
+      E_array_from_file(x,e1')
   | E_par(es) ->
       let es' = List.map f es in
       E_par es'
@@ -167,6 +170,7 @@ let rec iter f (e:e) : unit =
       ()
   | E_array_set_immediate(_,e1,e2) ->
       f e1; f e2
+  | E_array_from_file(_,e1) -> f e1
   | E_for(_,_,_,e,_) ->
       f e
   | E_generate((_,_,e1),e2,_,_,_) ->
@@ -457,6 +461,9 @@ let accum f (e:e) =   (* : ((x * ty * e) list * e)*)
             let ds1,e1' = aux e1 in
             let ds2,e2' = aux e2 in
             ds1@ds2,E_array_set_immediate(x,e1',e2')
+        | E_array_from_file(x,e1) ->
+            let ds1,e1' = aux e1 in
+            ds1,E_array_from_file(x,e1')
         | E_par(es) ->
             let ds,es' = aux_list es in
             ds,E_par(es')

@@ -212,6 +212,10 @@ let pp_exp (fmt:fmt) (e:e) : unit =
           pp_ident x
           (pp_e ~paren:false) e1
           (pp_e ~paren:false) e2) fmt ()
+  | E_array_from_file(x,e1) ->
+      fprintf fmt "@[<v>array_from_file(%a,%a)@]"
+        pp_ident x 
+        (pp_e ~paren:false) e1
   | E_par(es) ->
       fprintf fmt "(";
       pp_print_list

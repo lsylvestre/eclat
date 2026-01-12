@@ -78,7 +78,9 @@ package Print is
   alias t is std_logic_vector;
   function to_string (a: std_logic_vector) return string;
   function of_string   (s: string)   return t; 
+  function to_ascii (a: std_logic_vector) return string;
   procedure print_value (signal clk:in std_logic;arg:in t);
+  procedure print_ascii (signal clk:in std_logic;arg:in t);
   procedure print_string (signal clk:in std_logic;arg:in t);
   procedure print_newline (signal clk: in std_logic;arg: in t);
 end package;
@@ -113,6 +115,26 @@ package body Print is
     begin
       if rising_edge(clk) then
         work.Util.echo(to_string(arg));
+      end if;
+    end;
+
+  function to_ascii (a: std_logic_vector) return string is
+    variable tmp : t(0 to ((a'length+7)/8)*8-1) := (others => '0');
+    variable b : string (1 to tmp'length/8) := (others => NUL);
+    variable n : integer;
+    begin
+        tmp(0 to a'length-1) := a;
+        for i in 0 to tmp'length/8-1 loop
+            n := to_integer(unsigned(tmp(i*8 to i*8+7)));
+            b(i+1) := Character'val(n);
+        end loop;
+    return b;
+  end function;
+
+  procedure print_ascii (signal clk:in std_logic;arg:in t) is
+    begin
+      if rising_edge(clk) then
+        work.Util.echo(to_ascii(arg));
       end if;
     end;
 
@@ -754,9 +776,14 @@ end Lock;
 library ieee; 
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+use std.textio.all;
 use work.int;
+use work.print;
+
+
 package ram is
   alias t is std_logic_vector;
+  type array8 is array (natural range <>) of t(0 to 7);
   procedure start_read(x : inout std_logic_vector;
                        i : in std_logic_vector;
                        sz_val : in integer);

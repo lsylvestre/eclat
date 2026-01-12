@@ -62,6 +62,9 @@ let rec flat_s s =
   | S_array_set(x,y,a) ->
       let bs,a' = flat a in
       s_let_bindings bs @@ S_array_set(x,y,a')
+  | S_array_from_file(x,a) ->
+      let bs,a' = flat a in
+      s_let_bindings bs @@ S_array_from_file(x,a')
   | S_seq(s1,s2) -> S_seq(flat_s s1,flat_s s2)
   | S_letIn(x,a,s) ->
       let bs,a' = flat a in

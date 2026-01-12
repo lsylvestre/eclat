@@ -108,6 +108,9 @@ let subst_e x ex e =
     | E_array_set_immediate(y,e1,e2) ->
         let z = if x <> y then y else as_ident ex in
         E_array_set_immediate(z, ss (0::id) e1, ss (1::id) e2)
+    | E_array_from_file(y,e1) ->
+        let z = if x <> y then y else as_ident ex in
+        E_array_from_file(z, ss (0::id) e1)
     | E_for(y,sz1,sz2,e3,loc) ->
        E_for(y,sz1,sz2,
              (if x = y then e3 else ss (2::id) e3),loc)

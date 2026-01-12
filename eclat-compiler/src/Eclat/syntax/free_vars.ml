@@ -92,6 +92,11 @@ let fv ?(get_sig=true) ?(get_arrays=true) ?(xs=SMap.empty) e =
       if get_arrays 
       then fv_var xs x ++ vs 
       else vs
+  | E_array_from_file(x,e1) ->
+      let vs = aux xs e1 in
+      if get_arrays 
+      then fv_var xs x ++ vs 
+      else vs
   | E_par(es) ->
       fv_list xs es
   | E_for(i,_,_,e,_) ->
@@ -205,6 +210,9 @@ let fv_arrays ?(xs=SMap.empty) e =
   | E_array_set_immediate(x,e1,e2) ->
       let vs = aux xs e1 ++ aux xs e2 in
      vs ++ fv_var xs x
+  | E_array_from_file(x,e1) ->
+      let vs = aux xs e1 in
+      vs ++ fv_var xs x
   | E_par(es) ->
       fv_list xs es
   | E_for(i,_,_,e,_) ->

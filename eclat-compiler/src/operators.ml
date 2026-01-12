@@ -23,7 +23,7 @@ type op =
   | Vector_update of Types.tyB * Types.size
 
   (* for simulation only *)
-  | Print | Print_string | Print_int | Print_newline | Assert
+  | Print | Print_ascii | Print_string | Print_int | Print_newline | Assert
 
   | Bvect_of_int
   | Int_of_bvect
@@ -71,6 +71,9 @@ let ty_op ~externals op =
       let v' = new_tyB_unknown() in
       Ty_fun((Ty_tuple[Ty_fun(v,d,v'); v]),d,v')
   | Print ->
+      let tyB = new_tyB_unknown() in
+      Ty_fun(Ty_base tyB,Dur_zero,TyB_unit)
+  | Print_ascii ->
       let tyB = new_tyB_unknown() in
       Ty_fun(Ty_base tyB,Dur_zero,TyB_unit)
   | Print_string ->
@@ -128,6 +131,7 @@ let pp_op fmt (op:op) : unit =
   | Unroll n -> Format.fprintf fmt "%s" @@ "unroll" ^ string_of_int n ^ ">"
   | Size_of_val _ -> Format.fprintf fmt "%s" @@ "size_of_val"
   | Print -> Format.fprintf fmt "%s" @@ "print"
+  | Print_ascii -> Format.fprintf fmt "%s" @@ "print_ascii"
   | Print_string -> Format.fprintf fmt "%s" @@ "print_string"
   | Print_int -> Format.fprintf fmt "%s" @@ "print_int"
   | Print_newline -> Format.fprintf fmt "%s" @@ "print_newline"
@@ -144,7 +148,7 @@ let gen_op ~externals fmt (op:op) pp a : unit =
   let funcall fmt s = fprintf fmt "%s(%a)" s pp a in
   let procall fmt s = fprintf fmt "%s(clk,%a)" s pp a in
   let skip_when b fmt f s =
-    if b then fprintf fmt "eclat_skip(eclat_unit)"
+    if b then fprintf fmt "runtime.eclat_skip(eclat_unit)"
     else f fmt s 
   in
   match op with
@@ -171,6 +175,8 @@ let gen_op ~externals fmt (op:op) pp a : unit =
       assert false (* special case *)
   | Print ->
       skip_when !flag_no_print fmt procall "Print.print_value"
+  | Print_ascii ->
+      skip_when !flag_no_print fmt procall "Print.print_ascii"
   | Print_string ->
       skip_when !flag_no_print fmt procall "Print.print_string"
   | Print_int ->

@@ -100,10 +100,14 @@ package body Bytes is
     begin return arg; end;
   function to_hex(arg: t) return t is
       variable n : integer;
+      variable c : t(0 to 7) := (others => '0');
+      variable tmp : t(0 to (arg'length+7)/8*8-1)  := (others => '0');
       variable res : t(0 to arg'length / 8 * 4 - 1);
     begin
-      for i in 0 to arg'length / 8 - 1 loop
-        n := to_integer(unsigned(arg(i*8 to i*8 + 7)));
+      tmp(0 to ((arg'length+7)/8)*8-1) := arg;
+      for i in 0 to tmp'length / 8 - 1 loop
+        c(0 to 7) := tmp(i*8 to i*8 + 7);
+        n := to_integer(unsigned(c));
         case n is
         when 48 => res(i*4 to i*4+3) := "0000"; -- 0
         when 49 => res(i*4 to i*4+3) := "0001"; -- 1
@@ -121,7 +125,7 @@ package body Bytes is
         when 68 => res(i*4 to i*4+3) := "1101"; -- D
         when 69 => res(i*4 to i*4+3) := "1110"; -- E
         when 70 => res(i*4 to i*4+3) := "1111"; -- F
-        when others => res := "0000";
+        when others => res(i*4 to i*4+3) := "0000";
         end case;
       end loop;
       return res;
