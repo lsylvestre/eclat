@@ -345,7 +345,7 @@ let rec typing_s ~externals ~result h s =
       add_typing_env h idx tz2
   | S_write_stop(x) ->
       let t = new_tvar () in
-      add_typing_env h x t 
+      add_typing_env h x t
   | S_array_from_file(y,a) ->
       let telem = new_tvar() in
       let tz = new_tvar () in
@@ -353,10 +353,6 @@ let rec typing_s ~externals ~result h s =
       let tname = typing_a ~externals h a in
       let tz2 = new_tvar () in
       unify tname (TString tz2);
-      (* ***************************************** *)
-      add_typing_env h ("$"^y^"_from_file") TBool;
-      add_typing_env h ("$"^y^"_file_name") (TString tz2)
-      (* ***************************************** *)
   | S_if(x,s,so) ->
       add_typing_env h x TBool;
       typing_s ~externals ~result h s;
@@ -423,6 +419,15 @@ let typing_circuit ~statics ~externals ty (rdy,result,fsm) =
       | x,Static_array_of ty -> add_typing_env h x ty
       | x,Static_array(c,n) -> add_typing_env h x (TStatic{elem=typing_c c;size=TSize n})
           ) statics;
+
+
+    List.iter (function (x,_) -> 
+      (* to fill the array with content from a file, in simulation mode *)
+      (* ***************************************** *)
+      add_typing_env h ("$"^x^"_from_file") TBool;
+      add_typing_env h ("$"^x^"_file_name") (TString (new_tvar()))
+      (* ***************************************** *)
+    ) statics;
 
     let t1,t2 = match ty with Types.Ty_fun(t1,_,t2) -> t1,t2 | _ -> assert false (* err *)
     in
