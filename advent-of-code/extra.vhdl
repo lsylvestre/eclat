@@ -162,7 +162,7 @@ package body IOFile is
     variable res : t(0 to sr - 1) := (others => '0');
   begin        
     file_open(infile, to_string(name), read_mode);
-    while not endfile (infile) loop
+    while (not endfile (infile)) and i*8+7 < res'length loop
       read(infile, c);
       res(i*8 to i*8+7) := t(to_unsigned(Character'pos(c),8));
       i := i + 1;
