@@ -24,10 +24,13 @@ package body values is
       end;
    function equal(arg1,arg2:t) return t is
         variable b : boolean := true;
+        variable x,y : t(0 to arg1'length-1);
       begin
         assert (arg1'length = arg2'length);
-        for i in 0 to arg1'length - 1 loop 
-          b := b and (arg1(i) = arg2(i));
+        x(0 to arg1'length-1) := arg1;
+        y(0 to arg1'length-1) := arg2;
+        for i in 0 to x'length - 1 loop 
+          b := b and (x(i) = y(i));
         end loop;
         if b then return "1"; else return "0"; end if;
       end; 
@@ -78,7 +81,6 @@ package Print is
   alias t is std_logic_vector;
   function to_string (a: std_logic_vector) return string;
   function of_string   (s: string)   return t; 
-  function to_ascii (a: std_logic_vector) return string;
   procedure print_value (signal clk:in std_logic;arg:in t);
   procedure print_ascii (signal clk:in std_logic;arg:in t);
   procedure print_string (signal clk:in std_logic;arg:in t);
