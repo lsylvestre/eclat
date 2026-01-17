@@ -594,8 +594,8 @@ app_exp_desc:
                    | E_var x -> E_array_set_immediate((x,loc_of e0),e1,e2)
                    | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
                              ~msg:"... array immediate set" ())
-               | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
-                   ~msg:"... array immediate set" () }
+               | e0 -> Ast_pprint.pp_exp Format.std_formatter e0; Prelude.Errors.raise_error ~loc:(with_file $loc)
+                   ~msg:"... array immediate set (2)" () }
 /* | x=IDENT LBRACKET e1=exp RBRACKET
 | x=IDENT DOT LPAREN e1=exp RPAREN
    { E_array_get(x,e1) }*/
@@ -622,7 +622,7 @@ app_exp_desc:
         new_ty_unknown ())))),E_const(Unit))) *)
         | _ -> List.fold_left (fun ef ei -> E_app(ef,ei)) e es*) }
 | MINUS e1=aexp %prec prec_unary_minus { E_app(E_const(Op(Runtime(External_fun("Int.neg",new_ty_unknown ())))),e1) }
-| e1=app_exp op=binop e2=exp
+| e1=app_exp op=binop e2=lexp
         { E_app (mk_loc (with_file $loc) @@ E_const (Op (Runtime(op))),
                  mk_loc (with_file $loc) @@ E_tuple [e1;e2])
         }

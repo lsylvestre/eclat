@@ -804,7 +804,7 @@ let typing_handler ?(msg="") f () =
               (emph_pp bold pp_tyB) tyB1
               (emph_pp bold pp_ty) ty2
           | Size(sz1,sz2) ->
-              fprintf fmt "size %a should be %a"
+              fprintf fmt "A type has size %a but was expected of size %a"
                 (emph_pp bold pp_size) sz1
                 (emph_pp bold pp_size) sz2
           | Dur(d1,d2) ->
@@ -860,7 +860,7 @@ let typing_handler ?(msg="") f () =
               (emph_pp bold pp_tyB) tyB1
               (emph_pp bold pp_ty) ty2
           | Size(sz1,sz2) ->
-              fprintf fmt "An expression has size %a but was expected of size %a"
+              fprintf fmt "A type has size %a but was expected of size %a"
                 (emph_pp bold pp_size) sz1
                 (emph_pp bold pp_size) sz2
           | Dur(d1,d2) ->

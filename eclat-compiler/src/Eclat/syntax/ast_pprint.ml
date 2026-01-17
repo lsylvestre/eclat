@@ -97,8 +97,8 @@ let rec pp_pat (fmt:fmt) (p:p) : unit =
 let pp_exp (fmt:fmt) (e:e) : unit =
   let rec pp_e ~paren fmt e =
   match e with
-  | E_deco(e,loc) -> (fprintf fmt "(%a:__)" (pp_e ~paren) e)
-     (* pp_e ~paren fmt e*)
+  | E_deco(e,loc) -> (*fprintf fmt "(%a:__)" (pp_e ~paren) e*)
+     pp_e ~paren fmt e
   | E_const c ->
       pp_const fmt c
   | E_var x ->
