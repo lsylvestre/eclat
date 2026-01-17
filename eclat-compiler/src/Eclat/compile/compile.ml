@@ -60,10 +60,8 @@ let compile ?(vhdl_comment="") ?(prop_fsm=true) arg_list name ty fmt pi =
 
   ignore(MiniHDL_causality.check fsm);
 
-  let gen = if !Flag_mealy.mealy_flag then  Gen_vhdl.pp_component 
-            else Gen_vhdl_moore.pp_component in
   let (argument,result) = 
-      gen fmt ~vhdl_comment ~name ~externals:pi.externals ~state_var
+      Gen_vhdl.pp_component fmt ~vhdl_comment ~name ~externals:pi.externals ~state_var
                                 ~argument ~result ~idle ~rdy ~statics 
                                 typing_env (let infos = SMap.empty in infos) fsm
   in

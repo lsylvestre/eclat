@@ -171,7 +171,7 @@ let rec vars_of_p (p:p) : unit smap =
    around expression [e] *)
 let rec un_deco (e:e) : e =
   match e with
-  | E_deco(e,_) -> e
+  | E_deco(e1,_) -> e1
   | e -> e
 
 (** [un_annot e] removes both decorations

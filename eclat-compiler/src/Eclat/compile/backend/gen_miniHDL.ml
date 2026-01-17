@@ -449,65 +449,33 @@ let rec to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums gs e x k =
           (w, ts, seq_ (set_ y (to_a ~externals ~sums a)) s)
        | _ -> assert false)
   | E_array_get((y,_),idx) ->
-      if !Flag_mealy.mealy_flag then (
-        let a = to_a ~externals ~sums idx in
-        let q = Ast.gensym ~prefix:"pause_get" () in
-        let ts = SMap.add q (return_ @@ 
-                    seq_ (S_read_stop(x,y)) 
-                         (S_release_lock(y))) SMap.empty in 
-        let s = seq_ (S_acquire_lock(y)) @@
-                seq_ (S_read_start(y,a)) (S_continue q) in
-          let q_wait = Ast.gensym ~prefix:"q_wait" () in
-          let s' = let_plug_s (A_ptr_taken(y)) @@ fun z ->
-                   S_if(z, (S_continue q_wait), Some s) in
-          (SMap.empty, SMap.add q_wait s' ts, s')
-      ) else (
-        let a = to_a ~externals ~sums idx in
-        let q1 = Ast.gensym ~prefix:"pause_getI" () in
-        let q2 = Ast.gensym ~prefix:"pause_getII" () in
-        let ts = SMap.add q1 (S_continue q2) @@
-                 SMap.add q2 (seq_ (S_read_stop(x,y)) 
-                                   (return_ @@ (S_release_lock(y)))) SMap.empty in 
-        let s = seq_ (S_read_start(y,a)) (S_continue q1) in
-          let q_wait = Ast.gensym ~prefix:"q_wait" () in
-          let s' = let_plug_s (A_ptr_taken(y)) @@ fun z ->
-                   S_if(z, (S_continue q_wait),
-                             Some (seq_ (S_acquire_lock(y)) @@ s)) in
-          (SMap.empty, SMap.add q_wait s' ts, s')
-      )
-  | E_array_set((y,_),idx,e_upd) ->
-      if !Flag_mealy.mealy_flag then (
-        let a = to_a ~externals ~sums idx in
-        let a_upd = to_a ~externals ~sums e_upd in
-        let q = Ast.gensym ~prefix:"pause_set" () in
-        let ts = SMap.add q (
-              return_ @@ (seq_ (S_write_stop(y)) @@
-                          seq_ (S_release_lock(y)) @@ 
-                          set_ x (A_const Unit))) SMap.empty  in
+      let a = to_a ~externals ~sums idx in
+      let q = Ast.gensym ~prefix:"pause_get" () in
+      let ts = SMap.add q (return_ @@ 
+                  seq_ (S_read_stop(x,y)) 
+                       (S_release_lock(y))) SMap.empty in 
+      let s = seq_ (S_acquire_lock(y)) @@
+              seq_ (S_read_start(y,a)) (S_continue q) in
         let q_wait = Ast.gensym ~prefix:"q_wait" () in
         let s' = let_plug_s (A_ptr_taken(y)) @@ fun z ->
-                   S_if(z, (S_continue q_wait),
-                             Some (seq_ (S_acquire_lock(y)) @@
-                                   seq_ (S_write_start(y,a,a_upd)) @@
-                                        (S_continue q))) in
+                 S_if(z, (S_continue q_wait), Some s) in
         (SMap.empty, SMap.add q_wait s' ts, s')
-        (* todo: pas besoin de dupliquer s': l'écriture en tant que telle ne prend que 1 cycle : on peut la faire démarrer un cycle plus tard *)
-      ) else (
-          let a = to_a ~externals ~sums idx in
-          let a_upd = to_a ~externals ~sums e_upd in
-          let q1 = Ast.gensym ~prefix:"pause_setI" () in
-          let q2 = Ast.gensym ~prefix:"pause_setII" () in
-          let ts = SMap.add q1 (seq_ (S_write_stop(y)) (S_continue q2)) @@
-                   SMap.add q2 (seq_ (S_release_lock(y)) @@
-                                     (return_ @@ (set_ x (A_const Unit)))) SMap.empty  in
-          let q_wait = Ast.gensym ~prefix:"q_wait" () in
-          let s' = let_plug_s (A_ptr_taken(y)) @@ fun z ->
-                     S_if(z, (S_continue q_wait),
-                               Some (seq_ (S_acquire_lock(y)) @@
-                                     seq_ (S_write_start(y,a,a_upd)) @@
-                                     (S_continue q1))) in
-          (SMap.empty, SMap.add q_wait s' ts, s')
-      )
+  | E_array_set((y,_),idx,e_upd) ->
+      let a = to_a ~externals ~sums idx in
+      let a_upd = to_a ~externals ~sums e_upd in
+      let q = Ast.gensym ~prefix:"pause_set" () in
+      let ts = SMap.add q (
+            return_ @@ (seq_ (S_write_stop(y)) @@
+                        seq_ (S_release_lock(y)) @@ 
+                        set_ x (A_const Unit))) SMap.empty  in
+      let q_wait = Ast.gensym ~prefix:"q_wait" () in
+      let s' = let_plug_s (A_ptr_taken(y)) @@ fun z ->
+                 S_if(z, (S_continue q_wait),
+                           Some (seq_ (S_acquire_lock(y)) @@
+                                 seq_ (S_write_start(y,a,a_upd)) @@
+                                      (S_continue q))) in
+      (SMap.empty, SMap.add q_wait s' ts, s')
+      (* todo: pas besoin de dupliquer s': l'écriture en tant que telle ne prend que 1 cycle : on peut la faire démarrer un cycle plus tard *)
 
   | E_array_get_start((y,_),idx) ->
       let a = to_a ~externals ~sums idx in
@@ -547,20 +515,19 @@ let rec to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums gs e x k =
                     | Ast.Bool false -> ()
                     | Ast.C_tuple cs | Ast.C_vector cs -> List.iter w_c cs
                     | _ -> raise Found in  w_c c ; true with Ast.Not_a_constant | Found -> false
-in
-let y = match p with
-              | P_var y -> y 
-              | _ -> assert false 
-in
-if  is_default e0 then 
-	      let w1,ts1,s1 = to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums [] e1 y S_skip in
-	      assert (SMap.is_empty w1 (* && SMap.is_empty ts1)*));
-	      (SMap.empty, ts1,
-	      seq_ s1 @@
-	      return_ @@ set_ x (A_var y))
+      in
+      let y = match p with
+                    | P_var y -> y 
+                    | _ -> assert false 
+      in
+      if  is_default e0 then 
+      	      let w1,ts1,s1 = to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums [] e1 y S_skip in
+      	      assert (SMap.is_empty w1 (* && SMap.is_empty ts1)*));
+      	      (SMap.empty, ts1,
+      	      seq_ s1 @@
+      	      return_ @@ set_ x (A_var y))
 
-else
-
+      else
 
       let w1,ts1,s1 = to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums [] e1 y S_skip in
       let w0,ts0,s0 = to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums [] e0 y S_skip in
@@ -570,6 +537,7 @@ else
       seq_ (S_if(l, S_skip, Some (seq_ (set_ l (A_const (Bool true))) s0))) @@
       seq_ s1 @@
       return_ @@ set_ x (A_var y))
+
   | E_exec(e1,e0,eo,l) ->
       (* assume e0 is combinational *)
       let pi = Ast.{statics;externals;sums;main=e1} in

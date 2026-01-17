@@ -30,7 +30,6 @@ MENHIR=menhir --unused-tokens --unused-precedence-levels --infer --ocamlc "ocaml
 OBJS= $(SRC_DIR)/prelude.cmx \
       \
       $(SRC_DIR)/Eclat/frontend/current_filename.cmx \
-      $(SRC_DIR)/miniHDL/compile/flag_mealy.cmx \
       \
       $(SRC_DIR)/Eclat/typing/types.cmx \
       $(SRC_DIR)/operators.cmx \
@@ -92,7 +91,6 @@ OBJS= $(SRC_DIR)/prelude.cmx \
       \
       $(SRC_DIR)/miniHDL/compile/gen_vhdl_aux.cmx \
       $(SRC_DIR)/miniHDL/compile/gen_vhdl.cmx \
-      $(SRC_DIR)/miniHDL/compile/gen_vhdl_moore.cmx \
       \
       $(SRC_DIR)/miniHDL/simul/gen_ocaml.cmx \
       \

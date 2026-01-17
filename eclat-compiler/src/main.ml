@@ -156,11 +156,6 @@ let () =
 
     ("-nb-it", Arg.Set_int nb_iterations_interp,
                "Number of reactions for interpretation");
-    ("-moore", Arg.Clear Flag_mealy.mealy_flag,
-               "[experimental] force the generated circuit to be a Moore Finite State Machine\
-                \ (default: Mealy) -- warning: this cause additionnal latencies for RAM memory accesses\
-                \ and external function calls");
-
     ("-keep-ty", Arg.Set Ast_undecorated.keep_ty_flag,
                 "keep type annotation");
     ("-ram-init", Arg.String (fun s -> 
