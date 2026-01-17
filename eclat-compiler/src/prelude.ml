@@ -39,6 +39,14 @@ module Errors = struct
     else fprintf fmt "file %s, from line %d, characters %d, to line %d characters %d"
            filename l1 (c1-b1) l2 (c2-b2)
 
+  let pp_loc_nofile fmt (_,(Lexing.{pos_lnum=l1;pos_cnum=c1;pos_bol=b1},
+                                   Lexing.{pos_lnum=l2;pos_cnum=c2;pos_bol=b2})) =
+    if l1 = l2
+    then fprintf fmt "line %d, characters %d-%d" l1 (c1-b1) (c2-b2)
+    else fprintf fmt "from line %d, characters %d, to line %d characters %d"
+           l1 (c1-b1) l2 (c2-b2)
+
+
   let error ?(error_kw="Error") ?loc pp =
     let fmt = err_formatter in
     (match loc with

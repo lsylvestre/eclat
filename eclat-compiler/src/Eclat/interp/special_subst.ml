@@ -85,29 +85,29 @@ let subst_e x ex e =
         E_reg((p,tyB,e1'),ss (0::id) e0,l)
     | E_exec(e1,e2,eo,l) ->
         E_exec(ss (0::id) e1,ss (1::id) e2,Option.map (ss (2::id)) eo,l)
-    | E_array_length(y) ->
+    | E_array_length(y,loc) ->
         let z = if x <> y then y else as_ident ex in
-        E_array_length(z)
+        E_array_length(z,loc)
     | E_array_make(sz,e1,loc) ->
         let e1' = ss (0::id) e1 in
         E_array_make(sz,e1',loc)
     | E_array_create _ ->
         e
-    | E_array_get(y,e1) ->
+    | E_array_get((y,loc),e1) ->
         let z = if x <> y then y else as_ident ex in
-        E_array_get(z, ss (0::id) e1)
-    | E_array_set(y,e1,e2) ->
+        E_array_get((z,loc), ss (0::id) e1)
+    | E_array_set((y,loc),e1,e2) ->
         let z = if x <> y then y else as_ident ex in
-        E_array_set(z, ss (0::id) e1, ss (1::id) e2)
-    | E_array_get_start(y,e1) ->
+        E_array_set((z,loc), ss (0::id) e1, ss (1::id) e2)
+    | E_array_get_start((y,loc),e1) ->
         let z = if x <> y then y else as_ident ex in
-        E_array_get_start(z, ss (0::id) e1)
-    | E_array_get_end(y) ->
+        E_array_get_start((z,loc), ss (0::id) e1)
+    | E_array_get_end(y,loc) ->
         let z = if x <> y then y else as_ident ex in
-        E_array_get_end(z)
-    | E_array_set_immediate(y,e1,e2) ->
+        E_array_get_end(z,loc)
+    | E_array_set_immediate((y,loc),e1,e2) ->
         let z = if x <> y then y else as_ident ex in
-        E_array_set_immediate(z, ss (0::id) e1, ss (1::id) e2)
+        E_array_set_immediate((z,loc), ss (0::id) e1, ss (1::id) e2)
     | E_array_from_file(y,e1) ->
         let z = if x <> y then y else as_ident ex in
         E_array_from_file(z, ss (0::id) e1)

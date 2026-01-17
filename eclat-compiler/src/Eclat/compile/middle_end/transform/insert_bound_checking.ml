@@ -18,10 +18,10 @@ let bound_mod cc e x eidx len =
 
 let rec insert e =
   match e with
-  | E_array_get(x,eidx) ->
-      check_bound e x eidx (E_array_length x)
-  | E_array_set(x,eidx,_) ->
-      check_bound e x eidx (E_array_length x)
+  | E_array_get((x,loc_x),eidx) ->
+      check_bound e x eidx (E_array_length(x,loc_x))
+  | E_array_set((x,loc_x),eidx,_) ->
+      check_bound e x eidx (E_array_length (x,loc_x))
   (* | E_app((E_const(Op(Runtime(External_fun("Vect.nth",t)))) as c),ee) ->
        let x = gensym () in
        let idx = gensym () in

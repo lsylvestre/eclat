@@ -26,7 +26,7 @@ let rec globalize_arrays_e (e:e) : ((x * (ty * e)) list * e) =
             E_fix(loop,(P_var i,(Types.new_ty_unknown(), Types.new_tyB_unknown()),
               E_if(E_app(E_const(Op(Runtime(External_fun("Int.ge",Types.new_ty_unknown ())))),E_tuple[E_var i;n]),
                    e1',
-                   E_letIn(P_unit,Ty_base TyB_unit,E_array_set(x,E_var i, E_var y),E_app(E_var loop,
+                   E_letIn(P_unit,Ty_base TyB_unit,E_array_set((x,Prelude.dloc),E_var i, E_var y),E_app(E_var loop,
                     E_app(E_const(Op(Runtime(External_fun("Int.add",Types.new_ty_unknown ())))),
                         E_tuple[E_var i;E_const (Int (1,Types.new_size_unknown()))])))))), 
                  E_app(E_var loop,E_const(Int(0,Sz_lit 16))))) in

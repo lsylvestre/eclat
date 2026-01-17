@@ -191,7 +191,7 @@ let rec to_a ~externals ~sums (e:Ast.e) : a =
   | Ast.E_if(e1,e2,e3) -> A_call(If,A_tuple [to_a ~externals ~sums e1;to_a ~externals ~sums e2;to_a ~externals ~sums e3])
   | Ast.E_tuple(es) -> A_tuple (List.map (to_a ~externals ~sums) es)
   | Ast.E_letIn(P_var x,_,e1,e2) -> A_letIn(x,to_a ~externals ~sums e1,to_a ~externals ~sums e2)
-  | Ast.E_array_length x -> A_array_length(x,new_tvar())
+  | Ast.E_array_length(x,_) -> A_array_length(x,new_tvar())
   | E_app(E_const(Inj y),e) ->
       let_plug_a (to_a ~externals ~sums e) @@ (fun z ->
         let n,arg_size,ty_n = find_ctor y sums in
@@ -448,7 +448,7 @@ let rec to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums gs e x k =
           let w,ts,s = to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums gs (E_const Unit) x k in
           (w, ts, seq_ (set_ y (to_a ~externals ~sums a)) s)
        | _ -> assert false)
-  | E_array_get(y,idx) ->
+  | E_array_get((y,_),idx) ->
       if !Flag_mealy.mealy_flag then (
         let a = to_a ~externals ~sums idx in
         let q = Ast.gensym ~prefix:"pause_get" () in
@@ -475,7 +475,7 @@ let rec to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums gs e x k =
                              Some (seq_ (S_acquire_lock(y)) @@ s)) in
           (SMap.empty, SMap.add q_wait s' ts, s')
       )
-  | E_array_set(y,idx,e_upd) ->
+  | E_array_set((y,_),idx,e_upd) ->
       if !Flag_mealy.mealy_flag then (
         let a = to_a ~externals ~sums idx in
         let a_upd = to_a ~externals ~sums e_upd in
@@ -509,15 +509,15 @@ let rec to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums gs e x k =
           (SMap.empty, SMap.add q_wait s' ts, s')
       )
 
-  | E_array_get_start(y,idx) ->
+  | E_array_get_start((y,_),idx) ->
       let a = to_a ~externals ~sums idx in
       let s = (* let_plug_s (A_ptr_taken(y)) @@ fun z ->
                 S_if(z, S_skip, Some(S_read_start(y,a))) *) seq_ (S_acquire_lock(y)) (S_read_start(y,a)) in
       (SMap.empty, SMap.empty, return_ s)
-  | E_array_get_end(y) ->
+  | E_array_get_end(y,_) ->
       let s = seq_ (S_release_lock(y)) (S_read_stop(x,y)) in
       (SMap.empty, SMap.empty, return_ s)
-  | E_array_set_immediate(y,idx,e_upd) ->
+  | E_array_set_immediate((y,_),idx,e_upd) ->
       let a = to_a ~externals ~sums idx in
       let a_upd = to_a ~externals ~sums e_upd in
       let s = S_write_start(y,a,a_upd) in

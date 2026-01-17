@@ -101,11 +101,13 @@ src/Eclat/compile/middle_end/check_exec_mem_reset.cmx : \
 src/Eclat/compile/middle_end/check_tail_call.cmo : \
     src/prelude.cmo \
     src/Eclat/syntax/ast_undecorated.cmo \
+    src/Eclat/syntax/ast_pprint.cmo \
     src/Eclat/syntax/ast_mapper.cmo \
     src/Eclat/syntax/ast.cmo
 src/Eclat/compile/middle_end/check_tail_call.cmx : \
     src/prelude.cmx \
     src/Eclat/syntax/ast_undecorated.cmx \
+    src/Eclat/syntax/ast_pprint.cmx \
     src/Eclat/syntax/ast_mapper.cmx \
     src/Eclat/syntax/ast.cmx
 src/Eclat/compile/middle_end/middle_end.cmo : \
@@ -284,11 +286,13 @@ src/Eclat/compile/middle_end/transform/expand.cmx : \
     src/Eclat/compile/middle_end/normalize/anf.cmx
 src/Eclat/compile/middle_end/transform/globalize_arrays.cmo : \
     src/Eclat/typing/types.cmo \
+    src/prelude.cmo \
     src/Eclat/syntax/ast_subst.cmo \
     src/Eclat/syntax/ast_mapper.cmo \
     src/Eclat/syntax/ast.cmo
 src/Eclat/compile/middle_end/transform/globalize_arrays.cmx : \
     src/Eclat/typing/types.cmx \
+    src/prelude.cmx \
     src/Eclat/syntax/ast_subst.cmx \
     src/Eclat/syntax/ast_mapper.cmx \
     src/Eclat/syntax/ast.cmx
@@ -406,7 +410,6 @@ src/Eclat/frontend/parser.cmo : \
     src/Eclat/syntax/pattern.cmo \
     src/operators.cmo \
     src/Eclat/frontend/current_filename.cmo \
-    src/Eclat/syntax/ast_undecorated.cmo \
     src/Eclat/syntax/ast_pprint.cmo \
     src/Eclat/syntax/ast_mk.cmo \
     src/Eclat/syntax/ast.cmo \
@@ -417,7 +420,6 @@ src/Eclat/frontend/parser.cmx : \
     src/Eclat/syntax/pattern.cmx \
     src/operators.cmx \
     src/Eclat/frontend/current_filename.cmx \
-    src/Eclat/syntax/ast_undecorated.cmx \
     src/Eclat/syntax/ast_pprint.cmx \
     src/Eclat/syntax/ast_mk.cmx \
     src/Eclat/syntax/ast.cmx \

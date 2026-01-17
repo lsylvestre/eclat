@@ -27,10 +27,7 @@ let collect e =
         | Some `Mono -> ()
         | Some (`Ty ty0) -> 
             (try unify_ty ~loc:Prelude.dloc ty0 ty' with
-             | CannotUnify_tyB _
-             | CannotUnify_ty _
-             | CannotUnify_dur _
-             | CannotUnify_size _ -> Hashtbl.replace h f `Mono))
+             | CannotUnify _ -> Hashtbl.replace h f `Mono))
     | e -> Ast_mapper.iter trt e
   in
   trt e

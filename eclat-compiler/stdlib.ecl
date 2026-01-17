@@ -25,7 +25,9 @@ operator Int.print :  int<'N> => unit  @impure ;;
 
 operator Int.absv :    int<'N> => int<'N> ;;
 
-
+operator Int.logical_not : int<'s> => int<'s> ;;
+operator Int.get_bit : (int<'s> * int<32>) => bool ;;
+operator Int.update_bit : (int<'s> * int<32> * bool) => int<'s> ;;
 operator Int.add :    (int<'N> * int<'N>) => int<'N> ;;
 operator Int.sub :    (int<'N> * int<'N>) => int<'N> ;;
 operator Int.neg :    int<'N> => int<'N> ;;
@@ -46,6 +48,10 @@ operator Int.land :   (int<'N> * int<'N>) => int<'N> ;;
 operator Int.lsl :    (int<'N> * int<'OFFSET>) => int<'N> ;;
 operator Int.lsr :    (int<'N> * int<'OFFSET>) => int<'N> ;;
 operator Int.asr :    (int<'N> * int<'OFFSET>) => int<'N> ;;
+
+let lnot = Int.logical_not ;;
+let get_bit = Int.get_bit ;;
+let update_bit = Int.update_bit ;;
 
 let abs x = 
   if x < 0 then - x else x ;;
@@ -87,20 +93,24 @@ type `a vect<'b> ;;
 
 operator%with_sizes Vect.create : `a => `a vect<'size> ;;
 
-operator%with_sizes Vect.nth : (`a vect<'size> * int<16>) => `a;;
-operator%with_sizes Vect.copy_with : (`a vect<'size> * int<16> * `a) => `a vect<'size>;;
+operator%with_sizes Vect.nth : (`a vect<'size> * int<32>) => `a;;
+operator%with_sizes Vect.copy_with : (`a vect<'size> * int<32> * `a) => `a vect<'size>;;
 
-operator%with_sizes Vect.infos : `a vect<'size> => int<16> * `a;;
+operator%with_sizes Vect.infos : `a vect<'size> => int<32> * `a;;
 
 operator Vect.cons : (`a * `a vect<'size>) => `a vect<'size+1>;;
 operator%with_sizes Vect.head : (`a vect<'size+1>) => `a;;
 operator%with_sizes Vect.tail : (`a vect<'size+1>) => `a vect<'size>;;
 operator Vect.split : (`a vect<2*'size>) => (`a vect<'size>*`a vect<'size>);;
 operator Vect.concat : (`a vect<'size>*`a vect<'size>) => `a vect<2*'size>;;
+operator Vect.of_int : int<'size> => bool vect<'size>;;
+operator Vect.to_int : bool vect<'size> => int<'size>;;
 
-let vect_nth (v,n) = Vect.nth(v,resize_int<16>(n)) ;;
+let vect_nth (v,n) = Vect.nth(v,n) ;;
 
-let vect_copy_with(v,n,x) = Vect.copy_with(v,resize_int<16>(n),x) ;;
+let vect_copy_with(v,n,x) = Vect.copy_with(v,n,x) ;;
+let vect_update = vect_copy_with ;;
+
 let vect_size v = 
   let (n,_) = Vect.infos v in
   resize_int<'a>(n) ;;
@@ -115,6 +125,8 @@ let vect_forall (f,v) =
   let _ : 'a vect<'N> = v in
   generate<1 to 'N>(fun (i,acc) -> acc & vect_nth(v,i)) init false ;; 
 
+let vect_of_int = Vect.of_int;;
+let int_of_vect = Vect.to_int;;
 
 (********************************
 type `a matrix<'d1,'d2> ;;
@@ -123,7 +135,7 @@ operator%with_sizes Matrix.create : `a => `a matrix<'d1,'d2> ;;
 operator%with_sizes Matrix.get_line : (`a matrix<'d1,'d2> * int<16>) => `a vector<'d2> ;;
 operator%with_sizes Matrix.copy_with_line : 
   (`a matrix<'d1,'d2> * int<16> * `a vector<'size>) => `a vector<'d2> ;;
-operator%with_sizes Matrix.infos : `a matrix<'d1,'d2> => int<16> * `a;;
+operator%with_sizes Matrix.infos : `a matrix<'d1,'d2> => int<32> * `a;;
 
 
 let matrix_create = Matrix.create ;;
@@ -177,14 +189,14 @@ let print_fixed_point (f) =
 operator%with_sizes Default.create : unit => 'a ;; (* unsafe *)
 
 let halt() =
-  %loop pause end ;;
+  %loop pause() end ;;
 
 let sustain s = 
-  %loop emit s; pause end ;;
+  %loop emit s; pause() end ;;
 
 let await s = 
   trap T in 
-  %loop pause; if ?s then exit T else () end ;;
+  %loop pause(); if ?s then exit T else () end ;;
 
 let abort (f,s) =
   trap T in [ (%suspend f() %when s; exit T) || (await s; exit T )] ;;
@@ -193,10 +205,10 @@ let loop_each (f,s) =
   %loop abort ((fun () -> (f(); halt())),s) end ;;
 
 let await_immediate s =
-  trap T in %loop if ?s then exit T; pause end ;;
+  trap T in %loop if ?s then exit T; pause() end ;;
 
 let suspend_when_immediate(f,s) =
-  %suspend (if ?s then pause; f()) %when s ;;
+  %suspend (if ?s then pause(); f()) %when s ;;
 
 (*
 let do_every(p,s) = 

@@ -20,10 +20,10 @@ let mk_fun p e =
 
 
 (** constructs expression (fun p -> e) *)
-let mk_fun_ty_annot p ty_f_opt e =
+let mk_fun_ty_annot ?(loc=Prelude.dloc) p ty_f_opt e =
   match ty_f_opt with
   | None -> mk_fun p e
-  | Some ty -> (ty_annot ~ty (mk_fun p e))
+  | Some ty -> (ty_annot ~ty (mk_loc loc @@ mk_fun p e))
 
 let mk_fun_ty_annot_p p ty_p_opt e =
   match ty_p_opt with
@@ -38,7 +38,7 @@ let mk_let_fun ~loc ~p_ty_opt ~ty_opt_ret e =
     | p,None -> p,None
     | p,Some t -> p,Some (Ty_fun(t,new_dur_unknown(),new_tyB_unknown()))
   in
-  mk_fun_ty_annot p ty_f_opt (ty_annot_opt ~ty:ty_opt_ret e)
+  mk_fun_ty_annot ~loc p ty_f_opt (ty_annot_opt ~ty:ty_opt_ret e)
   |> mk_loc loc
 (*
 

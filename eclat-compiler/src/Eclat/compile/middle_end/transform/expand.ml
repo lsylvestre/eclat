@@ -30,7 +30,7 @@ let eval_static_exp_int ~loc ~statics e =
          | "Int.mul",E_tuple [e1;e2] -> app_binop(( * ),e1,e2)
          | "Int.div",E_tuple [e1;e2] -> app_binop((/),e1,e2)
          | _ -> raise Cannot)
-    | E_array_length(x) ->
+    | E_array_length(x,_) ->
        (match List.assoc_opt x statics with
        | Some (Static_array(_,n)) -> (n,Types.new_size_unknown())
        | _ -> Ast_pprint.pp_exp Format.std_formatter e; assert false (* ill-typed *) ) 

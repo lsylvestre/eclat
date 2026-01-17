@@ -66,28 +66,28 @@ let fv ?(get_sig=true) ?(get_arrays=true) ?(xs=SMap.empty) e =
       aux xs e1
   | E_array_create _ ->
       SMap.empty
-  | E_array_length(x) ->
+  | E_array_length(x,_) ->
       if get_arrays 
       then fv_var xs x
       else SMap.empty
-  | E_array_get(x,e1) ->
+  | E_array_get((x,_),e1) ->
       let vs = aux xs e1 in
       if get_arrays 
       then fv_var xs x ++ vs 
       else vs
-  | E_array_set(x,e1,e2) ->
+  | E_array_set((x,_),e1,e2) ->
       let vs = aux xs e1 ++ aux xs e2 in
       if get_arrays 
       then fv_var xs x ++ vs 
       else vs
-  | E_array_get_start(x,e1) ->
+  | E_array_get_start((x,_),e1) ->
       let vs = aux xs e1 in
       if get_arrays 
       then fv_var xs x ++ vs 
       else vs
   | E_array_get_end _ ->
       SMap.empty
-  | E_array_set_immediate(x,e1,e2) ->
+  | E_array_set_immediate((x,_),e1,e2) ->
       let vs = aux xs e1 ++ aux xs e2 in
       if get_arrays 
       then fv_var xs x ++ vs 
@@ -194,20 +194,20 @@ let fv_arrays ?(xs=SMap.empty) e =
       aux xs e1
   | E_array_create _ ->
       SMap.empty
-  | E_array_length(x) ->
+  | E_array_length(x,_) ->
       fv_var xs x
-  | E_array_get(x,e1) ->
+  | E_array_get((x,_),e1) ->
       let vs = aux xs e1 in
       vs ++ fv_var xs x
-  | E_array_set(x,e1,e2) ->
+  | E_array_set((x,_),e1,e2) ->
       let vs = aux xs e1 ++ aux xs e2 in
       vs ++ fv_var xs x
-  | E_array_get_start(x,e1) ->
+  | E_array_get_start((x,_),e1) ->
       let vs = aux xs e1 in
       vs ++ fv_var xs x
   | E_array_get_end _ ->
       SMap.empty
-  | E_array_set_immediate(x,e1,e2) ->
+  | E_array_set_immediate((x,_),e1,e2) ->
       let vs = aux xs e1 ++ aux xs e2 in
      vs ++ fv_var xs x
   | E_array_from_file(x,e1) ->

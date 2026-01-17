@@ -54,12 +54,12 @@ type e =                      (** expression     [e]                       *)
 
   | E_array_create of size * deco   (** [create<sz>] *)
   | E_array_make of size * e * deco (** [make<sz> e] *)
-  | E_array_get of x * e      (** static array access        [x.(e)]      *)
-  | E_array_length of x       (** static array length access [x.length]   *)
-  | E_array_set of x * e * e  (** static array assignment    [x.(e) <- e] *)
-  | E_array_get_start of x * e
-  | E_array_get_end of x
-  | E_array_set_immediate of x * e * e
+  | E_array_get of (x * deco) * e    (** static array access        [x.(e)]      *)
+  | E_array_length of x * deco      (** static array length access [x.length]   *)
+  | E_array_set of (x * deco) * e * e (** static array assignment    [x.(e) <- e] *)
+  | E_array_get_start of (x * deco) * e
+  | E_array_get_end of (x * deco)
+  | E_array_set_immediate of (x * deco) * e * e
   | E_array_from_file of x * e (** only for simulation *)
   | E_ref of e
   | E_get of e
@@ -167,7 +167,7 @@ let rec vars_of_p (p:p) : unit smap =
   | P_tuple ps ->
     List.fold_left (fun m p -> vars_of_p p ++ m) SMap.empty ps
 
-(** [un_annot e] removes decoration (i.e., position in the source file)
+(** [un_deco e] removes decoration (i.e., position in the source file)
    around expression [e] *)
 let rec un_deco (e:e) : e =
   match e with
@@ -217,21 +217,24 @@ let rec loc_of (e:e) : Prelude.loc =
       loc
   | e -> Prelude.dloc
 
-(** [mk_loc loc e] plugs the expression [e] into a node
-   indicating the location [loc] *)
+(** [mk_loc loc e] plugs the expression [e] into an AST 
+    node indicating its location [loc]. If the root of [e]
+    is already a location annotation, it is overrided by [loc] *)
 let mk_loc (loc: Prelude.loc) (e:e) : e =
-  E_deco(e,loc)
+  match e with
+  | E_deco(e1,_) -> E_deco(e1,loc)
+  | _ -> E_deco(e,loc)
 
 (** [ty_annot ~ty e] plugs the expression [e] under a type constraints
    such as [(e:ty)] *)
 let ty_annot ~(ty:ty) (e:e) : e =
-  E_app(E_const (Op (TyConstr ty)),e)
+  E_app((E_const (Op (TyConstr ty))), e)
 
 (** like [ty_annot] with an optional argument [~ty] *)
 let ty_annot_opt ~(ty:ty option) (e:e) : e =
   match ty with
   | None -> e
-  | Some ty ->ty_annot ~ty e
+  | Some ty -> ty_annot ~ty e
 
 
 exception Not_a_constant

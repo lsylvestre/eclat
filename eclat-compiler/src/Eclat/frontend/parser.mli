@@ -51,7 +51,6 @@ type token =
   | PIPE_COMMA_PIPE
   | PIPE
   | PERCENT
-  | PAUSE
   | PARFOR
   | OR
   | OPERATOR_IDENT of (string)

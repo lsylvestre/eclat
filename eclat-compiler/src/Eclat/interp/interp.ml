@@ -429,17 +429,17 @@ let rec red (e,r) =
       in
       let any_constant = Unit in
       E_const (V_loc l), {r with statics = SMap.add l (Array.make n any_constant) r.statics}
-  | E_array_get (x,e1) ->
+  | E_array_get ((x,loc),e1) ->
       let e1',r1 = red (e1,r) in
       if evaluated e1' then E_const (buffer_get x e1' r),r else
-      E_array_get (x,e1'),r1
-  | E_array_length(x) ->
+      E_array_get ((x,loc),e1'),r1
+  | E_array_length(x,_) ->
       E_const(buffer_length x r),r
-  | E_array_set (x,e1,e2) ->
+  | E_array_set ((x,loc),e1,e2) ->
       let e1',r1 = red (e1,r) in
       let e2',r2 = red (e2,r1) in
       if evaluated e1' && evaluated e2' then E_const(Unit), set_buffer x e1' e2' r else
-      E_array_set (x,e1',e2'),r2
+      E_array_set ((x,loc),e1',e2'),r2
   | E_generate _ 
   | E_for _ -> assert false (* todo *)
   | E_pause (_,e) -> E_letIn(P_unit,Ty_base(TyB_unit),E_const(Unit),e),r

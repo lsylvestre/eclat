@@ -207,17 +207,19 @@ let pp_tyB fmt (tyB:tyB) : unit =
            fprintf fmt "%s of %a" x pp t) fmt ctors;
         fprintf fmt ")"
   | TyB_string sz -> fprintf fmt "string<%a>" pp_size sz
-  | TyB_abstract (x,szs,tyB_list) -> 
-      if tyB_list <> [] then 
+  | TyB_abstract (x,szs,tyB_list) ->
+      if tyB_list <> [] then
         (fprintf fmt "(";
          pp_print_list
            ~pp_sep:(fun fmt () -> fprintf fmt ", ") pp fmt tyB_list;
          fprintf fmt ") ") else ();
-
-         (fprintf fmt "%s<" x;
-         pp_print_list
-           ~pp_sep:(fun fmt () -> fprintf fmt ", ") pp_size fmt szs;
-         fprintf fmt ">")
+         (fprintf fmt "%s" x;
+          match szs with
+          | [Sz_lit 1] -> ()
+          | _ -> fprintf fmt "<";
+                 pp_print_list
+                   ~pp_sep:(fun fmt () -> fprintf fmt ", ") pp_size fmt szs;
+                 fprintf fmt ">")
  in pp fmt tyB
 
 let pp_ty fmt (ty:ty) : unit =
@@ -488,6 +490,15 @@ let rec as_tyB ~loc ty =
   | Ty_var({contents=Unknown n} as r) -> TyB_var(Obj.magic r)
   | _ -> Prelude.Errors.raise_error ~loc ()
                  ~msg:"basic type expected"
+
+let rec is_tyB ty = 
+  match canon_ty ty with
+  | Ty_base _ -> true
+  | Ty_tuple(tys) -> List.for_all is_tyB tys
+  | Ty_var({contents=Is ty}) -> is_tyB ty
+  | Ty_var _ -> true
+  | _ -> false
+
 
 let extract_arg_res_fun ty =
   match canon_ty ty with

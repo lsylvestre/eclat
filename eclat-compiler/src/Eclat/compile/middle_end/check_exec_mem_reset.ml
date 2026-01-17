@@ -17,10 +17,10 @@ let check e =
     | E_letIn(P_var x, _, E_array_create _,e) ->
         Hashtbl.add h x false;
         loop e
-    | E_array_get(x,e1) ->
+    | E_array_get((x,_),e1) ->
         if Hashtbl.mem h x && Hashtbl.find h x then raise Found;
         loop e1
-    | E_array_set(x,e1,e2) ->
+    | E_array_set((x,_),e1,e2) ->
         if Hashtbl.mem h x && Hashtbl.find h x then raise Found;
         loop e1;
         loop e2

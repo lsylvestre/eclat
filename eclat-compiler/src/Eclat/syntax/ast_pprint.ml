@@ -97,8 +97,8 @@ let rec pp_pat (fmt:fmt) (p:p) : unit =
 let pp_exp (fmt:fmt) (e:e) : unit =
   let rec pp_e ~paren fmt e =
   match e with
-  | E_deco(e,loc) ->
-      pp_e ~paren fmt e
+  | E_deco(e,loc) -> (fprintf fmt "(%a:__)" (pp_e ~paren) e)
+     (* pp_e ~paren fmt e*)
   | E_const c ->
       pp_const fmt c
   | E_var x ->
@@ -183,30 +183,30 @@ let pp_exp (fmt:fmt) (e:e) : unit =
   | E_array_make(sz,e,_) ->
      fprintf fmt "make<%a>(%a)" 
        pp_size sz (pp_e ~paren:false) e
-  | E_array_length(x) ->
+  | E_array_length(x,_) ->
       parenthesize ~paren (fun fmt () ->
         fprintf fmt "@[<v>length %a@]"
           pp_ident x) fmt ()
-  | E_array_get(x,e1) ->
+  | E_array_get((x,_),e1) ->
       parenthesize ~paren (fun fmt () ->
       fprintf fmt "@[<v>get(%a,%a)@]"
         pp_ident x
         (pp_e ~paren:false) e1) fmt ()
-  | E_array_set(x,e1,e2) ->
+  | E_array_set((x,_),e1,e2) ->
       parenthesize ~paren (fun fmt () ->
         fprintf fmt "@[<v>set(%a,%a,%a)@]"
           pp_ident x
           (pp_e ~paren:false) e1
           (pp_e ~paren:false) e2) fmt ()
-  | E_array_get_start(x,e1) ->
+  | E_array_get_start((x,_),e1) ->
       parenthesize ~paren (fun fmt () ->
         fprintf fmt "@[<v>get_start(%a,%a)@]"
           pp_ident x
           (pp_e ~paren:false) e1) fmt ()
-  | E_array_get_end x ->
+  | E_array_get_end (x,_) ->
       fprintf fmt "@[<v>get_end(%a)@]"
           pp_ident x
-  | E_array_set_immediate(x,e1,e2) ->
+  | E_array_set_immediate((x,_),e1,e2) ->
       parenthesize ~paren (fun fmt () ->
         fprintf fmt "@[<v>set_immediate(%a,%a,%a)@]"
           pp_ident x

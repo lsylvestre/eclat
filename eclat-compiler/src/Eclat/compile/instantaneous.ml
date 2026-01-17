@@ -23,11 +23,10 @@ let rec combinational ?(with_sig_get=true) ~externals (e:e) : bool =
 	    true
 	| E_const c ->
 	    const_combinational ~externals c
-	| E_if(e1,e2,e3) ->
-	    combinational ~externals e1 && combinational ~externals e2 && combinational ~externals e3
-	| E_case _ | E_match _ ->
-      (* hard to defined as a combinational hardware description being generic in the number of cases *)
-      false
+	| E_if _ | E_case _ | E_match _ ->
+	    false (** lazy if/then/else is not a mux, even if subexpressions 
+	              are combinational ; for instance:
+	              [if false then vect_nth({0,1,2},55), 42] fails **)
 	| E_app(e1,e2) ->
       (match un_deco e1 with
       | E_const(Inj _) -> combinational ~externals e2

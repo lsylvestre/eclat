@@ -82,7 +82,6 @@
        "impure",IMPURE;
        "vect_create",VECT_CREATE;
        "make", ARRAY_MAKE;
-       "pause", PAUSE;
        "emit", EMIT;
        "signal", SIGNAL;
        "end",   END;

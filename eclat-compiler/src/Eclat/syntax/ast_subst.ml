@@ -42,29 +42,29 @@ let subst_e ?(warning=true) ?(when_var=(fun x -> x)) x ex e =
     | E_reg((p, tyB, e1), e0, l) ->
         let e1' = if pat_mem x p then e1 else ss e1 in
         E_reg((p, tyB, e1'), ss e0, l)
-    | E_array_length(y) ->
+    | E_array_length(y,loc) ->
         let z = if x <> y then y else as_ident ex in
-        E_array_length(z)
+        E_array_length(z,loc)
     | E_array_make(sz, e1, deco) ->
         let e1' = ss e1 in
         E_array_make(sz, e1', deco)
     | E_array_create(sz, deco) ->
         E_array_create(sz, deco)
-    | E_array_get(y, e1) ->
+    | E_array_get((y,loc), e1) ->
         let z = if x <> y then y else as_ident ex in
-        E_array_get(z, ss e1)
-    | E_array_set(y, e1, e2) ->
+        E_array_get((z,loc), ss e1)
+    | E_array_set((y,loc), e1, e2) ->
         let z = if x <> y then y else as_ident ex in
-        E_array_set(z, ss e1, ss e2)
-    | E_array_get_start(y, e1) ->
+        E_array_set((z,loc), ss e1, ss e2)
+    | E_array_get_start((y,loc), e1) ->
         let z = if x <> y then y else as_ident ex in
-        E_array_get_start(z, ss e1)
-    | E_array_get_end(y) ->
+        E_array_get_start((z,loc), ss e1)
+    | E_array_get_end(y,loc) ->
         let z = if x <> y then y else as_ident ex in
-        E_array_get_end(z)
-    | E_array_set_immediate(y, e1, e2) ->
+        E_array_get_end(z,loc)
+    | E_array_set_immediate((y,loc), e1, e2) ->
         let z = if x <> y then y else as_ident ex in
-        E_array_set_immediate(z, ss e1, ss e2)   
+        E_array_set_immediate((z,loc), ss e1, ss e2)   
     | E_array_from_file(y,e1) ->
         let z = if x <> y then y else as_ident ex in
         E_array_from_file(z, ss e1)

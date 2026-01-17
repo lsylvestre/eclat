@@ -56,21 +56,21 @@ let rec map f e =
       e
   | E_array_length _ ->
       e
-  | E_array_get(x, e1) ->
+  | E_array_get(x_annot, e1) ->
       let e1' = f e1 in
-      E_array_get(x,e1')
-  | E_array_set(x,e1,e2) ->
+      E_array_get(x_annot,e1')
+  | E_array_set(x_annot,e1,e2) ->
       let e1' = f e1 in
       let e2' = f e2 in
-      E_array_set(x, e1', e2')
-  | E_array_get_start(x,e1) ->
+      E_array_set(x_annot, e1', e2')
+  | E_array_get_start(x_annot,e1) ->
       let e1' = f e1 in
-      E_array_get_start(x,e1')
+      E_array_get_start(x_annot,e1')
   | E_array_get_end _ -> e
-  | E_array_set_immediate(x,e1,e2) ->
+  | E_array_set_immediate(x_annot,e1,e2) ->
       let e1' = f e1 in
       let e2' = f e2 in
-      E_array_set_immediate(x, e1', e2')
+      E_array_set_immediate(x_annot, e1', e2')
   | E_array_from_file(x,e1) ->
       let e1' = f e1 in
       E_array_from_file(x,e1')

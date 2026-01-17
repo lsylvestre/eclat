@@ -159,9 +159,9 @@ let gen_op ~externals fmt (op:op) pp a : unit =
   | Int_of_tuple _ ->
       pp fmt a (* should add a primitive call (identity ?) *)
   | GetBit -> 
-      funcall fmt "eclat_getBit"
+      funcall fmt "Runtime.eclat_getBit"
   | UpdateBit -> 
-      funcall fmt "eclat_updateBit"
+      funcall fmt "Runtime.eclat_updateBit"
   | Unroll _ -> assert false (* should be eliminated before *)
   | Vector_create _ ->
       assert false (* special case *)

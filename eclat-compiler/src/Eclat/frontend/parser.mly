@@ -103,7 +103,6 @@
 %token ARRAY_CREATE ARRAY_MAKE
 %token INIT_TUPLE INIT_INT
 %token VECTOR_MAPI INT_MAPI VECT_CREATE
-%token PAUSE
 %token EMIT SIGNAL LOOP TRAP EXIT SUSPEND
 /* The precedences must be listed from low to high. */
 
@@ -207,7 +206,12 @@ decl:
     d }
 
 decl_all:
-| LET b=after_let(SEMI_SEMI)
+| exp after_missing_semi_semi
+/* | LET after_let(after_missing_semi_semi)*/
+        { Prelude.Errors.syntax_error 
+            ~msg:"';;' expected at the end of this declaration"
+            (with_file ($loc)) }
+| LET b=after_let(SEMI_SEMI?)
         { b,(with_file $loc) }
 | NODE f=IDENT p=apat RETURNS p2=apat EQ eqs=equations SEMI_SEMI { 
     (let p',e = eqs in
@@ -220,6 +224,8 @@ decl_all:
 /*
 | EOF { E_var (!Ast_mk.main_symbol) }*/
 
+after_missing_semi_semi:
+LET | NODE | EOF | TYPE {}
 
 type_alias: /* todo: avoid side effect, which depends on the left-to-right evaluation order */
 | TYPE x=IDENT EQ tyB=tyB SEMI_SEMI? { add_alias x tyB (with_file $loc) }
@@ -265,7 +271,7 @@ fun_decl(In_kw):
                                 ~ty_opt_ret
                         e1
             in
-            (P_var f,ef)
+            (P_var f, ef)
         }
 
 after_let(In_kw):
@@ -512,8 +518,8 @@ lustre_aexp:
 | LPAREN le=lustre_lexp RPAREN { le }
 */
 if_end:
-| e2=lexp { e2,E_const Unit }
-| e2=lexp ELSE e3=lexp { e2, e3 }
+| e2=exp { e2,E_const Unit }
+| e2=exp ELSE e3=exp { e2, e3 }
 
 ret_ty_annot_eq:
 | EQ { None }
@@ -548,8 +554,6 @@ app_exp:
   e=app_exp_desc { mk_loc (with_file $loc) e }
 
 app_exp_desc:
-| PAUSE e=aexp { mk_loc (with_file $loc) @@ E_pause (Ast.gensym(), e) }
-| PAUSE { mk_loc (with_file $loc) @@ E_pause (Ast.gensym(), E_const (Unit)) }
 | ARRAY_MAKE LT sz=size GT e=aexp { E_array_make(sz, e, with_file $loc) }
 | ARRAY_CREATE LT sz=size GT LPAREN RPAREN
 | CREATE LT sz=size GT LPAREN RPAREN { E_array_create(sz, with_file $loc) }
@@ -564,49 +568,61 @@ app_exp_desc:
                | E_tuple[E_var x;e1] -> E_array_get(x,e1) 
                | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
                    ~msg:"array get" () } */
-| SET e=lexp { match Ast_undecorated.remove_deco e with 
-               | E_tuple[E_var x;e1;e2] -> E_array_set(x,e1,e2) 
+| SET e=lexp { match un_deco e with 
+               | E_tuple[e0;e1;e2] -> 
+                   (match un_deco e0 with
+                    | E_var x -> E_array_set((x,loc_of e0),e1,e2)
+                    | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
+                   ~msg:"... array set" ())
                | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
                    ~msg:"... array set" () }
-| GET_START e=lexp { match Ast_undecorated.remove_deco e with 
-               | E_tuple[E_var x;e1] -> E_array_get_start(x,e1) 
+| GET_START e=lexp { match un_deco e with 
+               | E_tuple[e0;e1] ->
+                   (match un_deco e0 with
+                    | E_var x -> E_array_get_start((x,loc_of e0),e1)
+                    | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
+                             ~msg:"... array set start" ())
                | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
                    ~msg:"... array set start" () }
-| GET_END e=lexp { match Ast_undecorated.remove_deco e with 
-                   | E_var x -> E_array_get_end(x) 
+| GET_END e=lexp { match un_deco e with 
+                   | E_var x -> E_array_get_end(x,loc_of e) 
                    | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
-                   ~msg:"... array set end" () }
-| IMMEDIATE SET e=lexp { match Ast_undecorated.remove_deco e with 
-               | E_tuple[E_var x;e1;e2] -> E_array_set_immediate(x,e1,e2) 
+                   ~msg:"... array get end" () }
+| IMMEDIATE SET e=lexp { match un_deco e with 
+               | E_tuple[e0;e1;e2] -> 
+                   (match un_annot e0 with
+                   | E_var x -> E_array_set_immediate((x,loc_of e0),e1,e2)
+                   | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
+                             ~msg:"... array immediate set" ())
                | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
-                   ~msg:"... array set" () }
+                   ~msg:"... array immediate set" () }
 /* | x=IDENT LBRACKET e1=exp RBRACKET
 | x=IDENT DOT LPAREN e1=exp RPAREN
    { E_array_get(x,e1) }*/
-| x=IDENT e1=dot_get { E_array_get(x,e1) }
-| x=IDENT DOT_LENGTH { E_array_length x }
+| x=IDENT e1=dot_get { E_array_get((x,with_file $loc(x)),e1) }
+| x=IDENT DOT_LENGTH { E_array_length (x, with_file $loc(x)) }
 | ARRAY_LENGTH a=aexp
 | LENGTH a=aexp { match un_annot a with
-                  | E_var x -> E_array_length x 
+                  | E_var x -> E_array_length (x, with_file $loc(a))
                   | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
                           ~msg:"array length: should be a variable......" () }
 | x=IDENT LBRACKET e1=exp RBRACKET LEFT_ARROW e2=app_exp
 | x=IDENT e1=dot_get LEFT_ARROW e2=app_exp 
-  { E_array_set(x,e1,e2) }
+  { E_array_set((x,with_file $loc(x)),e1,e2) }
 | SIZE_CREATE n=INT_LIT { E_const(C_size n) }
 | e=aexp  es=aexp+
-      { match e::es with
+      { List.fold_left (fun ef ei -> E_app(ef,ei)) e es 
+        (*match un_annot e::es with
         | [e1;e2] -> (match un_annot e1 with
                       | E_var _ | E_const _ | E_fun _ -> 
-                        E_app(e1,e2)
+                          E_app(e,e2) (* NB: e is annotated, e1 is not *)
                       | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
                    ~msg:"expression in functional position should be a variable or a constante" ())
     (* E_if(e2,e1,E_app(E_const (Op(Runtime(External_fun("Default.create",
         new_ty_unknown ())))),E_const(Unit))) *)
-        | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
-                   ~msg:"All functions and primitives should be unary. Hints: use a tuple as argument" () }
+        | _ -> List.fold_left (fun ef ei -> E_app(ef,ei)) e es*) }
 | MINUS e1=aexp %prec prec_unary_minus { E_app(E_const(Op(Runtime(External_fun("Int.neg",new_ty_unknown ())))),e1) }
-| e1=app_exp op=binop e2=app_exp
+| e1=app_exp op=binop e2=exp
         { E_app (mk_loc (with_file $loc) @@ E_const (Op (Runtime(op))),
                  mk_loc (with_file $loc) @@ E_tuple [e1;e2])
         }
@@ -619,15 +635,15 @@ app_exp_desc:
           E_if(e1,e2,e3)
         }*)
 | REGISTER ev=exp INIT e0=aexp
-       { match un_annot ev with
-         | E_fun(p,(_,tyB),e1) -> E_reg((p,tyB,e1),e0,Ast.gensym ())
-         | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
-                               ~msg:"This expression should be a function" ()
-       }
-| REGISTER f=IDENT INIT e0=aexp
-       {
-        let y = gensym () in
-         E_reg((P_var y,Types.new_tyB_unknown(),E_app(E_var f,E_var y)),e0,Ast.gensym ())
+       { mk_loc (with_file $loc) @@
+         match un_deco ev with
+         | E_fun(p,(ty,tyB),e1) ->
+            E_reg((p,tyB, mk_loc (with_file $loc(ev)) @@ ty_annot ~ty e1),e0,Ast.gensym ())
+         | _ -> 
+            let y = gensym () in
+            E_reg((P_var y,Types.new_tyB_unknown(),
+              mk_loc (with_file $loc(ev)) (E_app(ev,E_var y))),
+              e0, Ast.gensym ())
        }
 | EXEC e1=exp
        { E_exec(e1,E_app(E_const (Op(Runtime(External_fun("Default.create",new_ty_unknown ())))),E_const(Unit)),None,"") }
@@ -691,6 +707,13 @@ app_exp_desc:
 dot_get:
 DOT LPAREN e=exp RPAREN { e }
 
+lpar_unmatched: 
+INIT | SEMI_SEMI | IN 
+| REGISTER | EXEC | DEFAULT 
+| RBRACKET | NODE | MATCH | WITH 
+| END | RUN | IF | THEN | ELSE | RESET | WHERE 
+| LET | REC | AND | FIX {}
+
 
 aexp:
   e=aexp_desc { mk_loc (with_file $loc) e }
@@ -701,23 +724,30 @@ aexp_desc:
 | LPAREN e=exp RPAREN { e }
 | LPAREN e=exp COL ty=ty RPAREN { ty_annot ~ty e }
 (* | LPAREN RPAREN { E_const Unit } *)
-| c=const_exp { c }
+| e=const_exp { e }
+| p=LPAREN e=exp lpar_unmatched { 
+    Prelude.Errors.syntax_error 
+            ~msg:"This '(' might be unmatched"
+            (with_file ($loc(p))) }
 
 | RESIZE_INT LT k=size GT { E_const (Op(Runtime(Resize_int k))) }
 | TUPLE_OF_INT LT k=INT_LIT GT { E_const (Op(Runtime(Tuple_of_int k))) }
 | INT_OF_TUPLE LT k=INT_LIT GT { E_const (Op(Runtime(Int_of_tuple k))) }
 | VECTOR_MAPI e=aexp {
-                let loc = loc_of e in
-                match Ast_undecorated.remove_deco e with
+                let loc_e = loc_of e in
+                match un_deco e with
                 | E_tuple[v;e] -> assert (is_variable v || evaluated v); (* todo: error *)
                                   let x = Ast.gensym () in
                                   E_vector_mapi(false,(P_var x,(Types.new_tyB_unknown(),Types.new_tyB_unknown()),E_app(v,E_var x)), 
-                                     mk_loc loc e, new_size_unknown ())
+                                     mk_loc loc_e e, new_size_unknown ())
                 | _ -> assert false (* todo error *) }
 
 | x=UNROLL AT k=INT_LIT { E_const (Op(Runtime(Unroll k))) }
 | VECT_CREATE LT l=size GT { E_const (Op(Runtime(Vector_create l))) } 
-| x=IDENT { match x with
+| x=IDENT { mk_loc (with_file $loc) @@ match x with
+            | "pause" -> let x = Ast.gensym() in
+                         E_fun(P_var x, (Types.new_ty_unknown(),Types.new_tyB_unknown()), 
+                          E_pause (Ast.gensym(), E_var x))
             | "abs" -> E_const (Op(Runtime(External_fun("Int.absv",new_ty_unknown ()))))
             | "not" -> E_const (Op(Runtime(External_fun("Bool.lnot",new_ty_unknown ()))))
             | "print" -> E_const (Op(Runtime(Print)))
@@ -727,12 +757,10 @@ aexp_desc:
             | "print_newline" -> E_const (Op(Runtime(Print_newline)))
             | "string_length" -> E_const (Op(Runtime(String_length)))
             | "assert" -> E_const (Op(Runtime(Assert)))
-            | "get_bit"| "nth_bit" -> E_const (Op(Runtime(GetBit)))
-            | "update_bit" -> E_const (Op(Runtime(UpdateBit)))
             | "size_of_val" -> E_const (Op(Runtime(Size_of_val (Types.new_ty_unknown(),Types.new_size_unknown()))))
             | "get" -> let x = gensym () in let y = gensym () in
                        E_fun(P_tuple[P_var x;P_var y], (Types.new_ty_unknown(),Types.new_tyB_unknown()), 
-                          E_array_get(x,E_var y))
+                          E_array_get((x,(with_file $loc)),E_var y))
             | "bvect_of_int" -> E_const (Op(Runtime(Bvect_of_int)))
             | "int_of_bvect" -> E_const (Op(Runtime(Int_of_bvect)))
             (* | "vect_size" -> E_const (Op(Runtime(Vector_length (Types.new_size_unknown()))))
@@ -779,7 +807,7 @@ aexp_desc:
       { E_for(x,sz1,sz2,e,with_file $loc) }
 
 const_exp:
-c=const_without_vect { E_const c}
+| c=const_without_vect { E_const c}
 | LBRACKET es=separated_nonempty_list(COMMA,lexp) RBRACKET
     { E_vector es }
 
@@ -837,7 +865,7 @@ const_without_vect:
                 string_of_int k ^">") ()
       else Int (n,Sz_lit k) }
 | s=STRING_LIT           { String s }
-| x=OPERATOR_IDENT { Op(Runtime(External_fun(x,new_ty_unknown()))) }
+| x=OPERATOR_IDENT       { Op(Runtime(External_fun(x,new_ty_unknown()))) }
 | x=UP_IDENT             { Inj x }
 | LPAREN op=binop RPAREN { Op(Runtime(op)) }
 
