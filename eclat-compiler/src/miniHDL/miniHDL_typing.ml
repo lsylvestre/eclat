@@ -2,6 +2,8 @@ open MiniHDL_syntax
 
 let emit_warning_flag = ref false
 
+let hashtbl_array_from_file = Hashtbl.create 5 ;;
+
 let ptr_taken x = "$"^x^"_lock" 
 
 (** [canon t] put the type [t] in canonical form by replacing
@@ -147,7 +149,6 @@ let rec translate_tyB =
       let n = List.fold_left (max) 0 @@ List.map (fun (_,t) -> size_ty (translate_tyB t)) cs in
       TTuple[TInt(TSize size_tag);TVect(n)]
   | TyB_string sz -> TString (translate_size sz)
-  | TyB_size sz -> translate_size sz
 
   and translate_size = 
     let open Types in
@@ -162,7 +163,7 @@ let rec translate_tyB =
                     | Is sz -> T (translate_size sz)) in
         Hashtbl.add hvar r t;
         t)
-    | _ -> assert false
+    | _ -> assert false (* TSize 32 ? *)
 
 let rec translate_ty =
   let hvar = Hashtbl.create 10 in
@@ -185,6 +186,7 @@ let rec translate_ty =
   | Ty_signal(tyB) -> TSig(translate_tyB tyB)
   | Ty_trap _ -> assert false
   | Ty_fun _ -> assert false
+  | Ty_size _ -> assert false
 
 let rec typing_c = function
   |  Unit -> TUnit
@@ -347,6 +349,7 @@ let rec typing_s ~externals ~result h s =
       let t = new_tvar () in
       add_typing_env h x t
   | S_array_from_file(y,a) ->
+      Hashtbl.add hashtbl_array_from_file y ();
       let telem = new_tvar() in
       let tz = new_tvar () in
       add_typing_env h y (TStatic{elem=telem;size=tz});
@@ -390,6 +393,10 @@ let rec typing_s ~externals ~result h s =
               add_typing_env h rdy TBool;
               unify (translate_ty arg) (typing_a ~externals h a)
           | _ -> assert false))
+  | S_assert(a,_) ->
+      let t = typing_a ~externals h a in
+      unify t TBool
+
 (* typing of an fsm *)
 and typing_fsm h ~externals ~rdy ~result ~ty_result (ts,s) =
   add_typing_env h rdy TBool;
@@ -412,6 +419,8 @@ let typing_error_handler f =
 
 
 let typing_circuit ~statics ~externals ty (rdy,result,fsm) =
+  Hashtbl.clear hashtbl_array_from_file;
+
   typing_error_handler @@ fun () ->
     let h = Hashtbl.create 64 in
 
@@ -421,13 +430,13 @@ let typing_circuit ~statics ~externals ty (rdy,result,fsm) =
           ) statics;
 
 
-    List.iter (function (x,_) -> 
+    Hashtbl.iter (fun x _ -> 
       (* to fill the array with content from a file, in simulation mode *)
       (* ***************************************** *)
       add_typing_env h ("$"^x^"_from_file") TBool;
       add_typing_env h ("$"^x^"_file_name") (TString (new_tvar()))
       (* ***************************************** *)
-    ) statics;
+    ) hashtbl_array_from_file;
 
     let t1,t2 = match ty with Types.Ty_fun(t1,_,t2) -> t1,t2 | _ -> assert false (* err *)
     in

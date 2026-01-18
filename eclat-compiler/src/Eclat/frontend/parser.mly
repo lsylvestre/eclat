@@ -79,8 +79,9 @@
 %token <string> IDENT UP_IDENT TVAR_IDENT TYB_VAR_IDENT 
 %token <bool> BOOL_LIT
 %token <int> INT_LIT
-%token PLUS MINUS TIMES LT LE GT GE NEQ NOT MOD DIV AMP_AMP OR WHEN FBY MERGE
-%token XOR LAND LOR LXOR LSL LSR ASR RESIZE_INT TUPLE_OF_INT INT_OF_TUPLE
+%token PLUS MINUS TIMES LT LE GT GE NEQ NOT MOD DIV AMP_AMP OR WHEN FBY MERGE 
+%token DOLLARD
+%token XOR LAND LOR LXOR LSL LSR ASR RESIZE_INT VECT_CREATE TUPLE_OF_INT INT_OF_TUPLE
 %token TUPLE_GET TUPLE_UPDATE
 %token UNROLL AT AT_AT
 %token GET SET LENGTH CREATE GET_START GET_END
@@ -89,6 +90,7 @@
 %token EXTERNAL OPERATOR SHARED RUN
 %token <string> SYM
 %token <string> OPERATOR_IDENT
+%token ASSERT
 
 %token EOF
 %token SEMI_SEMI
@@ -102,8 +104,9 @@
 %token IMMEDIATE
 %token ARRAY_CREATE ARRAY_MAKE
 %token INIT_TUPLE INIT_INT
-%token VECTOR_MAPI INT_MAPI VECT_CREATE
+%token VECTOR_MAPI INT_MAPI
 %token EMIT SIGNAL LOOP TRAP EXIT SUSPEND
+%token LT_LT GT_GT
 /* The precedences must be listed from low to high. */
 
 %right    PIPE_PIPE PIPE_COMMA_PIPE /* parallel construct */
@@ -122,6 +125,7 @@
 %left     DIV MOD LAND LOR LXOR XOR
 %nonassoc prec_unary_minus
 %nonassoc DOT
+%nonassoc LT_LT GT_GT
 %nonassoc BOOL_LIT IDENT LPAREN
 
 %start <((x * (ty * bool)) list * (x * (ty * (bool * int * bool))) list) 
@@ -262,17 +266,29 @@ ty_case:
 | x=UP_IDENT OF tyB=tyB { x,tyB }
 
 fun_decl(In_kw):
-| f=IDENT p_ty_opt=arg_ty_atomic
+| f=IDENT szs=size_param_fun_decl* p_ty_opt=arg_ty_atomic
                   ty_opt_ret=ret_ty_annot_eq
     e1=exp In_kw
-        {
-            let ef = mk_let_fun ~loc:(with_file ($startpos(f),$endpos(e1)))
-                                ~p_ty_opt
-                                ~ty_opt_ret
+        { let p_ty_opt = 
+            match szs,p_ty_opt with
+            | [],p_ty_opt -> p_ty_opt
+            | szs,(p,ty_opt) ->
+                let ps = List.map (fun _ -> P_var(Ast.gensym ())) szs in
+                (P_tuple(ps@[p]), 
+                  Some (Ty_tuple(List.map (fun sz -> Ty_size sz) szs @ 
+                                [match ty_opt with
+                                 | None -> new_ty_unknown ()
+                                 | Some ty -> ty]))) in
+           let ef = mk_let_fun ~loc:(with_file ($startpos(f),$endpos(e1)))
+                               ~p_ty_opt
+                               ~ty_opt_ret
                         e1
             in
             (P_var f, ef)
         }
+
+size_param_fun_decl:
+| LT_LT sz=size GT_GT { sz }
 
 after_let(In_kw):
 | b=bindings(apat,exp) In_kw { b }
@@ -330,7 +346,6 @@ ty_ident:
 | tyB=tyB_ident { Ty_base tyB }
 
 tyB:
-| LT sz=size GT { TyB_size(sz) }
 | tyB=tyB_next TIMES tyBs=separated_nonempty_list(TIMES,tyB_next) 
     { TyB_tuple (tyB::tyBs) }
 | tyB=tyB_next {tyB}
@@ -391,6 +406,7 @@ ty_next:
 | ty=ty_next QUESTION_MARK RIGHT_ARROW tyB=tyB { Ty_fun(ty,new_dur_unknown(),tyB) } 
 | ty=ty_next IMPLY tyB=tyB { Ty_fun(ty,Dur_zero,tyB) } 
 | tyB=tyB_next { Ty_base tyB }
+| LT_LT sz=size GT_GT { Ty_size sz }
 | LPAREN ty=ty RPAREN { ty }
 
 size:
@@ -470,10 +486,16 @@ lexp_desc:
 | FUN p_ty_opt=arg_ty RIGHT_ARROW e=exp
         { let (p,ty_p_opt) = p_ty_opt in
           mk_fun_ty_annot_p p ty_p_opt e }
-(* | e=aexp WHERE eqs=equations { 
-          let p = Pattern.exp2pat e in
-          E_letIn(p,Types.new_ty_unknown(),E_equations(p, eqs),e) } 
-*)| IF e1=exp THEN e2_e3=if_end
+| e=aexp WHERE REC bs=bindings_and(pat,exp) { 
+          let (ps,es) = bs in
+          let p = group_ps ps in
+          E_letIn(p, Types.new_ty_unknown(),
+              mk_loc (with_file $loc) @@
+              E_app(E_var "fixpoint", 
+                  mk_loc (with_file $loc) @@
+                  E_fun(p,(Types.new_ty_unknown(),Types.new_tyB_unknown()),
+                    mk_loc (with_file $loc) @@ group_es es)), e) } 
+| IF e1=exp THEN e2_e3=if_end
         { let (e2,e3) = e2_e3 in E_if(e1,e2,e3) }
 | LET b=after_let(IN) e2=exp
         { let (p,e1) = b in
@@ -505,21 +527,10 @@ equations:
     { let p' = group_ps (List.map fst eqs) in
        p',E_app(E_var "fixpoint", E_fun(p', (Types.new_ty_unknown(),Types.new_tyB_unknown()),
                                     group_es (List.map snd eqs))) }
-/*
-lustre_lexp:
-| e=lexp { Exp(e) }
-| LPAREN le=lustre_lexp RPAREN { le }
-| le1=lustre_aexp FBY le2=lustre_lexp { Fby(le1,le2) }
-| le1=lustre_aexp WHEN e2=app_exp { When(le1,e2) }
-| MERGE e3=aexp le1=lustre_aexp le2=lustre_aexp { Merge(le1,le2,e3) }
 
-lustre_aexp:
-| e=aexp { Exp(e) }
-| LPAREN le=lustre_lexp RPAREN { le }
-*/
 if_end:
-| e2=exp { e2,E_const Unit }
-| e2=exp ELSE e3=exp { e2, e3 }
+| e2=lexp { e2,E_const Unit }
+| e2=lexp ELSE e3=exp { e2, e3 }
 
 ret_ty_annot_eq:
 | EQ { None }
@@ -554,6 +565,7 @@ app_exp:
   e=app_exp_desc { mk_loc (with_file $loc) e }
 
 app_exp_desc:
+| ASSERT e=aexp { E_assert(e,with_file ($loc(e))) }
 | ARRAY_MAKE LT sz=size GT e=aexp { E_array_make(sz, e, with_file $loc) }
 | ARRAY_CREATE LT sz=size GT LPAREN RPAREN
 | CREATE LT sz=size GT LPAREN RPAREN { E_array_create(sz, with_file $loc) }
@@ -609,9 +621,20 @@ app_exp_desc:
 | x=IDENT LBRACKET e1=exp RBRACKET LEFT_ARROW e2=app_exp
 | x=IDENT e1=dot_get LEFT_ARROW e2=app_exp 
   { E_array_set((x,with_file $loc(x)),e1,e2) }
-| SIZE_CREATE n=INT_LIT { E_const(C_size n) }
+| SIZE_CREATE n=INT_LIT { E_const(C_size (Sz_lit n)) 
+    (* [size_create<n>], or simply: <n>, see rule const_without_vect: *)}
 | e=aexp  es=aexp+
-      { List.fold_left (fun ef ei -> E_app(ef,ei)) e es 
+      { E_app((mk_loc (with_file $loc(e)) e), mk_loc (with_file $loc(es)) @@ group_es es) }
+      (* 
+        let es = match es with
+                 | [] | [_] -> es
+                 | e0::e1::es' ->
+                   (match un_deco e0 with
+                   | E_const(C_size _) -> 
+                       (mk_loc (with_file $loc(es)) @@ E_tuple[e0;e1])::es'
+                   | _ -> es) in *)
+
+         (* List.fold_left (fun ef ei -> E_app(ef,ei)) e es *)
         (*match un_annot e::es with
         | [e1;e2] -> (match un_annot e1 with
                       | E_var _ | E_const _ | E_fun _ -> 
@@ -620,10 +643,16 @@ app_exp_desc:
                    ~msg:"expression in functional position should be a variable or a constante" ())
     (* E_if(e2,e1,E_app(E_const (Op(Runtime(External_fun("Default.create",
         new_ty_unknown ())))),E_const(Unit))) *)
-        | _ -> List.fold_left (fun ef ei -> E_app(ef,ei)) e es*) }
-| MINUS e1=aexp %prec prec_unary_minus { E_app(E_const(Op(Runtime(External_fun("Int.neg",new_ty_unknown ())))),e1) }
-| e1=app_exp op=binop e2=lexp
-        { E_app (mk_loc (with_file $loc) @@ E_const (Op (Runtime(op))),
+        | _ -> List.fold_left (fun ef ei -> E_app(ef,ei)) e es*)
+| MINUS e1=aexp %prec prec_unary_minus { E_app(E_const(Op(Runtime(External_fun("Int.neg",new_ty_unknown ())))),e1) } 
+
+| e1=app_exp k=WHEN e2=app_exp 
+     { E_app((mk_loc (with_file $loc(k)) (E_var "when_")),
+            (mk_loc (with_file $loc) @@ E_tuple[(mk_loc (with_file $loc(e1)) @@ E_fun(P_unit,
+              (new_ty_unknown (),new_tyB_unknown ()),e1)); e2])) } 
+
+| e1=app_exp op=binop e2=app_exp
+        { E_app (mk_loc (with_file $loc(op)) @@ E_const (Op (Runtime(op))),
                  mk_loc (with_file $loc) @@ E_tuple [e1;e2])
         }
 | e1=app_exp AMP_AMP e2=app_exp
@@ -693,16 +722,11 @@ app_exp_desc:
 | SIGNAL e=aexp { E_sig_create e }
 | SIGNAL NEQ { E_sig_create (E_app(E_const (Op(Runtime(External_fun("Default.create",new_ty_unknown ())))),E_const(Unit))) }
 | e=aexp { e }
-| LOOP e=exp END { E_loop(e) }
 | TRAP LPAREN RPAREN { E_trap(new_tyB_unknown()) }
 | TRAP x=UP_IDENT IN e=exp { E_letIn(P_var x,new_ty_unknown(),E_trap(new_tyB_unknown()), e) }
 | EXIT x=IDENT
 | EXIT x=UP_IDENT { E_exit(x,E_const(Unit)) }
 | SUSPEND e=app_exp WHEN x=IDENT { E_suspend(e,x) }
-| e1=app_exp WHEN e2=app_exp {
-              E_app(E_var "when",
-                       E_tuple[E_fun(P_unit,(Ty_base TyB_unit,new_tyB_unknown ()),e1);e2])
-}
 
 dot_get:
 DOT LPAREN e=exp RPAREN { e }
@@ -729,8 +753,17 @@ aexp_desc:
     Prelude.Errors.syntax_error 
             ~msg:"This '(' might be unmatched"
             (with_file ($loc(p))) }
+/*| v=VECT_CREATE LT k=size GT */
+| v=VECT_CREATE LT k=size GT 
+    { let tyB = new_tyB_unknown() in
+      E_const (Op(Runtime(
+        External_fun("Vect.create",
+                     Ty_fun(Ty_base tyB,Dur_zero,vect_ k tyB))))) }
 
-| RESIZE_INT LT k=size GT { E_const (Op(Runtime(Resize_int k))) }
+| v=RESIZE_INT LT k=size GT 
+    { E_const (Op(Runtime(
+        External_fun("Int.resize",
+                     Ty_fun(new_ty_unknown(),Dur_zero,TyB_int k))))) }
 | TUPLE_OF_INT LT k=INT_LIT GT { E_const (Op(Runtime(Tuple_of_int k))) }
 | INT_OF_TUPLE LT k=INT_LIT GT { E_const (Op(Runtime(Int_of_tuple k))) }
 | VECTOR_MAPI e=aexp {
@@ -743,26 +776,23 @@ aexp_desc:
                 | _ -> assert false (* todo error *) }
 
 | x=UNROLL AT k=INT_LIT { E_const (Op(Runtime(Unroll k))) }
-| VECT_CREATE LT l=size GT { E_const (Op(Runtime(Vector_create l))) } 
-| x=IDENT { mk_loc (with_file $loc) @@ match x with
+| x=IDENT { let open Ast_mk in
+            mk_loc (with_file $loc) @@ 
+            match x with
             | "pause" -> let x = Ast.gensym() in
                          E_fun(P_var x, (Types.new_ty_unknown(),Types.new_tyB_unknown()), 
                           E_pause (Ast.gensym(), E_var x))
-            | "abs" -> E_const (Op(Runtime(External_fun("Int.absv",new_ty_unknown ()))))
-            | "not" -> E_const (Op(Runtime(External_fun("Bool.lnot",new_ty_unknown ()))))
-            | "print" -> E_const (Op(Runtime(Print)))
-            | "print_ascii" -> E_const (Op(Runtime(Print_ascii)))
-            | "print_string" -> E_const (Op(Runtime(Print_string)))
-            | "print_int" -> E_const (Op(Runtime(Print_int)))
-            | "print_newline" -> E_const (Op(Runtime(Print_newline)))
-            | "string_length" -> E_const (Op(Runtime(String_length)))
-            | "assert" -> E_const (Op(Runtime(Assert)))
-            | "size_of_val" -> E_const (Op(Runtime(Size_of_val (Types.new_ty_unknown(),Types.new_size_unknown()))))
+            | "abs" -> mk_prim "Int.absv"
+            | "not" -> mk_prim "Bool.lnot"
+            | "print" -> mk_prim "Print.print_value"
+            | "print_ascii" -> mk_prim "Print.print_ascii"
+            | "print_string" -> mk_prim "Print.print_string"
+            | "print_newline" -> mk_prim "Print.print_newline"
+            | "print_int" -> mk_prim "Int.print"
+            | "string_length" -> mk_prim "Print.print_string"
             | "get" -> let x = gensym () in let y = gensym () in
                        E_fun(P_tuple[P_var x;P_var y], (Types.new_ty_unknown(),Types.new_tyB_unknown()), 
                           E_array_get((x,(with_file $loc)),E_var y))
-            | "bvect_of_int" -> E_const (Op(Runtime(Bvect_of_int)))
-            | "int_of_bvect" -> E_const (Op(Runtime(Int_of_bvect)))
             (* | "vect_size" -> E_const (Op(Runtime(Vector_length (Types.new_size_unknown()))))
             | "vect_nth" -> E_const (Op(Runtime(Vector_get (Types.new_tyB_unknown()))))
             | "vect_copy_with" -> E_const (Op(Runtime(Vector_update (Types.new_tyB_unknown(),Types.new_size_unknown()))))
@@ -805,6 +835,7 @@ aexp_desc:
 
 | PARFOR x=IDENT EQ sz1=size TO sz2=size DO e=exp DONE 
       { E_for(x,sz1,sz2,e,with_file $loc) }
+| LOOP e=exp END { E_loop(e) }
 
 const_exp:
 | c=const_without_vect { E_const c}
@@ -867,8 +898,9 @@ const_without_vect:
 | s=STRING_LIT           { String s }
 | x=OPERATOR_IDENT       { Op(Runtime(External_fun(x,new_ty_unknown()))) }
 | x=UP_IDENT             { Inj x }
+| LT_LT sz=size GT_GT { C_size sz }
+| LT_LT GT_GT { C_size (new_size_unknown()) }
 | LPAREN op=binop RPAREN { Op(Runtime(op)) }
-
 
 %inline binop:
 /*| x=SYM        { let y = match Hashtbl.find_opt infix_operators x with 

@@ -34,8 +34,8 @@ exception Cyclic_dur of int * dur * Prelude.loc
 exception Cyclic_ty of int * ty * Prelude.loc
 
 let rec unify_size ~loc sz1 sz2 =
-  (* Format.fprintf Format.std_formatter "####-- ====> %a / %a\n"  pp_size  sz1  pp_size  sz2; *)
   let sz1, sz2 = canon_size sz1, canon_size sz2 in
+  (* Format.fprintf Format.std_formatter "####-- ====> %a / %a\n"  pp_size  sz1  pp_size  sz2; *)
   match sz1, sz2 with
   | sz1,Sz_var {contents=Is sz2}
   | Sz_var {contents=Is sz1},sz2 -> unify_size ~loc sz1 sz2
@@ -43,10 +43,16 @@ let rec unify_size ~loc sz1 sz2 =
     Sz_var ({contents=Unknown m} as v) ->
     if n = m then () else v := Is sz1
   | Sz_var ({contents=(Unknown n)} as r1),sz2 ->
-    if test_occur (occur_size n) sz2 then raise (Cyclic_size(n,sz2,loc));
+    if test_occur (occur_size n) sz2 then (
+      r1 := Is (Sz_lit 0)
+      (* raise (Cyclic_size(n,sz2,loc)) *)
+    ) else
     r1 := Is sz2
   | sz1,Sz_var ({contents=(Unknown n)} as r2) ->
-    if test_occur (occur_size n) sz1 then raise (Cyclic_size(n,sz1,loc));
+    if test_occur (occur_size n) sz1 then (
+      (* raise (Cyclic_size(n,sz1,loc)); *)
+      r2 := Is (Sz_lit 0)
+    ) else
     r2 := Is sz1
   | Sz_lit n1, Sz_lit n2 ->
     if n1 <= 0 || n2 <= 0 then
@@ -62,17 +68,49 @@ let rec unify_size ~loc sz1 sz2 =
       else raise @@ CannotUnify(loc,[Size(sz1,sz2)])
   | Sz_twice(sz),Sz_twice(sz') -> unify_size ~loc sz sz'
   | Sz_twice(sz),Sz_add(sz',n) | Sz_add(sz',n),Sz_twice(sz) ->  
-      let sz2 = Types.new_size_unknown() in  
+      if n = 0 then unify_size ~loc (Sz_twice(sz)) sz' 
+      else (
+      let sz2 = Types.new_size_unknown() in    
       if n mod 2 = 0 then (
-        unify_size ~loc (Sz_twice sz') (Sz_twice sz2);
-        unify_size ~loc (Sz_twice sz) (Sz_add(sz2,n/2))) 
-      else
-        unify_size ~loc (Sz_twice sz') (Sz_add(sz2,1));
-        unify_size ~loc (Sz_twice sz) (Sz_add(sz2,1+n))
+        (** =====================
+          for instance, with n := 2.
+          2A ~? B + 2 :
+          - we have: A > 0
+          - let B := 2C
+          - we want :
+          - 2A ~? 2C + 2
+          - A ~? C+1
+
+          2A ~? B + N :
+          - we have: A > 0 because B >= 0 and N > 0
+          - B is even because N is even and we want 2A ~ B + N
+          - let B := 2C
+          - we want :
+          - 2A ~? 2C + N
+          - A ~? C+M where M:=N/2
+
+          ===================== *)
+        unify_size ~loc sz' (Sz_twice sz2);
+        unify_size ~loc sz (Sz_add(sz2,n/2))) 
+      else (
+        (** =====================
+          2A ~? B + N :
+          - we have: A > 0
+          - if B = 0 then we have not 2A ~? N because N is odd.
+          - so B > 0
+          - let B := 2C + 1
+          - we want :
+          - 2A ~? (2C+1)+N
+          - 2A ~? 2C+(N+1)
+          - A ~? C+M where M:=(N+1)/2
+          ===================== *)
+        unify_size ~loc sz' (Sz_add(Sz_twice(sz2),1));
+        unify_size ~loc sz (Sz_add(sz2,(n+1)/2)))
+    )
   | Sz_twice(sz),Sz_lit n | Sz_lit n, Sz_twice(sz) -> 
       if n mod 2 = 0 then unify_size ~loc sz (Sz_lit (n/2))
       else raise @@ CannotUnify(loc,[Size(sz1,sz2)])
-
+  
 let rec unify_dur ~loc d1 d2 =
 
   let warning_loss_of_precision d d' var =
@@ -172,10 +210,6 @@ let rec unify_tyB ~loc tyB1 tyB2 =
     (try List.iter2 (unify_tyB ~loc) tyB_list1 tyB_list2 
      with CannotUnify(_,l) ->
             raise @@ CannotUnify(loc,TyB(tyB1,tyB2)::l))
-  | TyB_size sz1, TyB_size sz2 -> 
-      (try unify_size ~loc sz1 sz2
-       with CannotUnify(_,l) ->
-        raise @@ CannotUnify(loc,TyB(tyB1,tyB2)::l))
   | TyB_sum(ctors),TyB_sum(ctors') ->
     if List.compare_lengths ctors ctors' <> 0 then
       raise @@ CannotUnify(loc,(Imcompatible_length(Ty_base tyB1, Ty_base tyB2))::[]);
@@ -261,6 +295,11 @@ let unify_ty ~loc ty1 ty2 =
         raise @@ CannotUnify(loc,(TyB_Ty(tyB1,ty2))::[]);
     | _,Ty_base tyB2 ->
         raise @@ CannotUnify(loc,(Ty_TyB(ty1,tyB2))::[]);
+    | Ty_size sz1, Ty_size sz2 -> 
+      (try unify_size ~loc sz1 sz2
+       with CannotUnify(_,l) ->
+        raise @@ CannotUnify(loc,Ty(ty1,ty2)::l))
+
     | _ ->  raise @@ CannotUnify(loc,(Ty(ty1,ty2))::[]);
   in
   try unify ~loc ty1 ty2 with
@@ -390,7 +429,7 @@ let rec typ_const ~loc g = function
     let v = new_tyB_unknown () in
     List.iter (fun c -> unify_tyB ~loc v (typ_const ~loc g c)) cs;
     Operators.vect_ (Sz_lit (List.length cs)) v
-  | C_size n -> TyB_size (Sz_lit n)
+  | C_size _ -> assert false
   | C_appInj(x,c,tyB) ->
     let tx = typ_ident ~loc g x in (* todo loc x *)
     let tc = typ_const ~loc g c in (* todo loc c *)
@@ -418,6 +457,8 @@ let rec typ_exp ?(collect_sig=false) ~statics ~externals ~sums ~ctors ?(toplevel
   | E_const(Inj x) -> (* Prelude.Errors.warning ~loc (fun fmt -> ()); *)
       let tx = typ_ident ~loc g x in
       tx,Dur_zero
+  | E_const (C_size sz) -> 
+      (Ty_size sz, Dur_zero)
   | E_const c ->
     (Ty_base (typ_const ~loc g c), Dur_zero)
   | E_var(x) ->
@@ -776,6 +817,10 @@ let rec typ_exp ?(collect_sig=false) ~statics ~externals ~sums ~ctors ?(toplevel
                            ~toplevel:false ~loc:(loc_of e1) g e1 in
       unify_ty ~loc (Ty_signal(TyB_bool)) tyx; (* todo loc of x *)
       (ty1, d1)
+  | E_assert(e1,loc_e1) ->
+      let ty1,d1 = typ_exp ~collect_sig ~statics ~externals ~sums ~ctors ~toplevel:false ~loc:(loc_of e1) g e1 in
+      unify_ty ~loc:loc_e1 ty1 (Ty_base TyB_bool);
+      (Ty_base TyB_unit, d1)
 
 let typing_handler ?(msg="") f () =
   let open Format in

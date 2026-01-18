@@ -62,11 +62,7 @@ let error_cannot_be_reduced e =
     match e with
     | E_const(Int(l,sz)) -> E_const(Int(l,subs sz))
     | E_const(Op(Runtime op)) ->
-       let op' = match op with
-       | Resize_int sz -> Operators.Resize_int (subs sz)
-       | Vector_create sz -> Operators.Vector_create (subs sz)
-       | _ -> op
-       in E_const(Op(Runtime op'))
+       E_const(Op(Runtime op))
     | e -> Ast_mapper.map subse e
   in 
   subse e
@@ -192,11 +188,6 @@ let app_const e e2 r =
       end
   | Op op -> begin
       match op,e2 with
-      | Runtime(Vector_create sz), E_const(c) ->
-          (match sz with
-          | Sz_lit k ->
-              E_const(C_vector(List.init k (fun _ -> c))),r
-          | _ -> assert false)
       | Runtime(Tuple_of_int n),  E_const (Int (l,tz)) ->
           (* https://stackoverflow.com/questions/14328600/ocaml-looking-at-a-specific-digit-of-an-int *)
           let digits n = (* Assuming n is a non-negative number *)
@@ -216,40 +207,16 @@ let app_const e e2 r =
           in 
           let vs = loop [] ls n in
           E_tuple (List.map (fun c -> E_const c) vs), r
-      | Runtime(Resize_int sz),  E_const (Int (l,tz)) -> 
-          let return_c k =
-            E_const (Int (l mod (1 lsl (k-1)) ,Sz_lit k))
-          in
-          (match Types.canon_size sz with
-          | Sz_lit k ->
-              return_c k
-          | _ -> 
-              return_c 32), r
-      | Runtime(Print_string),E_const (String s) ->
-         assert (evaluated e);
-         Format.fprintf Format.std_formatter "%s" s; flush stdout; E_const Unit, r
-      | Runtime(Print_int),E_const (Int(n,_)) ->
-         assert (evaluated e);
-         Format.fprintf Format.std_formatter "%d" n; flush stdout; E_const Unit, r
-      | Runtime(Print_newline),E_const Unit ->
-         assert (evaluated e);
-         Format.fprintf Format.std_formatter "\n"; flush stdout; E_const Unit, r
-  
-      | Runtime(Print),e ->
-         assert (evaluated e);
-         Format.fprintf Format.std_formatter "==> %a\n" Ast_pprint.pp_exp e; flush stdout; E_const Unit, r
       | GetTuple{pos=i;arity=n}, E_tuple vs ->
           check_bounds ~index:i ~size:n;
           List.nth vs i, r
       | GetTuple{pos=i;arity=n}, E_const(C_tuple cs) ->
           check_bounds ~index:i ~size:n;
           E_const(List.nth cs i), r
-      | Runtime(Assert),E_const (Bool b) -> assert b; E_const Unit, r
       | Wait 0,v ->
           v, r
       | Wait n,v ->
           E_app(E_const(Op(Wait (n-1))),v), r
-      | Runtime(String_length),E_const(String s) -> E_const(Int (String.length s,Sz_lit 32)), r
       | TyConstr _, v -> v, r
       | _ -> error_cannot_be_reduced (E_app(e,e2))
     end

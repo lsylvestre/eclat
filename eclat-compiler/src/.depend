@@ -427,7 +427,6 @@ src/Eclat/interp/interp.cmo : \
     src/Eclat/typing/types.cmo \
     src/Eclat/interp/special_subst.cmo \
     src/prelude.cmo \
-    src/operators.cmo \
     src/Eclat/syntax/ast_pprint.cmo \
     src/Eclat/syntax/ast_mapper.cmo \
     src/Eclat/syntax/ast.cmo
@@ -436,7 +435,6 @@ src/Eclat/interp/interp.cmx : \
     src/Eclat/typing/types.cmx \
     src/Eclat/interp/special_subst.cmx \
     src/prelude.cmx \
-    src/operators.cmx \
     src/Eclat/syntax/ast_pprint.cmx \
     src/Eclat/syntax/ast_mapper.cmx \
     src/Eclat/syntax/ast.cmx
@@ -659,9 +657,11 @@ src/miniHDL/miniHDL_causality.cmx : \
     src/miniHDL/miniHDL_syntax.cmx \
     src/Eclat/syntax/ast.cmx
 src/miniHDL/miniHDL_syntax.cmo : \
+    src/prelude.cmo \
     src/operators.cmo \
     src/Eclat/syntax/ast_pprint.cmo
 src/miniHDL/miniHDL_syntax.cmx : \
+    src/prelude.cmx \
     src/operators.cmx \
     src/Eclat/syntax/ast_pprint.cmx
 src/miniHDL/miniHDL_typing.cmo : \

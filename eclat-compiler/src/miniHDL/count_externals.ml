@@ -40,6 +40,7 @@ let rec count_s s =
       ()
   | S_external_run(f,l,_,_,_) ->
       add f l
+  | S_assert _ -> ()
 
 let count_externals_fsm (ts,s) =
   Hashtbl.clear external_count;

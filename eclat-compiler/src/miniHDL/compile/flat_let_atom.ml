@@ -82,6 +82,9 @@ let rec flat_s s =
   | S_sig_set(x,a) ->
      let bs,a' = flat a in
      s_let_bindings bs @@ S_sig_set(x,a')
+  | S_assert(a,loc) ->
+     let bs,a' = flat a in
+     s_let_bindings bs @@ S_assert(a',loc)
 
 let flat_let_atom (ts,s) =
   List.map (fun (x,s) -> x,flat_s s) ts, flat_s s

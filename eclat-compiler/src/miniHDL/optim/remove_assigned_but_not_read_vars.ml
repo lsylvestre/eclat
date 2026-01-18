@@ -78,6 +78,8 @@ let clean_fsm ~rdy ~result (ts,s) typing_env =
       collect_read_a a
   | S_external_run(_,_,_,_,a) ->
       collect_read_a a
+  | S_assert(a,_) ->
+      collect_read_a a
   in
   List.iter (fun (_,s) -> collect_s s) ts;
   collect_s s;
@@ -118,6 +120,8 @@ let clean_fsm ~rdy ~result (ts,s) typing_env =
   | S_call _ ->
       s
   | S_external_run _ -> s
+  | S_assert _ ->
+      s
   in
   let fsm' = (List.map (fun (q,s) -> q, clean s) ts, clean s) in
   Hashtbl.iter (fun x _ -> Hashtbl.remove typing_env x) vs_assigned_but_never_read;

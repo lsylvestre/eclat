@@ -157,6 +157,9 @@ let subst_e x ex e =
     | E_suspend(e1,x) ->
         let e1' = ss (0::id) e1 in
         E_suspend(e1',x)
+    | E_assert(e1,loc) ->
+        let e1' = ss (0::id) e1 in
+        E_assert(e1',loc)
   in
   ss [] e
 

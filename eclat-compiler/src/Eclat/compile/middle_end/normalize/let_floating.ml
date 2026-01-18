@@ -146,6 +146,9 @@ let rec lfloat (e:e) : e =
       ds1,E_exit(x,e1')
   | E_suspend(e1,x) ->
       [],E_suspend(lfloat e1,x)
+  | E_assert(e1,loc) ->
+      let ds,e1' = glob e1 in
+      ds,E_assert(e1',loc)
   in 
   let ds,e' = glob e in 
   declare ds e'

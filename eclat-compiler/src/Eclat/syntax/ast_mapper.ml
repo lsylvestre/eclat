@@ -118,7 +118,9 @@ let rec map f e =
   | E_suspend(e1,x) ->
       let e1' = f e1 in
       E_suspend(e1',x)
-
+  | E_assert(e1,loc) ->
+      let e1' = f e1 in
+      E_assert(e1',loc)
 
 (** traversal order of sub-expressions is unspecified *)
 let rec iter f (e:e) : unit =
@@ -182,178 +184,7 @@ let rec iter f (e:e) : unit =
   | E_run(_,e1,_) ->
       f e1
   | E_pause (_,e1) -> f e1
- 
-(*
-
-type clock1 ;;
-operator Lustre.to_bool : bool => 'a ;;
-operator Lustre.as_bool : 'a => bool ;;
-
-let when(f,c) =
-  if as_bool c then f() else absent ();;
-
-let whenot(f,c) =
-  if as_bool c then absent() else f();;
-
-let merge(c,x,y) =
-  if as_bool c then
-  *)
-(****************
-
-
-
-operator Lustre.when_on : ('a * 'ck clock<1>) => ('a * 'ck clock<1>) on<1> ;;
-operator Lustre.when_not_on : ('a * 'ck clock<1>) => ('a * 'ck clock<1>) not_on<1> ;;
-
-type 'a clock<1> ;;
-
-let c1 : clock1 ;;
-let c2 : clock2 ;;
-
-
-let when(f,c) =
-  if as_bool Lustre.when_on(,c)
-
-let whenot(s,f) =
-  if as_clock(s) then absent() else f() ;; 
-
-
-
-let x = clock<> ;;
-let y = signal<> ;;
-
-node main i returns o =
-  o1 = when(c1,i);
-  o2 = whenot(c1,i);
-  o = merge(c1,o1,o2) ;;
-
-
-let f () = print_int 3 ;;
-let g () = print_int 4 ;;
-let main : int => unit = 
-  fun n ->
-    let s = signal<> in
-    merge (s,f,g) ;;
-
-
-(*
-type 'a not_on<1> ;;
-type 'a on<1> ;;
-type 'a clock<1> ;;
-
-operator%with_sizes Lustre.as_clock : (bool * 'ck) => 'ck clock<1> ;; 
-operator%with_sizes Lustre.as_bool : 'a => bool ;; 
-
-
-
-operator Lustre.when_on : ('a * 'ck clock<1>) => ('a * 'ck clock<1>) on<1> ;;
-operator Lustre.when_not_on : ('a * 'ck clock<1>) => ('a * 'ck clock<1>) not_on<1> ;;
-operator Lustre.merge : ('a clock<1> * 
-                  ('b * 'a clock<1>) on<1> * 
-                  ('b * 'a clock<1>) not_on<1>) => 'b ;;
-
-
-let as_bool ck = Lustre.as_bool ck ;;
-
-let when_on (f,ck) =
-  let x = if as_bool ck then f () else absent() in
-  Lustre.when_on(x,ck) ;;
-
-let whenot_on (f,ck) =
-  let x = if as_bool ck then absent() else f () in
-  Lustre.when_not_on(x,ck) ;;
-
-let merge = Lustre.merge ;;
-
-*)
-
-(*
-
-let main i = 
-  let x = fby(true,false) in
-  let c = abstype in
-  let y = when_on ((fun () -> print_int 3; 3),c) in
-  let z = whenot_on ((fun () -> print_int 4; 4),c) in 
-  let u = merge(c,y,z) in print_int u ;;
-
-let main v = 
-  let x = fby(true,false) in
-  let c = as_clock(x) in
-  let i = fby(false,true) in
-  let c2 = as_clock(i) in
-  let y = when_on ((fun () -> print_int 3; 3),c) in
-  let z = whenot_on ((fun () -> print_int 4; 4),c2) in 
-  let u = merge(c,y,z) in print_int u ;;
-
-
-let main i = 
-  let x = fby(true,false) in
-  let c = as_clock(x) in
-  let c2 = as_clock(x) in
-  let y = when_on (4,c) in
-  let z = whenot_on (3,c2) in 
-  let u = merge(c,y,z) in u ;;
-
-
-let main i = 
-  let x = fby(true,false) in
-  let c = as_clock(x) in let y = Lustre.when (4,c) in let z = when_not (3,c) in let u = Lustre.merge(c,y,z) in u ;;
-
-let main i = 
-  let x = fby(true,false) in
-  let c = Lustre.as_clock(x) in let y = Lustre.when_on (4,c) in let z = Lustre.when_not_on (3,c) in let u = Lustre.merge(c,y,z) in u ;;
-
-
-let main i = 
-  let x = fby(true,false) in
-  let c = Lustre.as_clock (x) in let y = Lustre.when_on (4,c) in let z = Lustre.when_not_on (3,c) in let u = Lustre.merge(c,y,y) in u ;;
-
-
-
-let fby2 (x, y) =
-  (x,y) ;;
-
-*)
-  (* let main _ = (fby(1,2), fby(true,false));;
-
-
-
-
-
-
-
-
-let foby(x,y) =
-  let pre_sy = signal<> in
-  let sy = signal<> in
-  emit sy(y);
-  let _ = exec emit pre_sy(x); %loop let z = ?sy in pause(); emit pre_sy(z) end default () in
-  ?pre_sy ;;
-
-let main (x,y) =
-  let z = foby(x,y) in
-  print_int z;print_string ";" ;;
-
-
-
-
-
-
-let foby(x,y) =
-  let pre_sy = signal<> in
-  let sy = signal<> in
-  emit sy(y);
-  let _ = exec emit pre_sy(x); %loop let z = ?sy in pause(); emit pre_sy(z) end default () in
-  ?pre_sy ;;
-
-let main (x,y) =
-  let z = foby(x,y) in
-  print_int z;print_string ";" ;;
-
-
-
-   *)*******)
- | E_sig_get _ -> 
+  | E_sig_get _ -> 
       ()
   | E_emit(_,e1) ->
       f e1
@@ -365,6 +196,8 @@ let main (x,y) =
   | E_exit(_,e1) ->
       f e1
   | E_suspend(e1,_) ->
+      f e1
+  | E_assert(e1,_) ->
       f e1
 
 let declare ds ts e =
@@ -520,6 +353,9 @@ let accum f (e:e) =   (* : ((x * ty * e) list * e)*)
         | E_suspend(e1,x) ->
             let ds1,e1' = aux e1 in
             [],E_suspend(declare' ds1 e1',x)
+        | E_assert(e1,loc) ->
+            let ds1,e1' = aux e1 in
+            ds1,E_assert(e1',loc)
     ) 
   in 
   aux e

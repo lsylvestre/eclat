@@ -16,7 +16,7 @@ type c =                (** constant [c] *)
                             does not occur in source programs *)
   | C_tuple of c list   (** tuple literal  [(e1, .. en)]    *)
   | C_vector of c list  (** vector literal [{ e1, ... en }] *)
-  | C_size of int       (** integer constant used only at compile time *)
+  | C_size of size      (** integer constant used only at compile time *)
   | Inj of x            (* non-applyed constructor (data type) *)
   | C_appInj of x * c * tyB (* constructor (data type) *)
 
@@ -80,14 +80,9 @@ type e =                      (** expression     [e]                       *)
   | E_exit of x * e
   | E_suspend of e * x
 
-and e_static = size
+  | E_assert of e * deco
 
-and le = (* Lustre expression *)
-  | Exp of e
-  | Fby of le * le
-  | When of le * e
-  | Merge of le * le * e
-  
+and e_static = size
 
 type static =                         (** static toplevel data *)
   | Static_array_of of (ty * deco) (** [let static x : ty array<n> ;;] *)

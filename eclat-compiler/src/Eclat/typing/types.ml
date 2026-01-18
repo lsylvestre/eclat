@@ -37,7 +37,6 @@ type tyB = TyB_var of tyB var
          | TyB_tuple of tyB list
          | TyB_sum of (tag * tyB) list
          | TyB_string of size
-         | TyB_size of size
          | TyB_abstract of x * size list * tyB list (* size in number of bits *)
 
 and tag = string
@@ -55,6 +54,7 @@ type ty = Ty_var of ty var
         | Ty_array of size * tyB
         | Ty_signal of tyB
         | Ty_trap of tyB
+        | Ty_size of size
 
 let dur_add d1 d2 =
   Dur_max(d1,d2)
@@ -85,8 +85,6 @@ let rec canon_tyB = function
 | TyB_unit -> TyB_unit
 | TyB_tuple tyB_list ->
     TyB_tuple (List.map canon_tyB tyB_list)
-| TyB_size(sz) ->
-    TyB_size(canon_size sz)
 | TyB_sum(ctors) ->
     TyB_sum(List.map (fun (tag,tyB) -> (tag,canon_tyB tyB)) ctors)
 | TyB_string sz ->
@@ -155,6 +153,8 @@ let rec canon_ty = function
     Ty_signal(canon_tyB tyB)
 | Ty_trap(tyB) ->
     Ty_trap(canon_tyB tyB)
+| Ty_size(sz) ->
+    Ty_size(canon_size sz)
 
 let pp_dur fmt (d:dur) : unit =
   let open Format in
@@ -197,8 +197,6 @@ let pp_tyB fmt (tyB:tyB) : unit =
   | TyB_unit -> fprintf fmt "unit"
   | TyB_int sz -> fprintf fmt "int<%a>" pp_size sz
   | TyB_tuple tyB_list -> pp_tuple fmt pp tyB_list
-  | TyB_size(sz) ->
-      fprintf fmt "size<%a>" pp_size sz
   | TyB_sum(ctors) ->
      fprintf fmt "(";
         pp_print_list
@@ -239,6 +237,8 @@ let pp_ty fmt (ty:ty) : unit =
       fprintf fmt "signal<%a>" pp_tyB tyB
   | Ty_trap(tyB) ->
       fprintf fmt "trap<%a>" pp_tyB tyB
+  | Ty_size(sz) ->
+      fprintf fmt "size<%a>" pp_size sz
   in pp fmt ty
 
 
@@ -300,7 +300,6 @@ let rec occ = function
 | TyB_var {contents=Is tyB} -> occ tyB
 | TyB_bool | TyB_unit -> ()
 | TyB_int sz -> occur_size v sz
-| TyB_size sz -> occur_size v sz
 | TyB_tuple tyB_list ->
     List.iter occ tyB_list
 | TyB_sum ctors ->
@@ -332,6 +331,8 @@ let rec occur_ty v ty =
       occur_tyB v tyB
   | Ty_trap(tyB) ->
       occur_tyB v tyB
+  | Ty_size sz ->
+      occur_size v sz
   in occ ty
 
 let test_occur occ o =
@@ -362,7 +363,6 @@ let rec vars s = function
   | TyB_int sz -> vars_of_size ~s:s sz
   | TyB_tuple tyB_list ->
       List.fold_left vars s tyB_list
-  | TyB_size sz -> vars_of_size ~s sz
   | TyB_sum ctors ->
       List.fold_left (fun s (_,tyB) -> vars s tyB) s ctors
   | TyB_string sz -> vars_of_size ~s:s sz
@@ -391,6 +391,8 @@ let rec vars s = function
     vars_of_tyB ~s:s tyB
 | Ty_trap (tyB) ->
     vars_of_tyB ~s:s tyB
+| Ty_size sz ->
+    vars_of_size ~s sz
 in vars s ty
 
 let free_vars_of_type (bv,t) =
@@ -430,8 +432,6 @@ let instance (Forall(vs,ty)) =
   | TyB_int sz -> TyB_int (inst_size sz)
   | TyB_tuple tyB_list ->
       TyB_tuple (List.map inst_tyB tyB_list)
-  | TyB_size sz ->
-      TyB_size(inst_size sz)
   | TyB_sum ctors ->
       TyB_sum (List.map (fun (tag,tyB) -> tag,inst_tyB tyB) ctors)
   | TyB_string sz -> TyB_string (inst_size sz)
@@ -459,6 +459,8 @@ let instance (Forall(vs,ty)) =
       Ty_signal(inst_tyB tyB)
   | Ty_trap(tyB) ->
       Ty_trap(inst_tyB tyB)
+  | Ty_size sz ->
+      Ty_size(inst_size sz) 
   in
   inst_ty ty
 
@@ -521,7 +523,8 @@ let contains_fun ty =
   | Ty_ref _
   | Ty_array _
   | Ty_signal _
-  | Ty_trap _ -> () 
+  | Ty_trap _
+  | Ty_size _ -> () 
   in
   try aux ty; false 
   with Find -> true ;;
@@ -568,8 +571,6 @@ let rec rename_tyB unknowns = function
 | TyB_int sz -> TyB_int (rename_size unknowns sz)
 | TyB_tuple tyB_list ->
     TyB_tuple (List.map (rename_tyB unknowns) tyB_list)
-| TyB_size sz ->
-    TyB_size(rename_size unknowns sz)
 | TyB_sum ctors ->
     TyB_sum (List.map (fun (tag,tyB) -> tag,rename_tyB unknowns tyB) ctors)
 | TyB_string sz -> TyB_string (rename_size unknowns sz)
@@ -597,6 +598,8 @@ let rec rename_ty unknowns = function
     Ty_signal(rename_tyB unknowns tyB)
 | Ty_trap(tyB) ->
     Ty_trap(rename_tyB unknowns tyB)
+| Ty_size sz ->
+    Ty_size(rename_size unknowns sz)
 
 let size_sz sz =
     let sz' = canon_size sz in

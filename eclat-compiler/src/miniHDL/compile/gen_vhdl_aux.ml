@@ -24,11 +24,11 @@ let rec size_const c =
       assert false (* cannot infer enum size *)
   | CTuple cs | CVector cs ->
       List.fold_left (fun s c -> s + size_const c) 0 cs
-  | CSize _ -> 
-      Prelude.Errors.warning (fun fmt ->
+  | CSize n -> 
+      (* Prelude.Errors.warning (fun fmt ->
         Format.fprintf fmt
-          "Size literal detected in the generated code: this is not an immediate value");
-      1 (* or 0 ? *)
+          "Size literal detected in the generated code: this is not an immediate value"); *)
+      Float.(int_of_float @@ ceil @@ log2 @@ float_of_int n)
   | String s -> String.length s * 8
   | C_encode(_,n) ->
       n
@@ -39,7 +39,7 @@ let reserved : string -> bool =
   let tbl = Hashtbl.create 20 in
   let () =
     List.iter (fun x -> Hashtbl.add tbl x ()) @@
-      [ (*"result"; "argument"; *)"_"; "reset"; "others" ; "value"; "clk"; "loop"; "exit";"next";"rdy";"wait"]
+      [ (*"result"; "argument"; *)"_"; "reset"; "others" ; "clk"; "loop"; "exit";"next";"rdy";"wait"]
       (* todo: complete with other VHDL keywords *)
   in
   (fun x -> Hashtbl.mem tbl x)
@@ -95,7 +95,7 @@ let ptr_taken x = MiniHDL_typing.ptr_taken x
 
 let decl_locks ?(init=false) fmt x =
   (* if !single_read_write_lock_flag then *)
-    fprintf fmt "variable %a : value(0 to 0)%s;@," pp_ident (ptr_taken x)
+    fprintf fmt "variable %a : Values.t(0 to 0)%s;@," pp_ident (ptr_taken x)
       (if init then " := (others => '0')" else "")
 
 
@@ -111,31 +111,31 @@ let pp_vector fmt pp vs =
 (** code generator for constants *)
 let rec pp_c fmt c =
   match c with
-  | Unit -> fprintf fmt "eclat_unit"
+  | Unit -> fprintf fmt "work.values.val_unit"
   | Int {value=n;tsize} ->
       let is_neg = n < 0 in
       let n = abs n in
       let sz = size_ty tsize in
-      if is_neg then fprintf fmt "eclat_neg(";
+      if is_neg then fprintf fmt "work.Int.neg(";
       if true (* sz < 16 *) then
         fprintf fmt "\"%s\"" (int2bin ~int_size:sz n)
       else
         (let v = Printf.sprintf "%x" n in (* dislay in hexa directly *)
          let l_pad = sz - String.length v * 4 in
-           Printf.printf "=====>--%d. / %s.  %d\n" l_pad v sz;
+           (* Printf.printf "=====>--%d. / %s.  %d\n" l_pad v sz; *)
          if l_pad = 0 then fprintf fmt "X\"%s\"" v else
          fprintf fmt "%s & X\"%s\"" (const_zero l_pad) v);
       if is_neg then fprintf fmt ")";
   | Bool b ->
       (* notice: in VHDL, eclat_true(0) is valid, but "1"(0) is invalid. *)
-      fprintf fmt "%s" (if b then "eclat_true" else "eclat_false")
+      fprintf fmt "%s" (if b then "work.Values.val_true" else "work.values.val_false")
   | Enum x -> pp_ident fmt x
   | CTuple(cs) ->
        pp_tuple fmt pp_c cs
   | CVector(cs) ->
       pp_vector fmt pp_c cs
-  | String s -> fprintf fmt "of_string(\"%s\")" s
-  | CSize n -> fprintf fmt "%d" n
+  | String s -> fprintf fmt "work.Util.of_string(\"%s\")" s
+  | CSize n -> pp_c fmt (Int{value=n;tsize=TSize (size_const c)})
   | C_encode(c,n) ->
       fprintf fmt "%a & %s" pp_c c (const_zero (n - size_const c))
 
@@ -189,28 +189,10 @@ let rec pp_tuple_access externals fmt (i:int) ty (a:a) : unit =
   | `Atom(a) -> pp_a externals fmt a
 
 
-(** code generator for call of operator *)
+(** code generator for operator call *)
 and pp_call externals fmt (op,a) =
   match op with
   | GetTuple(i,_,ty) -> pp_tuple_access externals fmt i ty a
-  | Runtime(Size_of_val(ty,size_int)) -> 
-     let n = size_ty (MiniHDL_typing.translate_ty ty) in
-     pp_c fmt (Int{value=n;tsize=MiniHDL_typing.translate_size size_int})
- | Runtime(Resize_int sz) ->
-      let n = size_ty @@ MiniHDL_typing.translate_size sz in
-      fprintf fmt "eclat_resize(%a,%d)" (pp_a externals) a n
- | Runtime(Vector_create sz) ->
-      let n = size_ty @@ MiniHDL_typing.translate_size sz in
-      fprintf fmt "eclat_vector_make(%d,%a)" n (pp_a externals) a
-  | Runtime(Vector_length (sz)) ->
-      (match Types.canon_size sz with
-      | Sz_lit n -> pp_c fmt (Int {value=n;tsize=(MiniHDL_typing.translate_size (Sz_lit 16))})
-      | _ -> Types.pp_size Format.std_formatter (Types.canon_size sz); assert false)
-   | Runtime(Vector_get t) ->
-      fprintf fmt "eclat_vector_get(%a,%d)" (pp_a externals) a (size_ty MiniHDL_typing.(translate_tyB t))
-   | Runtime(Vector_update(t,sz)) ->
-      fprintf fmt "eclat_vector_update(%a,%d)" (pp_a externals) a (size_ty MiniHDL_typing.(translate_size sz))
- 
   | Runtime(External_fun (x,ty)) ->
       let annot_with_sizes,arity = match List.assoc_opt x (snd externals) with
                                    | Some (_,(b,n,_)) -> (b,n)
@@ -241,14 +223,14 @@ and pp_call externals fmt (op,a) =
             (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt ", ") (pp_a externals)) aa
       | _ -> fprintf fmt "@[%a)@]" (pp_a externals) a);
       fprintf fmt "@]"
-  | Runtime p -> fprintf fmt "work."; Operators.gen_op ~externals fmt p (pp_a externals) a
+  | Runtime p -> Operators.gen_op ~externals fmt p (pp_a externals) a
   | _ -> fprintf fmt "@[%a(%a)@]" pp_op op (pp_a externals) a
 
 (** code generator for operator *)
 and pp_op fmt = function
-| If -> fprintf fmt "eclat_if"
+| If -> fprintf fmt "work.if_then_else.mux"
 | Runtime p -> assert false (* deal with in pp_call*)
-| TyConstr _ -> fprintf fmt "eclat_id"
+| TyConstr _ -> assert false
 | GetTuple (i,_,_) -> assert false (* special case, defined below (see tuple_access) *)
 
 (** code generator for atoms (i.e. combinatorial expression) *)
@@ -393,8 +375,8 @@ let array_decl fmt x sz_elem n default_value_pp =
 
   if List.mem x !has_init_file_ram then fprintf fmt "attribute ram_init_file of %s : signal is \"%s.mif\";@," x x;
 
-  fprintf fmt "signal %a : value(0 to %d) := (others => '0');@," pp_ident ("$"^x^"_value") (sz_elem - 1);
+  fprintf fmt "signal %a : Values.t(0 to %d) := (others => '0');@," pp_ident ("$"^x^"_value") (sz_elem - 1);
   fprintf fmt "signal %a, %a : natural range 0 to %d := 0;@," pp_ident ("$"^x^"_ptr") pp_ident ("$"^x^"_ptr%pre") (n - 1);
   fprintf fmt "signal %a, %a : natural range 0 to %d := 0;@," pp_ident ("$"^x^"_ptr_write") pp_ident ("$"^x^"_ptr_write%pre") (n - 1);
-  fprintf fmt "signal %a, %a : value(0 to %d) := (others => '0');@," pp_ident ("$"^x^"_write") pp_ident ("$"^x^"_write%pre") (sz_elem - 1);
+  fprintf fmt "signal %a, %a : Values.t(0 to %d) := (others => '0');@," pp_ident ("$"^x^"_write") pp_ident ("$"^x^"_write%pre") (sz_elem - 1);
   fprintf fmt "signal %a, %a : std_logic := '0';@," pp_ident ("$"^x^"_write_request") pp_ident ("$"^x^"_write_request%pre")

@@ -3,7 +3,7 @@ open Ast_subst
 
 (* remove simulation primitives like print and assert *)
 
-let clean_exp ~no_print ~no_assert e =
+let clean_exp ~no_print ~no_assert ~externals e =
   let rec clean e =
     match e with
     | E_letIn(p,ty,E_fun(p2,sigty,e1),e2) ->
@@ -14,18 +14,25 @@ let clean_exp ~no_print ~no_assert e =
         E_letIn(p,ty,clean e1,clean e2)
     | E_app(e1,e2) ->
         let opt = match un_annot e1 with
-                  | E_const(Op(Runtime(Print | Print_string | Print_int | Print_newline))) ->
-                       let x = gensym ~prefix:"tmp" () in
-                       if no_print then (Some (E_letIn(P_var x,Types.new_ty_unknown(),e2,E_const(Unit)))) else None
-                  | E_const(Op(Runtime(Assert))) ->
-                       let x = gensym ~prefix:"tmp" () in
-                       if no_assert then Some (E_letIn(P_var x,Types.new_ty_unknown(),e2,E_const(Unit))) else None
-                  | _ -> None in
+                  | E_const(Op(Runtime(External_fun(x,_)))) ->
+                      if no_print then
+                          (match List.assoc_opt x (snd externals) with
+                           | Some (t,(_,_,is_imp)) ->
+                              if is_imp 
+                              then (Some (E_letIn(P_var x,Types.new_ty_unknown(),e2,E_const(Unit))))
+                              else None
+                           | None -> None)
+                      else None
+                   | _ -> None in
         (match opt with
         | None -> E_app(clean e1,clean e2)
         | Some e0 -> e0)
+    | E_assert(e1,loc) ->
+        let x = gensym ~prefix:"tmp" () in
+        if no_assert then E_letIn(P_var x,Types.new_ty_unknown(),e1,E_const(Unit))
+        else E_assert(clean e1,loc)
     | e -> Ast_mapper.map clean e
   in clean e
 
 let clean_pi ~no_print ~no_assert pi =
-  Map_pi.map (clean_exp ~no_print ~no_assert) pi
+  Map_pi.map (clean_exp ~no_print ~no_assert ~externals:pi.externals) pi

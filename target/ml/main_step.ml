@@ -1,42 +1,60 @@
-open Extra;;
 open Runtime
 
-type state_t = IDLE91
+type state_t = IDLE106
 
-let state = ref IDLE91 ;;
-let _619 : Int.t ref = ref 0L ;;
-let _615 : 'vv10 ref = ref (Array.make 3 ((default_char ()))) ;;
-let _614_dir : 'vv11 ref = ref (default_char ()) ;;
-let _613_by : 'vv12 ref = ref (default_bytes ()) ;;
-let _622 : 'vv13 ref = ref (Array.make 2 ((default_char ()))) ;;
-let _620 : Int.t ref = ref 0L ;;
-let _616_pos : 'vv14 ref = ref (default_bytes ()) ;;
-let rdy90 : bool ref = ref false ;;let _617 : unit ref = ref () ;;
-let _618 : unit ref = ref () ;;let _621 : unit ref = ref () ;;
-let result89 : unit ref = ref () ;;
+type state_var112 = IDLE109  | Q_665_FACT86
+let state = ref IDLE106 ;;
+let state_var112 = ref IDLE109 ;;
+let result104 : (unit*bool) ref = ref ((),false) ;;
+let _665_fact86_id : Int.t ref = ref 0L ;;
+let _665_fact86_result : Int.t ref = ref 0L ;;
+let _666 : Int.t ref = ref 0L ;;let _670 : Int.t ref = ref 0L ;;
+let _671 : Int.t ref = ref 0L ;;
+let _665_fact86_arg : (Int.t*Int.t) ref = ref (0L,0L) ;;
+let _669 : bool ref = ref false ;;let _v110 : bool ref = ref false ;;
+let rdy105 : bool ref = ref false ;;let rdy108 : bool ref = ref false ;;
+let result107 : unit ref = ref () ;;
 let main_step =
   fun arg ->
     let argument = ref arg in
     (match !state with
-    | IDLE91 -> 
-      rdy90 := false;
-      _613_by := IOFile.read_file_ (256, 24)("../advent-of-code/rot/instr_hexa.txt");
-      _614_dir := Bytes.get_ (56, 8)((!_613_by, 0L));
-      _615 := Bytes.to_vect_ (!_613_by);
-      _622 := Vect.tail_ (24, 16)(!_615);
-      _616_pos := Bytes.from_vect_ (!_622);
-      _617 := Char.print_ (!_614_dir);
-      _618 := Print.string_ (":");
-      _619 := Bytes.to_hex_ (!_616_pos);
-      _620 := Int.resize_(!_619,32);
-      _621 := Print.int_ (!_620);
-      result89 := Print.newline_ (());
-      rdy90 := true;
-      state := IDLE91
-        
-    );
-  !result89
-  
+    | IDLE106 -> 
+      rdy105 := false;
+      (match !state_var112 with
+      | Q_665_FACT86 ->
+         _669 := Int.lt_ (((tuple_get_ (0,!_665_fact86_arg) : Int.t), 2L));
+         _v110 := !_669;
+         (if !_v110 then
+            (_665_fact86_result := (tuple_get_ (1,!_665_fact86_arg) : Int.t);
+             _666 := !_665_fact86_result;
+             result107 := Int.print_ (!_666);
+             rdy108 := true;
+             state_var112 := IDLE109)
+         else
+           (_670 := Int.sub_ (((tuple_get_ (0,!_665_fact86_arg) : Int.t), 1L));
+            _671 := Int.mul_ (((tuple_get_ (1,!_665_fact86_arg) : Int.t), (tuple_get_ (0,!_665_fact86_arg) : Int.t)));
+            _665_fact86_arg := (!_670, !_671);
+            state_var112 := Q_665_FACT86)
+           )
+          
+      | IDLE109 -> 
+        rdy108 := false;
+        _665_fact86_id := 1L;
+        _665_fact86_arg := (6L, 1L);
+        state_var112 := Q_665_FACT86
+          
+      );
+      (if !rdy108 then
+         (())
+      else
+        (result107 := ())
+        );
+      result104 := (!result107, !rdy108);
+      rdy105 := true;
+      state := IDLE106
+      
+  );!result104
+
 
 let run n =
   let args_list = [|()|] in

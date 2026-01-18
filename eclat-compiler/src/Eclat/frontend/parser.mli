@@ -66,6 +66,7 @@ type token =
   | MACRO_GENERATE
   | MACRO_FOR
   | LXOR
+  | LT_LT
   | LT
   | LSR
   | LSL
@@ -93,6 +94,7 @@ type token =
   | IF
   | IDENT of (string)
   | HAT
+  | GT_GT
   | GT
   | GET_START
   | GET_END
@@ -115,6 +117,7 @@ type token =
   | DOT_LENGTH
   | DOT
   | DONE
+  | DOLLARD
   | DO
   | DIV
   | DEFAULT
@@ -126,6 +129,7 @@ type token =
   | BANG
   | AT_AT
   | AT
+  | ASSERT
   | ASR
   | ARRAY_MAKE
   | ARRAY_LENGTH

@@ -37,7 +37,7 @@ let declare_toplevel_error e =
     E_fix(stop,(P_unit, (Ty_base TyB_unit, TyB_unit),
       E_letIn(P_unit, Ty_base TyB_unit,
         (if !Operators.flag_no_print then E_const Unit 
-         else E_app(E_const(Op(Runtime(Print_string))),E_const(String("index out of bounds")))),
+         else E_app(E_const(Op(Runtime(External_fun("Print.print_string",Types.new_ty_unknown())))),E_const(String("index out of bounds")))),
         E_app(E_var stop,E_const Unit)))),e) 
 
 let insert_pi pi =

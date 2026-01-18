@@ -61,8 +61,8 @@ let () =
                  "monomorphic type system");
     ("-no-glob", Arg.Clear Compile.globalize_flag,
                  "no globalization during lambda lifting");
-    ("-interp",   Arg.Set interp_flag,
-                 "interpret and exit (note: experimental, may be buggy).");
+    (* ("-interp",   Arg.Set interp_flag,
+                 "interpret and exit (note: experimental, may be buggy)."); *)
 
     ("-arg",      Arg.Set_string arguments,
                   "specify a list of inputs (one at each clock tick)\

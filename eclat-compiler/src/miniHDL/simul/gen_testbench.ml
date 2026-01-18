@@ -23,7 +23,6 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-use work.runtime.all;
 use work.all;
 
 entity tb_%s is@," name;
@@ -35,8 +34,8 @@ architecture tb of tb_%s is
     port(
       signal clk    : in std_logic;
       signal reset  : in std_logic;
-      signal %s : in value(0 to %d);
-      signal result : out value(0 to %d)" name argument (argument_size-1) (result_size-1);
+      signal %s : in Values.t(0 to %d);
+      signal result : out Values.t(0 to %d)" name argument (argument_size-1) (result_size-1);
 
   fprintf fmt ");@,end component;";
 

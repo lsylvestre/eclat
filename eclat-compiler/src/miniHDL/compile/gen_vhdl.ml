@@ -33,17 +33,15 @@ let rec pp_s externals ~st fmt = function
       Option.iter (fun s ->
         fprintf fmt "@[<v 2>when others =>@,%a@]@," (pp_s externals ~st) s) so;
       fprintf fmt "@]end case;")
-| S_set(x,((A_call(Runtime(((Print|Print_ascii|Print_string|Print_int|Print_newline))),_)) as a))->
-   fprintf fmt "%a;@," (pp_a externals) a
 | S_set(x,a) -> fprintf fmt "@[<v>%a := %a;@]" pp_ident x (pp_a externals) a
 | S_sig_set(x,a) -> fprintf fmt "@[<v>%a <= %a;@]" pp_ident x (pp_a externals) a
 | S_acquire_lock(l) ->
       fprintf fmt
-         "@[acquire(%a);@]" 
+         "@[Lock.acquire(%a);@]" 
             pp_ident (ptr_taken l)
  | S_release_lock l ->
       fprintf fmt
-         "@[release(%a);@]" 
+         "@[Lock.release(%a);@]" 
             pp_ident (ptr_taken l)
 | S_read_start(x,idx) -> (* todo: avoid code duplication between S_setptr & S_setptr_write *)
    fprintf fmt "@[%a <= " pp_ident ("$"^x^"_ptr");
@@ -122,7 +120,11 @@ let rec pp_s externals ~st fmt = function
    fprintf fmt "%s_argument_%a_var := \"1\" & %a;@,"
           f pp_ident l
           (pp_a externals) a
-
+| S_assert(a,loc) ->
+   fprintf fmt "-- ===================================@,";
+   fprintf fmt "assert %a = \"1\" report \"from %a\" severity error;@,"
+        (pp_a externals) a Prelude.Errors.pp_loc loc;
+   fprintf fmt "-- ===================================@,"
 
 
 (** code generator for FSMs *)
@@ -190,7 +192,7 @@ let declare_machine fmt ~state_var ~idle ~infos (ts,s) =
       fprintf fmt "signal %a : %a;@," pp_ident (Naming_convention.instance_id_of_fun x) pp_ident inst_tname
     end
   ) infos
-(* type array_value is array (0 to 20) of value(0 to 31); *)
+(* type array_value is array (0 to 20) of Values.t(0 to 31); *)
 let pp_ty fmt t =
   match MiniHDL_typing.canon t with
   | TStatic{elem;size=TTuple ts} -> 
@@ -198,7 +200,7 @@ let pp_ty fmt t =
       List.iter (fun tsize -> fprintf fmt "(0 to %d)" (size_ty tsize - 1)) ts;
   | TStatic{elem;size} -> fprintf fmt "array_value_%d(0 to %d)" (size_ty elem) (size_ty size - 1);
   | _ ->
-      fprintf fmt "value(0 to %d)" (size_ty t-1)
+      fprintf fmt "Values.t(0 to %d)" (size_ty t-1)
 
 let declare_signals others variables fmt =
   let var_decls = Hashtbl.create 10 in
@@ -217,7 +219,7 @@ let declare_signals others variables fmt =
       let n = (size_ty t) in
       add_var x n) others;
   Hashtbl.iter (fun n xs ->
-      fprintf fmt "signal @[<v>@[<hov>%a@] : value(0 to %d) := (others => '0');@]@,"
+      fprintf fmt "signal @[<v>@[<hov>%a@] : Values.t(0 to %d) := (others => '0');@]@,"
         (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt ",@ @,") pp_ident) xs (n-1)
     ) var_decls
 
@@ -238,7 +240,7 @@ let declare_variable ~argument ~statics typing_env fmt =
 
   Hashtbl.iter (fun n xs ->
       (* Notice there is a default value ``0'' *)
-      fprintf fmt "variable @[<v>@[<hov>%a@] : value(0 to %d) := (others => '0');@]@,"
+      fprintf fmt "variable @[<v>@[<hov>%a@] : Values.t(0 to %d) := (others => '0');@]@,"
         (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt ",@ @,") pp_ident) xs (n-1)
     ) var_decls
 
@@ -264,7 +266,7 @@ let pp_component fmt ~vhdl_comment ~name ~externals ~state_var ~argument ~result
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-use work.runtime.all;
+use work.all;
 
 @[<v 2>entity %a is@," pp_ident name;
 
@@ -278,11 +280,11 @@ use work.runtime.all;
      fprintf fmt ");@]");
   fprintf fmt "@,port(@[<v>signal clk    : in std_logic;@,";
   fprintf fmt "signal reset  : in std_logic;@,";
-  (* fprintf fmt "signal rdy    : out value(0 to 0);@,"; *)
+  (* fprintf fmt "signal rdy    : out Values.t(0 to 0);@,"; *)
   let st_argument = match t_argument with None -> "argument_width - 1" | Some t -> string_of_int (size_ty t - 1) in
   let st_result = match t_result with None -> "result_width - 1" | Some t -> string_of_int (size_ty t - 1) in
-  fprintf fmt "signal %s : in value(0 to %s);@," argument st_argument;
-  fprintf fmt "signal result : out value(0 to %s)" st_result;
+  fprintf fmt "signal %s : in Values.t(0 to %s);@," argument st_argument;
+  fprintf fmt "signal result : out Values.t(0 to %s)" st_result;
   fprintf fmt ");@,@]@]@,end entity;
 architecture rtl of %a is@,@[<v 2>@," pp_ident name;
 
@@ -296,9 +298,11 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
   declare_machine fmt ~state_var ~idle ~infos (ts,s);
 
   ArrayType.iter (fun n _ ->
-      fprintf fmt "type array_value_%d is array (natural range <>) of value(0 to %d);@," n (n-1)) arty;
+      fprintf fmt "type array_value_%d is array (natural range <>) of Values.t(0 to %d);@," n (n-1)) arty;
 
-  if !Operators.flag_no_print then () else (
+  if !Operators.flag_no_print || 
+    Hashtbl.length MiniHDL_typing.hashtbl_array_from_file = 0 
+  then () else (
   ArrayType.iter (fun n _ ->
       fprintf fmt 
 "@,@,procedure array_from_file(signal x : inout array_value_%d; name : in std_logic_vector) is
@@ -397,7 +401,9 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
           pp_ident ("$"^x^"_ptr_write")
           pp_ident ("$"^x^"_write")
           (fun fmt () -> 
-              if !Operators.flag_no_print then () else (
+              if !Operators.flag_no_print ||
+                not(Hashtbl.mem MiniHDL_typing.hashtbl_array_from_file x) 
+                then () else (
                 fprintf fmt "@,             elsif %a(0) = '1' then@,               array_from_file(%a,%a);" 
                             pp_ident ("$"^x^"_from_file%next")
                             pp_ident x
@@ -561,6 +567,7 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
   
   if !Operators.flag_no_print then () else (
       List.iter (fun (x,st) ->
+        if Hashtbl.mem MiniHDL_typing.hashtbl_array_from_file x then
     match st with
     | Static_array_of _
     | Static_array _ ->

@@ -78,6 +78,7 @@ type s = (* all instructions terminates in one clock cycle *)
   | S_call of Operators.op * a
   | S_external_run of x * l * x * x * a (* (f,id,result,rdy,a) *)
   | S_sig_set of x * a
+  | S_assert of a * Prelude.loc
 
 and t = (x * s)
 
@@ -207,6 +208,8 @@ let pp_vector = Ast_pprint.pp_vector
       fprintf fmt "@[(%s,%s) := run_%s %s %a;@]" res rdy l f pp_a a
   | S_sig_set(x,a) ->
       fprintf fmt "@[<v>%s <= %a;@]" x pp_a a
+  | S_assert(a,_) ->
+      fprintf fmt "@[assert(%a);@]" pp_a a
   and pp_fsm fmt (ts,s) =
     let pp_t fmt (x,s) = fprintf fmt "@[%s = %a@]@," x pp_s s in
     fprintf fmt "@[<v>let rec ";

@@ -46,7 +46,11 @@
        "lsl", LSL;
        "lsr", LSR;
        "asr", ASR;
+       "assert", ASSERT;
+       "when",   WHEN;
+       "suspend", SUSPEND;
        "resize_int", RESIZE_INT;
+       "vect_create", VECT_CREATE;
        "tuple_of_int",TUPLE_OF_INT;
        "int_of_tuple",INT_OF_TUPLE;
        "type", TYPE;
@@ -80,7 +84,6 @@
        "shared", SHARED;
        "run", RUN;
        "impure",IMPURE;
-       "vect_create",VECT_CREATE;
        "make", ARRAY_MAKE;
        "emit", EMIT;
        "signal", SIGNAL;
@@ -167,20 +170,21 @@ rule token = parse
 | "!"                 { BANG }
 | "?"                 { QUESTION_MARK }
 | "!=" | "<>"         { NEQ }
+| "<<"                 { LT_LT }
+| ">>"                 { GT_GT }
 | "&&"                { AMP_AMP }
 | "&"                 { AMP }
 (* | "%"                 { PERCENT }*)
 | "^"                 { HAT }
 | ".length"           { DOT_LENGTH }
-| "%loop"             { LOOP }
-| "%suspend"          { SUSPEND }
-| "%when"             { WHEN }
+| "loop:"             { LOOP }
 | ['"']([^'"']* as s)['"'] { STRING_LIT s }
 | ['\r']['\n'] | ['\n']| ['\r'] { (Lexing.new_line lexbuf) ; (token lexbuf) }
 | [' ' '\t']          { token lexbuf }
 | ';'                 { SEMI }
 | '.'                 { DOT }
 | ";;"                { SEMI_SEMI }
+| "$"                 { DOLLARD }
 | eof | "%eof"        { EOF }
 | "(*"                { incr nested_comment_depth; comment lexbuf }
 | _  as lxm           { Prelude.Errors.raise_error ~loc:(get_loc lexbuf)

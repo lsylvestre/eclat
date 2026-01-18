@@ -127,15 +127,6 @@ let rec pp_call externals typing_env res fmt (op,a) =
         (fun fmt i -> fprintf fmt "Int.get_bit_(%s,%dL)" z i) 
          fmt ns;
      fprintf fmt "))"
-  | Runtime(Size_of_val(ty,size_int)) -> 
-     let n = size_ty (MiniHDL_typing.translate_ty ty) in
-     pp_c fmt (Int{value=n;tsize=MiniHDL_typing.translate_size size_int})
-  | Runtime(Resize_int sz) ->
-      let n = size_ty @@ MiniHDL_typing.translate_size sz in
-      fprintf fmt "Int.resize_(%a,%d)" (pp_a typing_env externals) a n
-  | Runtime(Vector_create sz) ->
-      let n = size_ty @@ MiniHDL_typing.translate_size sz in
-      fprintf fmt "Vector.make_ (%d,%a)" n (pp_a typing_env externals) a
   | Runtime(External_fun (x,ty)) ->
       (** no normalization of ident [x], 
           but add caracter '_' for ensuring [x_] is a valid 
@@ -156,21 +147,6 @@ let rec pp_call externals typing_env res fmt (op,a) =
                                     (fun fmt d -> fprintf fmt "%d" d)) fmt extra;
                                 fprintf fmt ")");
       fprintf fmt "(%a)"
-        (pp_a typing_env externals) a
-  | Runtime(Assert) -> 
-      fprintf fmt "assert (%a)"
-        (pp_a typing_env externals) a
-  | Runtime(Print_newline) -> 
-      fprintf fmt "Print.newline_ (%a)"
-        (pp_a typing_env externals) a
-  | Runtime(Print_string) -> 
-      fprintf fmt "Print.string_ (%a)"
-        (pp_a typing_env externals) a
-  | Runtime(Print_int) -> 
-      fprintf fmt "Print.int_ (%a)"
-        (pp_a typing_env externals) a
-  | Runtime(Print) -> 
-      fprintf fmt "Print.value_ (%a)"
         (pp_a typing_env externals) a
   | Runtime p ->
       Operators.gen_op ~externals fmt p (fun fmt a -> 
@@ -305,6 +281,11 @@ let rec pp_s typing_env externals ~st fmt = function
        pp_prog_name f
        (pp_a typing_env externals) a;
      fprintf fmt "%a := snd %a" pp_ident rdy pp_ident res
+| S_assert(a,loc) ->
+   fprintf fmt "if %a then () else (print_string \"%a\"; assert false);@,"
+        (pp_a typing_env externals) a Prelude.Errors.pp_loc loc
+
+
 
 (** code generator for FSMs *)
 and pp_fsm typing_env externals fmt ~state_var:st ~idle ~rdy (id,ts,s) =

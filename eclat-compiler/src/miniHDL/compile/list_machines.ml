@@ -32,6 +32,7 @@ let rec list_machines_s s =
   | S_in_fsm(id,s) -> S_in_fsm(id,list_machines_s s)
   | S_call _ -> s
   | S_external_run _ -> s
+  | S_assert _ -> s
 
 
 and list_machines (ts,s) =

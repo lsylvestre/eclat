@@ -33,7 +33,7 @@ package body values is
           b := b and (x(i) = y(i));
         end loop;
         if b then return "1"; else return "0"; end if;
-      end; 
+      end;
 end;
 
 library ieee; 
@@ -41,8 +41,12 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 package util is
+  alias t is std_logic_vector;
   procedure echo (arg : in string);
   function val_of_bool (b:boolean) return std_logic_vector;
+  function to_string (a: std_logic_vector) return string;
+  function of_string   (s: string)   return t;
+  function to_ascii (a: t) return string;
 end package;
 
 package body util is
@@ -58,36 +62,6 @@ package body util is
         return "0";
       end if;
     end;
-end util;
-
-library ieee; 
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
-package Assertion is
-  procedure ok (b: in std_logic_vector);
-end Assertion;
-package body Assertion is
-  procedure ok (b:in std_logic_vector) is
-    begin
-      assert b = "1" report "assertion failed" severity error;
-    end;
-end Assertion;
-
-library ieee; 
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
-
-package Print is
-  alias t is std_logic_vector;
-  function to_string (a: std_logic_vector) return string;
-  function of_string   (s: string)   return t; 
-  procedure print_value (signal clk:in std_logic;arg:in t);
-  procedure print_ascii (signal clk:in std_logic;arg:in t);
-  procedure print_string (signal clk:in std_logic;arg:in t);
-  procedure print_newline (signal clk: in std_logic;arg: in t);
-end package;
-package body Print is
-  
   function to_string (a: std_logic_vector) return string is
     variable b : string (1 to a'length) := (others => NUL);
     variable stri : integer := 1; 
@@ -111,16 +85,9 @@ package body Print is
             answer(p - 8 to p-1) := std_logic_vector(to_unsigned(c,8)); 
         end loop; 
         return answer;
-    end; 
-
-  procedure print_value (signal clk:in std_logic;arg:in t) is
-    begin
-      if rising_edge(clk) then
-        work.Util.echo(to_string(arg));
-      end if;
     end;
-
-  function to_ascii (a: std_logic_vector) return string is
+  
+  function to_ascii (a: t) return string is
     variable tmp : t(0 to ((a'length+7)/8)*8-1) := (others => '0');
     variable b : string (1 to tmp'length/8) := (others => NUL);
     variable n : integer;
@@ -132,19 +99,60 @@ package body Print is
         end loop;
     return b;
   end function;
+end util;
 
-  procedure print_ascii (signal clk:in std_logic;arg:in t) is
+library ieee; 
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+package Assertion is
+  procedure ok (b: in std_logic_vector);
+end Assertion;
+package body Assertion is
+  procedure ok (b:in std_logic_vector) is
+    begin
+      assert b = "1" report "assertion failed" severity error;
+    end;
+end Assertion;
+
+library ieee; 
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+library work; 
+use work.util;
+
+package Print is
+  alias t is std_logic_vector;
+  impure function print_value (signal clk: std_logic ; arg: t) return t;
+  impure function print_ascii (signal clk: std_logic ; arg: t) return t;
+  impure function print_string (signal clk: std_logic ; arg: t) return t;
+  impure function print_newline (signal clk: std_logic ; arg: t) return t;
+end package;
+package body Print is
+  impure function print_value (signal clk: std_logic ; arg: t) return t is
+      variable res : t(0 to 0) := "0";
     begin
       if rising_edge(clk) then
-        work.Util.echo(to_ascii(arg));
+        work.Util.echo(work.Util.to_string(arg));
       end if;
+      return res;
     end;
 
-  procedure print_newline (signal clk: in std_logic;arg: in t) is
+  impure function print_ascii (signal clk: std_logic ; arg: t) return t is
+      variable res : t(0 to 0) := "0";
+    begin
+      if rising_edge(clk) then
+        work.Util.echo(work.Util.to_ascii(arg));
+      end if;
+      return res;
+    end;
+
+  impure function print_newline (signal clk: std_logic ; arg: t) return t is
+      variable res : t(0 to 0) := "0";
     begin
       if rising_edge(clk) then
         work.Util.echo(" " &LF);
       end if;
+      return res;
     end;
 
   function char_of_value(arg : std_logic_vector(0 to 7)) return character is
@@ -163,8 +171,9 @@ package body Print is
     return character'val(temp);
   end;
 
-  procedure print_string (signal clk: in std_logic ; arg: in t) is
-    variable s : string (0 to arg'length / 8);
+  impure function print_string (signal clk: std_logic ; arg: t) return t is
+      variable res : t(0 to 0) := "0";
+      variable s : string (0 to arg'length / 8);
     begin
       if rising_edge(clk) then
         for i in 0 to s'length-2 loop
@@ -172,6 +181,7 @@ package body Print is
         end loop;
         work.Util.echo(s);
       end if;
+      return res;
     end;
 end Print;
 
@@ -211,7 +221,7 @@ use ieee.numeric_std.all;
 
 package bool is
   alias t is std_logic_vector;
-  procedure print (signal clk:in std_logic;arg: in t);
+  impure function print(signal clk: in std_logic; arg: in t) return t;
   function is_true (arg: t) return boolean;
   function lnot (arg: t) return t;
   function lor  (arg1: t;arg2: t) return t;
@@ -221,7 +231,9 @@ end package;
 
 package body bool is
 
-  procedure print(signal clk: in std_logic; arg: in t) is
+  
+  impure function print(signal clk: in std_logic; arg: in t) return t is
+      variable res : t(0 to 0) := "0";
     begin
       if rising_edge(clk) then
         if arg(0) = '1' then
@@ -230,7 +242,9 @@ package body bool is
           work.Util.echo("false");
         end if;
       end if;
-    end procedure;
+      return res;
+    end;
+
   function is_true (arg: t) return boolean is
     begin
       if arg(0) = '1' then
@@ -261,10 +275,33 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+package if_then_else is
+  alias t is std_logic_vector;
+  function mux(arg1,arg2,arg3:t) return t;
+end package;
+
+package body if_then_else is
+  function mux(arg1,arg2,arg3:t) return t is
+    begin
+      if arg1(0) = '1' then
+        return arg2;
+      else
+        return arg3;
+      end if;
+    end;
+end if_then_else;
+
+library ieee; 
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
 package int is
   alias t is std_logic_vector;
-  procedure print(signal clk: in std_logic; arg: in t);
+  impure function print(signal clk: std_logic; arg: t) return t;
   function resize(arg:t; k:integer) return t;
+  function resize(sa,sr: integer; arg:t) return t;
+  function resize(arg1:t; arg2:t) return t;
+  function logical_not (arg1: t) return t;
   function absv   (arg1: t) return t;
   function add    (arg1: t;arg2: t) return t;
   function sub    (arg1: t;arg2: t) return t;
@@ -284,11 +321,14 @@ package int is
   function lor    (arg1: t;arg2: t) return t;
   function land   (arg1: t;arg2: t) return t;
   function lxor   (arg1: t;arg2: t) return t;
+  function get_bit(arg1: t;arg2: t) return t;
+  function update_bit(arg1: t;arg2: t; arg3:t) return t;
 end package;
 
 package body int is -- signed int
 
-  procedure print(signal clk:in std_logic;arg:in t) is
+  impure function print(signal clk: std_logic; arg: t) return t is
+      variable res : t(0 to 0) := "0";
     begin
       if rising_edge(clk) then
         if arg'length <= 63 then
@@ -298,16 +338,36 @@ package body int is -- signed int
           work.Util.echo(integer'image(to_integer(resize(unsigned(arg),63))));
         end if;
       end if;
-    end procedure;
+      return res;
+    end;
 
   function resize(arg:t; k:integer) return t is
     begin
-       return std_logic_vector(resize(unsigned(arg),k));
+       return t(resize(unsigned(arg),k));
+    end;
+  -- (<'s1> * int<'s2>) => int<'s1> ;;
+  function resize(arg1:t; arg2:t) return t is
+    begin
+       return resize(arg2, to_integer(unsigned(arg1)));
+    end;
+  function resize(sa,sr:integer; arg:t) return t is
+    begin
+       return resize(arg, sr);
     end;
 
   function absv (arg1: t) return t is
     begin
       return t(abs(signed(arg1)));
+    end;
+
+  function logical_not (arg1: t) return t is
+     variable a,res : t(0 to arg1'length - 1);
+    begin
+      a(0 to arg1'length - 1) := arg1;
+      for i in 0 to arg1'length - 1 loop
+        res(i) := not(a(i));
+      end loop;
+      return res;
     end;
 
   function add (arg1: t;arg2: t) return t is
@@ -410,9 +470,9 @@ package body int is -- signed int
     end;
   
   function asr (arg1: t;arg2: t) return t is
-    variable r : unsigned (0 to arg1'length - 1);
+    variable r : signed (0 to arg1'length - 1);
     begin
-      r := unsigned(arg1) srl unsigned_integer_of_value(arg2);  -- ok ?
+      r := shift_right(signed(arg1), unsigned_integer_of_value(arg2));  -- ok ?
       return t(r);
     end;
   
@@ -442,6 +502,30 @@ package body int is -- signed int
       end loop;
       return t(r);
     end;
+
+  function get_bit(arg1: t;arg2: t) return t is
+      constant i : natural := to_integer(unsigned(arg2));
+      variable a : t(0 to arg1'length - 1);
+      variable res : t(0 to 0);
+      begin
+        a(0 to arg1'length - 1) := arg1;
+        if i >= arg1'length then
+          res(0 to 0) := "0";
+        else
+          res(0 to 0) := a(i to i);
+        end if;
+        return res;
+      end;
+  function update_bit(arg1: t;arg2: t;arg3: t) return t is
+        constant i : natural := to_integer(unsigned(arg2));
+        variable res : t(0 to arg1'length - 1); 
+      begin
+        res(0 to arg1'length - 1) := arg1;
+        if i < arg1'length then
+          res(i to i) := arg3;
+        end if;
+        return res;
+      end;   
 end int;
 
 
@@ -574,6 +658,7 @@ use ieee.numeric_std.all;
 package vect is
   alias t is std_logic_vector;
   function create (sa,sr : integer; arg: t) return t;
+  function create (sa,sr : integer; size: t; arg: t) return t;
   function nth (sa,sr : integer; arg1: t; arg2 : t) return t;
   function copy_with (sa,sr : integer; arg1: t;arg2 : t; arg3 : t) return t;
   function infos (sa,sr : integer; arg: t) return t;
@@ -582,6 +667,8 @@ package vect is
   function cons (arg1,arg2: t) return t;
   function concat (arg1,arg2: t) return t;
   function split (arg: t) return t;
+  function of_int (arg: t) return t;
+  function to_int (arg: t) return t;
 end package;
 
 package body vect is
@@ -593,7 +680,10 @@ package body vect is
       r(i * sa to (i+1) * sa -1) := arg;
       end loop;
       return r;
-    end function;
+    end;
+  function create (sa,sr : integer; size: t; arg: t) return t is
+    begin return create(sa-to_integer(unsigned(size)),sr,arg);
+  end;
   -- knowing argument size and result size is not sufficient to
   -- find the number of element of a vector,
   -- hence this auxiliary function 
@@ -601,22 +691,25 @@ package body vect is
     constant zero : t(0 to sr-16-1) := (others => '0');
     begin
       return t(to_unsigned(sa/(sr-16),16))&zero;
-    end function;
-  
-  -- `a vect<'N> * int<16> => `a
+    end;
+  -- `a vect<'N> * int<32> => `a
   function nth (sa,sr : integer; arg1: t; arg2 : t) return t is
     constant i : natural := to_integer(unsigned(arg2));
-    variable r : t(0 to sr-1);
-    variable u : t(0 to sa - 16 - 1); 
+    constant size_vect : natural := arg1'length / sr;
+    constant size_elem : natural := sr;
+    variable res : t(0 to size_elem - 1) := (others => '0');
+    variable a : t(0 to arg1'length - 1); 
     begin
-      u := t(arg1); -- needed because, with GHDL, depending on the caller, arg1 is an array that does not start by 0 
-      for j in 0 to sr - 1 loop
-        r(j) := u(sr * i + j);
-      end loop;
-      return t(r);
+      if (i+1) * size_elem >= arg1'length then
+        return res; -- return 0 in case of index out of bounds
+      else
+        a(0 to arg1'length - 1) := t(arg1); -- needed because, with GHDL, depending on the caller, arg1 is an array that does not start by 0 
+        res := a(i * size_elem to (i+1) * size_elem - 1);
+        return res;
+      end if;
     end;
   
-  -- `a vect<'N> * int<16> * `a => `a vect<'N>
+  -- `a vect<'N> * int<32> * `a => `a vect<'N>
   function copy_with (sa,sr : integer; arg1: t;arg2 : t; arg3 : t) return t is
     constant size_elem : integer := arg3'length;
     constant i : natural := to_integer(unsigned(arg2));
@@ -661,6 +754,14 @@ package body vect is
   begin
     return arg;
   end;
+  function of_int (arg: t) return t is
+    begin
+      return arg;
+    end;
+  function to_int (arg: t) return t is
+    begin
+      return arg;
+    end;
 end vect;
 
 
@@ -707,9 +808,9 @@ package body matrix is
     end function;
 
   function infos (sa,sr : integer; arg: t) return t is
-    constant zero : t(0 to sr-16-1) := (others => '0');
+    constant zero : t(0 to sr-32-1) := (others => '0');
     begin
-      return t(to_unsigned(sa/(sr-16),16))&zero;
+      return t(to_unsigned(sa/(sr-32),32))&zero;
     end function;
 end matrix;
 
@@ -820,3 +921,188 @@ package body ram is
   end;
 end ram;
 
+library ieee; 
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+package Char is
+  alias t is std_logic_vector;
+  function code(arg: t) return t;
+  function chr(arg:t) return t;
+  impure function print(signal clk:std_logic;arg:t) return t;
+end package;
+
+package body Char is 
+  function code(arg: t) return t is
+      variable res : t(0 to arg'length - 1);
+    begin 
+      res(0 to arg'length - 1) := arg;
+      return arg;  -- identity
+    end;
+  function chr(arg:t) return t is
+      variable res : t(0 to arg'length - 1);
+    begin 
+      res(0 to arg'length - 1) := arg;
+      return arg;  -- identity
+    end;
+  impure function print(signal clk:std_logic;arg:t)
+    return t is
+      variable n : integer;
+    begin
+      if rising_edge(clk) then
+        n := to_integer(unsigned(arg));
+        work.Util.echo(Character'image(Character'Val(n)));
+      end if;
+      return "0";
+    end;
+end Char;
+
+library ieee; 
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+use work.all;
+
+package Bytes is
+  alias t is std_logic_vector;
+  function make(sa,sr : integer; arg: t) return t;
+  function len(arg: t) return t;
+  function get(sa,sr : integer; arg1,arg2:t) return t;
+  impure function print(signal clk:std_logic;arg:t) return t;
+  function to_vect(arg: t) return t;
+  function from_vect(arg: t) return t;
+  function to_hex(arg: t) return t;
+end package;
+package body Bytes is 
+  function make(sa,sr : integer; arg: t) return t is
+    variable res: t(0 to sr-1);
+    begin
+      for i in 0 to sr/8-1 loop
+        for k in 0 to 7 loop
+          res(i*8+k) := arg(k);
+        end loop;
+      end loop;
+      return res;
+    end;
+  function len(arg: t) return t is
+    begin 
+      return t(to_unsigned(arg'length / 8,32));
+    end;
+  function get(sa,sr : integer; arg1, arg2:t) return t is
+      variable i : integer;
+      variable by : t(0 to sa - 32 - 1);
+      variable res : t(0 to 7);
+    begin
+      by(0 to sa - 32 - 1) := arg1;
+      i := to_integer(unsigned(arg2));
+      for k in 0 to 7 loop
+        res(k) := by(i * 8 + k);
+      end loop;
+      return res;
+    end;
+  impure function print(signal clk:std_logic;arg:t) return t is
+      variable by : t(0 to arg'length - 1);
+      variable c : t(0 to 7);
+      variable u : t(0 to 0);
+    begin
+      if rising_edge(clk) then
+        by(0 to arg'length - 1) := arg;
+        for i in 0 to arg'length/8-1 loop
+          for k in 0 to 7 loop
+            c(k) := by(i*8+k);
+          end loop;
+          if c /= (0|1|2|3|4|5|6|7 => '0') then
+            u := Char.print(clk,c);
+          end if;
+        end loop;
+      end if;
+      return "0";
+    end;
+  function to_vect(arg: t) return t is 
+    begin return arg; end;
+  function from_vect(arg: t) return t is
+    begin return arg; end;
+  function to_hex(arg: t) return t is
+      variable n : integer;
+      variable c : t(0 to 7) := (others => '0');
+      variable tmp : t(0 to (arg'length+7)/8*8-1)  := (others => '0');
+      variable res : t(0 to arg'length / 8 * 4 - 1);
+    begin
+      tmp(0 to ((arg'length+7)/8)*8-1) := arg;
+      for i in 0 to tmp'length / 8 - 1 loop
+        c(0 to 7) := tmp(i*8 to i*8 + 7);
+        n := to_integer(unsigned(c));
+        case n is
+        when 48 => res(i*4 to i*4+3) := "0000"; -- 0
+        when 49 => res(i*4 to i*4+3) := "0001"; -- 1
+        when 50 => res(i*4 to i*4+3) := "0010"; -- 2
+        when 51 => res(i*4 to i*4+3) := "0011"; -- 3
+        when 52 => res(i*4 to i*4+3) := "0100"; -- 4
+        when 53 => res(i*4 to i*4+3) := "0101"; -- 5
+        when 54 => res(i*4 to i*4+3) := "0110"; -- 6
+        when 55 => res(i*4 to i*4+3) := "0111"; -- 7
+        when 56 => res(i*4 to i*4+3) := "1000"; -- 8
+        when 57 => res(i*4 to i*4+3) := "1001"; -- 9
+        when 65 => res(i*4 to i*4+3) := "1010"; -- A
+        when 66 => res(i*4 to i*4+3) := "1011"; -- B
+        when 67 => res(i*4 to i*4+3) := "1100"; -- C
+        when 68 => res(i*4 to i*4+3) := "1101"; -- D
+        when 69 => res(i*4 to i*4+3) := "1110"; -- E
+        when 70 => res(i*4 to i*4+3) := "1111"; -- F
+        when others => res(i*4 to i*4+3) := "0000";
+        end case;
+      end loop;
+      return res;
+    end;
+end Bytes;
+
+library ieee; 
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+use std.textio.all;
+
+package IOFile is
+  alias t is std_logic_vector;
+  function to_string(arg: t) return string;
+  impure function read_file(signal clk:std_logic; sa,sr : integer; name: t) return t;
+  impure function write_file(signal clk:std_logic; name, content: t) return t;
+end package;
+package body IOFile is
+  
+  function to_string(arg: t) return string is
+    variable s : string (0 to arg'length / 8);
+  begin
+    for i in 0 to arg'length/8-1 loop
+      s(i) := Character'val(to_integer(unsigned(arg(i*8 to i*8+7))));
+    end loop;
+    return s;
+  end;
+
+  impure function read_file(signal clk:std_logic;sa,sr : integer; name: t) return t is
+     type char_file_t is file of character;     
+  file infile : char_file_t;
+    variable c: character;
+    variable i : integer := 0;
+    variable res : t(0 to sr - 1) := (others => '0');
+  begin        
+    file_open(infile, to_string(name), read_mode);
+    while (not endfile (infile)) and i*8+7 < res'length loop
+      read(infile, c);
+      res(i*8 to i*8+7) := t(to_unsigned(Character'pos(c),8));
+      i := i + 1;
+    end loop;
+    file_close(infile);
+    return res;
+  end;
+
+  impure function write_file(signal clk:std_logic; name, content: t) return t is
+    type char_file_t is file of character;     
+    file outfile : char_file_t;
+    begin        
+      file_open(outfile, to_string(name), write_mode);
+      for i in 0 to content'length / 8 - 1 loop
+        write(outfile, Character'val(to_integer(unsigned(content(i*8 to i*8+7)))));
+      end loop;
+      return "0";
+    end;
+   
+end IOFile;

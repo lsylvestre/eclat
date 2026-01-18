@@ -74,7 +74,8 @@ let rec filter ty =
   | Ty_ref _
   | Ty_array _
   | Ty_signal _ 
-  | Ty_trap _ -> Ty_base TyB_unit
+  | Ty_trap _
+  | Ty_size _ -> Ty_base TyB_unit
 
 let not_tyB ty =
   match canon_ty ty with

@@ -6,7 +6,7 @@ exception UnsupportedPrimitive
 
 module Values = struct
   let size_ _ = raise UnsupportedPrimitive
-  let equal = (=) 
+  let equal_ (v1,v2) = (v1 = v2) 
 end
 
 module Bool = struct
@@ -48,6 +48,7 @@ module Int = struct
 
   let to_int_ = Int64.to_int
   let of_int_ = Int64.of_int
+  let print_ n = print_int (to_int_ n)
 end
 let eclat_getBit = Int.get_bit_
 
@@ -114,3 +115,58 @@ end
 let tuple_get_ (i,v) =
   Obj.magic (Obj.field (Obj.repr v) i)
 
+
+(* type char = char *)
+let default_char () = '0' ;;
+
+type bytes = string ref ;;
+let default_bytes () = Bytes.create 0 ;;
+
+module Eclat_char = struct
+  let code_ c = Int64.of_int @@ Char.code c
+  let chr_ n = Char.chr @@ Int64.to_int n
+  let print_ c = output_char stdout c
+end
+module Eclat_bytes = struct
+  let make_ (_sz_arg,sz_res) (c) = Bytes.make (sz_res/8) c
+  let len_ b = Int64.of_int @@ Bytes.length b
+  let get_ _ (by,i) = Bytes.get by (Int64.to_int i)
+  let print_ by = 
+    for i = 0 to Bytes.length by - 1 do
+      Eclat_char.print_ (Bytes.get by i)
+    done 
+  let from_vect_ v =
+    Bytes.init (Array.length v) (fun i -> Array.get v i) ;;
+  let to_vect_ b =
+    Array.init (Bytes.length b) (fun i -> Bytes.get b i) ;;
+  let to_hex_ b =
+    let char_to_hex c = match c with
+    | '0' .. '9' -> Char.code c - 48
+    | 'A' .. 'F' -> Char.code c - 55
+    | _ -> 0 in 
+    let r = ref 0 in
+    for i = 0 to Bytes.length b - 1 do
+      r := !r * 16 + char_to_hex (Bytes.get b i)
+    done;
+    Int64.of_int !r ;;
+end
+
+
+module Eclat_IOFile = struct
+  let read_file_ (_sz_arg,sz_res) name =
+    let ic = open_in ("../"^name) in
+    let s = In_channel.input_all ic in
+    close_in ic;
+    let res = Bytes.create (sz_res/8) in
+    String.iteri (fun i c -> Bytes.set res i c) s;
+    res
+
+  let write_file_ (name,by) =
+    let oc = open_out ("../"^name) in
+    Out_channel.output_bytes oc by;
+    close_out oc
+end
+
+module Char = Eclat_char
+module Bytes = Eclat_bytes
+module IOFile = Eclat_IOFile

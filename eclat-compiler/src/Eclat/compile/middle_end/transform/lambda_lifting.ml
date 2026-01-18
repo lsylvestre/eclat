@@ -325,6 +325,9 @@ let globalize_e (e:e) : ((x * _ * e) list * e) =
     | E_suspend(e1,x) ->
         let ds1,e1' = glob e1 in
         [],E_suspend(declare ds1 e1',x)
+    | E_assert(e1,loc) ->
+        let ds1,e1' = glob e1 in
+        ds1,E_assert(e1',loc)
   in glob e
 
 

@@ -104,7 +104,8 @@ let rec prop_s env s =
       S_call(op,prop env a1)
   | S_external_run(f,i,res,rdy,a) ->
       S_external_run(f,i,res,rdy,prop env a)
-
+  | S_assert(a1,loc) ->
+      S_assert(prop env a1,loc)
 let propagation_s s =
   prop_s SMap.empty s
 

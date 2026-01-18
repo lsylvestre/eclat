@@ -52,7 +52,8 @@ let rec can sigs s =
   | S_read_start _ | S_read_stop _ 
   | S_write_start _  | S_write_stop _ 
   | S_array_set _ 
-  | S_array_from_file _ -> SMap.empty
+  | S_array_from_file _ 
+  | S_assert _ -> SMap.empty
 
 
 

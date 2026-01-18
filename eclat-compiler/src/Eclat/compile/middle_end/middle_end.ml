@@ -111,5 +111,5 @@ let compile ?globalize
   let pi = Expand.expand_pi pi in
   
   let pi = Ast_rename.rename_pi pi in
-    let pi = Rename_fix.rename_pi pi in
+  let pi = Rename_fix.rename_pi pi in
   pi

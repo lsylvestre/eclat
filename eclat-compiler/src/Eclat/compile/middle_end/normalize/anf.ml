@@ -220,6 +220,9 @@ let rec anf (e:e) : e =
       E_exit(x,xc)
   | E_suspend(e1,x) ->
       E_suspend(anf e1,x)
+  | E_assert(e1,loc) ->
+      plug (anf e1) @@ fun xc ->
+        E_assert(xc,loc)
   in 
   glob e ;;
 

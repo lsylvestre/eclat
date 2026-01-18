@@ -6,7 +6,7 @@ NAME=main
 
 MAIN=$(NAME).vhdl
 EXTERNALS=
-RUNTIME=runtime.vhdl stdlib.vhdl
+RUNTIME=stdlib.vhdl
 
 
 

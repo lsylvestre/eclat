@@ -69,7 +69,8 @@ let contains_return s =
   | S_set _
   | S_sig_set _
   | S_array_set _ 
-  | S_array_from_file _ -> false
+  | S_array_from_file _
+  | S_assert _ -> false
   | S_letIn(_,_,s1) -> aux s1
   | S_seq(s1,s2) -> aux s1 || aux s2
   | S_if(_,s1,so2) -> aux s1 || (match so2 with None -> false | Some s -> aux s)
@@ -129,7 +130,8 @@ let rec insert_kont ~is_zero w ~idle ~x s =
     | S_external_run _ 
     | S_array_set _ 
     | S_sig_set _
-    | S_array_from_file _ -> s
+    | S_array_from_file _
+    | S_assert _ -> s
   in
   Some (aux s)
 
@@ -140,7 +142,10 @@ let rec to_c ~sums = function
 | Ast.String s -> String s
 | Ast.C_tuple cs -> CTuple (List.map (to_c ~sums) cs)
 | Ast.C_vector cs -> CVector (List.map (to_c ~sums) cs)
-| Ast.C_size n -> CSize n
+| Ast.C_size sz -> 
+    (match Types.canon_size sz with
+     | Sz_lit n -> CSize n
+     | _ -> CSize 32) (* todo: deal with the default size elsewhere *)
 | Ast.C_appInj(x,c,tyB) ->
     let n,arg_size,ty_n = find_ctor x sums in
     CTuple[n;C_encode(to_c ~sums c,arg_size)]
@@ -370,8 +375,8 @@ let rec to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums gs e x k =
       SMap.empty,(SMap.singleton q s3), s2
   | E_loop(e1) ->
       let e1' = Instantiate.instantiate ~with_pauses:false @@ Ast_rename.rename_trap_and_signals ~statics:(List.map fst statics) e1 in
-      Ast_pprint.pp_exp Format.std_formatter e1;
-      Ast_pprint.pp_exp Format.std_formatter e1';
+      (*Ast_pprint.pp_exp Format.std_formatter e1;
+      Ast_pprint.pp_exp Format.std_formatter e1';*)
       let z = Ast.gensym ~prefix:"z" () in
       let w2,ts2,s2 = to_s ~endloop:true ~traps ~is_zero:false ~statics ~externals ~sums gs e1' z S_skip in
       let w1,ts1,s1 = to_s ~endloop ~traps ~is_zero:false ~statics ~externals ~sums gs e1 x s2 in
@@ -680,6 +685,10 @@ let rec to_s ~endloop ~traps ~is_zero ~statics ~externals ~sums gs e x k =
 
   | E_emit(x,ey) ->
        SMap.empty,SMap.empty,return_ @@ S_sig_set(x,to_a ~externals ~sums ey)
+ 
+  | E_assert(e1,loc) ->
+      let a = to_a ~externals ~sums e1 in
+      SMap.empty,SMap.empty,return_ @@ S_assert(a,loc)
   | e -> Ast_pprint.pp_exp Format.std_formatter e; assert false (* todo *)
 
 (* takes a program and translates it into an FSM *)

@@ -78,7 +78,7 @@ let rec pp_const (fmt:fmt) (c:c) : unit =
       pp_tuple fmt pp_const cs
   | C_vector(cs) ->
       pp_vector fmt pp_const cs
-  | C_size n -> fprintf fmt "size<%d>" n
+  | C_size sz -> fprintf fmt "size<%a>" pp_size (canon_size sz)
   | Inj x ->
       fprintf fmt "%s" x
   | C_appInj(x,c,_) ->
@@ -262,7 +262,9 @@ let pp_exp (fmt:fmt) (e:e) : unit =
   | E_suspend(e1,x) ->
       parenthesize ~paren (fun fmt () ->
         fprintf fmt "suspend %a when %a" (pp_e ~paren:false) e1 pp_ident x) fmt ()
-  
+  | E_assert(e1,_) ->
+      parenthesize ~paren (fun fmt () ->
+        fprintf fmt "assert %a" (pp_e ~paren:true) e1) fmt ()
   in
   fprintf fmt "@[<v 0>%a@]" (pp_e ~paren:false) e
 

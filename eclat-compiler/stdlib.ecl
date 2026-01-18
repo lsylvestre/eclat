@@ -15,6 +15,15 @@ operator Bool.lor :  (bool * bool) => bool ;;
 operator Bool.land : (bool * bool) => bool ;;
 operator Bool.lxor : (bool * bool) => bool ;;
 
+operator Print.print_newline : unit => unit @impure ;;
+operator Print.print_value   : `a => unit @impure ;;
+operator Print.print_string   : string => unit @impure ;;
+operator Print.print_ascii   : `a => unit @impure ;;
+
+let print = Print.print_value ;;
+let print_string = Print.print_string ;;
+let print_ascii = Print.print_value ;;
+
 (*******************************)
 (************* int *************)
 (*******************************)
@@ -22,8 +31,12 @@ operator Bool.lxor : (bool * bool) => bool ;;
 (* int<'N> *)
 
 operator Int.print :  int<'N> => unit  @impure ;;
+let print_int = Int.print ;;
 
 operator Int.absv :    int<'N> => int<'N> ;;
+
+operator%with_sizes Int.resize : int<'s2> => int<'s1> ;;
+let int_resize<<'s>> (x) : int<'s> = Int.resize(x) ;;
 
 operator Int.logical_not : int<'s> => int<'s> ;;
 operator Int.get_bit : (int<'s> * int<32>) => bool ;;
@@ -92,6 +105,7 @@ operator Uint.ge :     (uint<'N> * uint<'N>) => bool ;;
 type `a vect<'b> ;;
 
 operator%with_sizes Vect.create : `a => `a vect<'size> ;;
+let vect_make <<'s>> (x:`a) : `a vect<'s> = Vect.create(x) ;;
 
 operator%with_sizes Vect.nth : (`a vect<'size> * int<32>) => `a;;
 operator%with_sizes Vect.copy_with : (`a vect<'size> * int<32> * `a) => `a vect<'size>;;
@@ -113,7 +127,7 @@ let vect_update = vect_copy_with ;;
 
 let vect_size v = 
   let (n,_) = Vect.infos v in
-  resize_int<'a>(n) ;;
+  n ;;
 
 let vect_cons (x,v) = Vect.cons(x,v) ;;
 let vect_head v = Vect.head v ;;
@@ -189,30 +203,30 @@ let print_fixed_point (f) =
 operator%with_sizes Default.create : unit => 'a ;; (* unsafe *)
 
 let halt() =
-  %loop pause() end ;;
+  loop: pause() end ;;
 
 let sustain s = 
-  %loop emit s; pause() end ;;
+  loop: emit s; pause() end ;;
 
 let await s = 
   trap T in 
-  %loop pause(); if ?s then exit T else () end ;;
+  loop: pause(); if ?s then exit T else () end ;;
 
 let abort (f,s) =
-  trap T in [ (%suspend f() %when s; exit T) || (await s; exit T )] ;;
+  trap T in [ (suspend f() when s; exit T) || (await s; exit T )] ;;
 
 let loop_each (f,s) =
-  %loop abort ((fun () -> (f(); halt())),s) end ;;
+  loop: abort ((fun () -> (f(); halt())),s) end ;;
 
 let await_immediate s =
-  trap T in %loop if ?s then exit T; pause() end ;;
+  trap T in loop: if ?s then exit T; pause() end ;;
 
 let suspend_when_immediate(f,s) =
-  %suspend (if ?s then pause(); f()) %when s ;;
+  suspend (if ?s then pause(); f()) when s ;;
 
 (*
 let do_every(p,s) = 
-  await s; loop p() each s
+  await s; loop: p() each s
 *)
 
 let abro (a,b,r,o) =
@@ -238,7 +252,7 @@ let fby(x,y) =
   emit s(y);
   let _ = exec 
             emit pre_s(x);
-            %loop
+            loop:
               let z = ?s in pause(); 
               emit pre_s(z) 
             end default () in
@@ -254,7 +268,7 @@ let fby (x, y) =
 let mux(a, b, c) = 
   if a then b else c ;;
 
-let when(f, clk) =
+let when_(f, clk) =
   if clk then f() else absent() ;;
 
 let merge(clk, a, b) =
@@ -265,3 +279,89 @@ let fixpoint (f) =
   let s = signal <> in
   emit s(f(?s));
   ?s ;;
+
+
+(****************************************************************************)
+(** extension of the Eclat standard library (../eclat-compiler/stdlib.ecl) **)
+(****************************************************************************)
+
+(* all the operators below are synthesizable except:
+   - Char.print 
+   - Bytes.print
+   - IOFile.read_file
+   - IOFile.write_file *)
+
+(**************************************************)
+(**************** char and bytes ******************)
+(**************************************************)
+
+type char@8 ;;       (* new type constructor for 8-bits values *)
+type bytes<'s>@8 ;;  (* sequence of chars *)
+
+operator Char.code : char => int<8> ;;
+operator Char.chr : int<8> => char ;;
+operator Char.print : char => unit @impure ;; (* @impure denotes the side effect *)
+
+(** the %with_sizes annotation means that the corresponding VHDL primitive
+    requires two additional parameters : the size of the argument 
+    and the size of the result **)
+
+operator%with_sizes Bytes.make : char => bytes<'s> ;; 
+operator            Bytes.len : bytes<'s> => int ;;
+operator%with_sizes Bytes.get : (bytes<'s> * int) => char ;;
+operator            Bytes.print : bytes<'s> => unit  @impure ;;
+operator            Bytes.to_vect : bytes<'s> => char vect<'s> ;;
+operator            Bytes.from_vect : char vect<'s> => bytes<'s> ;;
+operator            Bytes.to_hex : bytes<'s> => int<2*2*'s> ;;
+
+let char_code = Char.code ;;
+let char_chr = Char.chr ;;
+let char_print = Char.print ;;
+let char_eq ((c1,c2) : char * char) = equal(c1,c2) ;; (* see stdlib.ecl *)
+
+let bytes_make = Bytes.make ;;
+let bytes_length = Bytes.len ;;
+let bytes_get = Bytes.get ;;
+let bytes_print = Bytes.print ;;
+let bytes_to_vect = Bytes.to_vect ;;
+let bytes_from_vect = Bytes.from_vect ;;
+let bytes_to_hex = Bytes.to_hex ;;
+
+let bytes_vect_map ((f,b):(char vect<'s1> => char vect<'s2>) * bytes<'s1>) : bytes<'s2> = 
+  bytes_from_vect(f(bytes_to_vect b));;
+
+let bytes_cons ((x,b):char * bytes<'s>) : bytes<'s+1> =
+  let cons (v:char vect<'s1>) : char vect<'s1+1> = vect_cons(x,v) in  
+  bytes_from_vect(cons(bytes_to_vect b));;
+
+let bytes_tail (b:bytes<'s+1>) : bytes<'s> = 
+  bytes_vect_map(vect_tail,b);;
+
+let print_char = char_print ;;
+let print_bytes = bytes_print ;;
+(**************************************************)
+(************** file manipulations ****************)
+(**************************************************)
+
+operator%with_sizes IOFile.read_file : string => bytes<'s> @impure ;;
+operator            IOFile.write_file : (string * bytes<'s>) => unit @impure ;;
+
+let input_file = IOFile.read_file ;;
+let output_file = IOFile.write_file ;;
+
+(**************************************************)
+(* generating .mif initialization file for arrays *)
+(**************************************************)
+
+let vect2mif v = 
+  print_string "WIDTH="; print_int (size_val v); print_string ";"; print_newline ();
+  print_string "DEPTH="; print_int (vect_size v); print_string ";"; print_newline ();
+  print_string "ADDRESS_RADIX=DEC;"; print_newline (); print_string "DATA_RADIX=BIN;"; print_newline ();
+  print_string "CONTENT BEGIN"; 
+  for i = 0 to vect_size v - 1 do
+    print_int i; print_string ":"; print (vect_nth (v,i)); print_string ";"; print_newline ()
+  done;
+  print_string "END;"; print_newline () ;;
+
+let bytes2mif b =
+  vect2mif (bytes_to_vect b) ;;

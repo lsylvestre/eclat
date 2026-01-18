@@ -64,3 +64,23 @@ let mk_letrec (f:x) (e1:e) (e2:e) loc_fun : e =
   let e1' = mk_fix f e1 loc_fun in
   E_letIn(P_var f,e1',e2)
 *)
+
+let mk_prim name = 
+  E_const (Op(Runtime(External_fun(name,new_ty_unknown ()))))
+
+let mk_prim_with_size ~loc name sz =
+  let mk e = mk_loc loc e in
+  let x = Ast.gensym () in
+  E_fun(P_var x,(Types.new_ty_unknown(),Types.new_tyB_unknown()),
+    mk(E_app(mk(E_const (Op(Runtime(External_fun(x,new_ty_unknown ()))))),
+          mk(E_tuple[mk(E_const (C_size sz)); mk(E_var x)]))))
+
+
+let mk_ident_with_size ~loc name sz =
+  let mk e = mk_loc loc e in
+  let x = Ast.gensym () in
+  E_fun(P_var x,(Types.new_ty_unknown(),Types.new_tyB_unknown()),
+    mk(E_app(mk(E_var name),
+          mk(E_tuple[mk(E_const (C_size sz)); mk(E_var x)]))))
+
+
