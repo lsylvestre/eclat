@@ -54,10 +54,10 @@ let eclat_getBit = Int.get_bit_
 
 
 module Print = struct
-  let int_ n = print_int (Int64.to_int n)
-  let string_ = print_string
-  let newline_ = print_newline
-  let value_ _ = raise UnsupportedPrimitive
+  let print_int_ n = print_int (Int64.to_int n)
+  let print_string_ = print_string
+  let print_newline_ = print_newline
+  let print_value_ _ = raise UnsupportedPrimitive
 end
 
 module Vect = struct
@@ -65,7 +65,7 @@ module Vect = struct
   let make_ (n,v0) = Array.make n v0
   let create_ (sz_arg,sz_res) n = Array.make (sz_res/sz_arg) (Obj.magic 0)
   let nth_ _ (x,n) = Array.get x (Int.to_int_ n)
-  let copy_with_ _ (x,n,v) = 
+  let copy_with_ (x,n,v) = 
     let a = Array.copy x in
     a.(Int.to_int_ n) <- v;
     a

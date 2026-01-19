@@ -24,7 +24,9 @@ let compile ?(vhdl_comment="") ?(prop_fsm=true) arg_list name ty fmt pi =
 
   let pi = Rename_main_arg.rename_main_arg_pi pi in
 
-  let (rdy,result,idle,fsm) = Gen_miniHDL.compile ~endloop:false ~is_zero:true pi in
+  let (rdy,result,idle,fsm) = 
+    Gen_miniHDL.compile 
+      ~endloop:false ~is_zero:(not @@ !Typing.relax_flag) pi in
 
   Count_externals.count_externals_fsm fsm;
 

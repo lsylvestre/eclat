@@ -660,7 +660,7 @@ package vect is
   function create (sa,sr : integer; arg: t) return t;
   function create (sa,sr : integer; size: t; arg: t) return t;
   function nth (sa,sr : integer; arg1: t; arg2 : t) return t;
-  function copy_with (sa,sr : integer; arg1: t;arg2 : t; arg3 : t) return t;
+  function copy_with (arg1: t;arg2 : t; arg3 : t) return t;
   function infos (sa,sr : integer; arg: t) return t;
   function head (sa,sr : integer; arg: t) return t;
   function tail (sa,sr : integer; arg: t) return t;
@@ -677,7 +677,7 @@ package body vect is
     variable r : t(0 to sr -1); 
     begin
       for i in 0 to nb_elements - 1 loop
-      r(i * sa to (i+1) * sa -1) := arg;
+        r(i * sa to (i+1) * sa -1) := arg;
       end loop;
       return r;
     end;
@@ -688,9 +688,9 @@ package body vect is
   -- find the number of element of a vector,
   -- hence this auxiliary function 
   function infos (sa,sr : integer; arg: t) return t is
-    constant zero : t(0 to sr-16-1) := (others => '0');
+    constant zero : t(0 to sr-32-1) := (others => '0');
     begin
-      return t(to_unsigned(sa/(sr-16),16))&zero;
+      return t(to_unsigned(sa/(sr-32),32))&zero;
     end;
   -- `a vect<'N> * int<32> => `a
   function nth (sa,sr : integer; arg1: t; arg2 : t) return t is
@@ -700,7 +700,7 @@ package body vect is
     variable res : t(0 to size_elem - 1) := (others => '0');
     variable a : t(0 to arg1'length - 1); 
     begin
-      if (i+1) * size_elem >= arg1'length then
+      if (i+1) * size_elem > arg1'length then
         return res; -- return 0 in case of index out of bounds
       else
         a(0 to arg1'length - 1) := t(arg1); -- needed because, with GHDL, depending on the caller, arg1 is an array that does not start by 0 
@@ -710,12 +710,12 @@ package body vect is
     end;
   
   -- `a vect<'N> * int<32> * `a => `a vect<'N>
-  function copy_with (sa,sr : integer; arg1: t;arg2 : t; arg3 : t) return t is
+  function copy_with (arg1: t;arg2 : t; arg3 : t) return t is
     constant size_elem : integer := arg3'length;
     constant i : natural := to_integer(unsigned(arg2));
     variable r : t(0 to arg1'length - 1) := arg1; 
     begin
-      for j in 0 to sr/size_elem - 1 loop
+      for j in 0 to arg1'length/size_elem - 1 loop
         if i = j then
            -- note: synthetizer 
            r(size_elem * j to size_elem * j + size_elem - 1) := arg3;
@@ -781,7 +781,6 @@ package body matrix is
     constant nb_elements : integer := sr/sa; 
     variable r : t(0 to sr -1); 
     begin
-
       for i in 0 to nb_elements - 1 loop
        r(i * sa to (i+1) * sa -1) := arg;
       end loop;

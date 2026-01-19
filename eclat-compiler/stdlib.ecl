@@ -108,7 +108,7 @@ operator%with_sizes Vect.create : `a => `a vect<'size> ;;
 let vect_make <<'s>> (x:`a) : `a vect<'s> = Vect.create(x) ;;
 
 operator%with_sizes Vect.nth : (`a vect<'size> * int<32>) => `a;;
-operator%with_sizes Vect.copy_with : (`a vect<'size> * int<32> * `a) => `a vect<'size>;;
+operator Vect.copy_with : (`a vect<'size> * int<32> * `a) => `a vect<'size>;;
 
 operator%with_sizes Vect.infos : `a vect<'size> => int<32> * `a;;
 

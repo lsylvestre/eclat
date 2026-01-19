@@ -29,6 +29,7 @@ src/Eclat/compile/backend/gen_miniHDL.cmx : \
 src/Eclat/compile/backend/naming_convention.cmo :
 src/Eclat/compile/backend/naming_convention.cmx :
 src/Eclat/compile/compile.cmo : \
+    src/Eclat/typing/typing.cmo \
     src/Eclat/compile/middle_end/rename_main_arg.cmo \
     src/miniHDL/miniHDL_typing.cmo \
     src/miniHDL/miniHDL_syntax.cmo \
@@ -46,6 +47,7 @@ src/Eclat/compile/compile.cmo : \
     src/miniHDL/count_externals.cmo \
     src/Eclat/syntax/ast.cmo
 src/Eclat/compile/compile.cmx : \
+    src/Eclat/typing/typing.cmx \
     src/Eclat/compile/middle_end/rename_main_arg.cmx \
     src/miniHDL/miniHDL_typing.cmx \
     src/miniHDL/miniHDL_syntax.cmx \
