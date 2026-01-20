@@ -33,8 +33,8 @@ A function is said instantaneous if, for any argument, it computes a result inst
 
 Below are main Eclat features:
 
-Tail-recursion
-=== 
+### Tail-recursion
+
 
 Tail-recursion allows for iterative execution with 
 a pause of one clock cycle at each (direct or recursive) call.
@@ -61,8 +61,7 @@ let gcd3 (a,b,c,d) =
   gcd(x,y) ;;
 ```
 
-Arrays
-===
+### Arrays
 
 Arrays constitute a regular, mutable data structure, 
 efficiently implemented with RAM blocks on FPGA targets.
@@ -78,8 +77,8 @@ let main() =
   end
 ```
 
-Sequential circuits
-===
+### Sequential circuits
+
 
 The Eclat construct `reg f init e0` is a register initialized with expression `e0`
 and updated with function `f`. Note that this is a Mealy machine: the first execution of `reg f init e0` returns `f(e0)`, the next execution returns `f(f(e0))`, etc.
@@ -90,8 +89,7 @@ let count () =
   reg (fun 0 -> c + 1) init 0;;
 ```
 
-Mixing interaction and computation
-===
+### Mixing interaction and computation
 
 The Eclat construct `exec e defaut e0` aims to repeatedly computes the expression `e`, which is typically a multi-cycle expression, within an instantaneous expression. Each time `exec e defaut e0` is executed, a single step is performed in the computation of `e`. If the obtained redex is a value `v`, then the pair `(v,true)` is returned by `exec`. Otherwise, if the redex is a reductible expression `e1`, then `exec` returns the pair `(e0,false)` where `e0` is an instantaneous expression computing a default value.
 
@@ -174,8 +172,7 @@ c ::= () | true | false      -- constant
 
 ```
 
-Types
-=====
+## Types
 
 Eclat is statically and implicitely typed using a variant of the ML type system. The type language is as follows:
 
@@ -250,8 +247,7 @@ Primitives such as `print_string`, `print_int` and `print_newline` are used for 
 The compiler flag `-no-print` can be used to remove call to these functions
 in the generated RTL code.
 
-Structure of Eclat programs
-=======
+## Structure of Eclat programs
 
 Eclat programs are sequences of declarations:
 - ```type x = ty ;;``` is an alias `x` for type `ty` ;
@@ -263,8 +259,7 @@ Eclat programs are sequences of declarations:
 - ```let x = e ;;``` define the value `x`
 
 
-Compile a program
-====
+## Compile a program
 
 to compile a file `foo.ecl`, enter in the `eclat-compiler` directory
 and execute the command:
@@ -313,13 +308,9 @@ By default, the compiler includes the file `eclat-compiler/stdlib.ecl`, which is
 
 The compiler flag `-nostdlib` prevents the load of `eclat-compiler/stdlib.ecl`.
 
+If no `.ecl` file is passed to the compiler, the compiler enter in a toplevel read-type-print loop. For instance:
 
-
-Example
-=====
-
-$ cd eclat-compiler
-$ make
+```
 $ ./eclat -arg "6;5;4;3;7;5;8;3;9;5"
 === eclat toploop ===.
 Enter phrases (separated by ';;') then compile (or run) with ``#q.''
