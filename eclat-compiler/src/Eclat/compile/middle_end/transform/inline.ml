@@ -99,7 +99,7 @@ let fv_type_in ?(s=Types.Vs.empty) e =
 
 (* instanciate type annotation in expression [e]
    while preserving sharing *)
-let subst_ty _ty e = (* todo: rename this function and remove the unused parameter *)
+let subst_ty e = (* todo: rename this function and remove the unused parameter *)
   let open Types in
   let vs = fv_type_in e in
   let unknowns = Hashtbl.create (Vs.cardinal vs) in
@@ -157,14 +157,14 @@ let inline_with_statics ~statics e =
         (match p,e1 with
         | P_var x,E_fun _ -> 
             has_changed := true;
-            inline @@ subst_e ~when_var:(subst_ty ty) x e1 e2
+            inline @@ subst_e ~when_var:subst_ty x e1 e2
         | _ -> E_letIn(p,ty,inline e1,inline e2))
 
     | E_app(E_fun(p,(ty,tyB),e1),e2) ->
         has_changed := true;
         (* substitution is needed (rather than a let-binding)
            since e2 could be a function (fun x -> e3)       (* no, first order now *) (* ah ? *) *)
-        inline @@ subst_ty ty @@ E_letIn(p,ty,e2,e1)
+        inline @@ subst_ty @@ E_letIn(p,ty,e2,e1)
 
 (*     | E_generate((p,e1),init,e_st3,loc) ->
         has_changed := true;

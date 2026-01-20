@@ -60,6 +60,7 @@ OBJS= $(SRC_DIR)/prelude.cmx \
       $(SRC_DIR)/Eclat/compile/middle_end/transform/globalize_arrays.cmx \
       $(SRC_DIR)/Eclat/compile/middle_end/transform/inline.cmx \
       $(SRC_DIR)/Eclat/compile/middle_end/normalize/propagation.cmx \
+      $(SRC_DIR)/Eclat/compile/middle_end/monomorphize.cmx \
       $(SRC_DIR)/Eclat/compile/middle_end/transform/specialize.cmx \
       $(SRC_DIR)/Eclat/compile/middle_end/transform/lambda_lifting.cmx \
       $(SRC_DIR)/Eclat/compile/middle_end/transform/unroll.cmx \
@@ -73,7 +74,6 @@ OBJS= $(SRC_DIR)/prelude.cmx \
       $(SRC_DIR)/Eclat/compile/middle_end/rename_main_arg.cmx \
       $(SRC_DIR)/Eclat/compile/backend/naming_convention.cmx \
       $(SRC_DIR)/Eclat/compile/inspect/display_internal_steps.cmx \
-      $(SRC_DIR)/Eclat/compile/middle_end/monomorphize.cmx \
       $(SRC_DIR)/Eclat/compile/middle_end/middle_end.cmx \
       \
       $(SRC_DIR)/miniHDL/miniHDL_syntax.cmx \

@@ -753,7 +753,6 @@ aexp_desc:
     Prelude.Errors.syntax_error 
             ~msg:"This '(' might be unmatched"
             (with_file ($loc(p))) }
-/*| v=VECT_CREATE LT k=size GT */
 | v=VECT_CREATE LT k=size GT 
     { let tyB = new_tyB_unknown() in
       E_const (Op(Runtime(

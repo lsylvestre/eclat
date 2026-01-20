@@ -31,6 +31,8 @@ let pp_op (fmt:fmt) (op:op) : unit =
       fprintf fmt "%s" s
     in
     match op with
+    | Runtime(External_fun(f,ty) as p) ->
+        fprintf fmt "[%a : %a]" Operators.pp_op p pp_ty ty
     | Runtime p ->
         Operators.pp_op fmt p
     | Wait n ->

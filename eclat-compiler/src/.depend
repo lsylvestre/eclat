@@ -157,6 +157,7 @@ src/Eclat/compile/middle_end/monomorphize.cmo : \
     src/Eclat/typing/types.cmo \
     src/Eclat/syntax/rename_fix.cmo \
     src/prelude.cmo \
+    src/Eclat/compile/middle_end/transform/inline.cmo \
     src/Eclat/syntax/ast_rename.cmo \
     src/Eclat/syntax/ast_mapper.cmo \
     src/Eclat/syntax/ast.cmo
@@ -165,6 +166,7 @@ src/Eclat/compile/middle_end/monomorphize.cmx : \
     src/Eclat/typing/types.cmx \
     src/Eclat/syntax/rename_fix.cmx \
     src/prelude.cmx \
+    src/Eclat/compile/middle_end/transform/inline.cmx \
     src/Eclat/syntax/ast_rename.cmx \
     src/Eclat/syntax/ast_mapper.cmx \
     src/Eclat/syntax/ast.cmx
@@ -349,20 +351,26 @@ src/Eclat/compile/middle_end/transform/matching.cmx : \
     src/Eclat/syntax/ast_mapper.cmx \
     src/Eclat/syntax/ast.cmx
 src/Eclat/compile/middle_end/transform/specialize.cmo : \
+    src/Eclat/typing/typing.cmo \
     src/Eclat/typing/types.cmo \
+    src/Eclat/syntax/rename_fix.cmo \
     src/Eclat/compile/middle_end/normalize/propagation.cmo \
     src/Eclat/syntax/pattern.cmo \
     src/Eclat/compile/middle_end/normalize/let_floating.cmo \
     src/Eclat/compile/middle_end/transform/inline.cmo \
+    src/Eclat/syntax/ast_subst.cmo \
     src/Eclat/syntax/ast_rename.cmo \
     src/Eclat/syntax/ast_mapper.cmo \
     src/Eclat/syntax/ast.cmo
 src/Eclat/compile/middle_end/transform/specialize.cmx : \
+    src/Eclat/typing/typing.cmx \
     src/Eclat/typing/types.cmx \
+    src/Eclat/syntax/rename_fix.cmx \
     src/Eclat/compile/middle_end/normalize/propagation.cmx \
     src/Eclat/syntax/pattern.cmx \
     src/Eclat/compile/middle_end/normalize/let_floating.cmx \
     src/Eclat/compile/middle_end/transform/inline.cmx \
+    src/Eclat/syntax/ast_subst.cmx \
     src/Eclat/syntax/ast_rename.cmx \
     src/Eclat/syntax/ast_mapper.cmx \
     src/Eclat/syntax/ast.cmx
@@ -390,14 +398,40 @@ src/Eclat/frontend/frontend.cmo : \
     src/Eclat/typing/types.cmo \
     src/prelude.cmo \
     src/Eclat/syntax/pattern.cmo \
+    src/Eclat/frontend/parser.cmi \
     src/Eclat/frontend/current_filename.cmo \
     src/Eclat/syntax/ast.cmo
 src/Eclat/frontend/frontend.cmx : \
     src/Eclat/typing/types.cmx \
     src/prelude.cmx \
     src/Eclat/syntax/pattern.cmx \
+    src/Eclat/frontend/parser.cmx \
     src/Eclat/frontend/current_filename.cmx \
     src/Eclat/syntax/ast.cmx
+src/Eclat/frontend/parser.cmo : \
+    src/Eclat/typing/types.cmo \
+    src/prelude.cmo \
+    src/Eclat/syntax/pattern.cmo \
+    src/operators.cmo \
+    src/Eclat/frontend/current_filename.cmo \
+    src/Eclat/syntax/ast_pprint.cmo \
+    src/Eclat/syntax/ast_mk.cmo \
+    src/Eclat/syntax/ast.cmo \
+    src/Eclat/frontend/parser.cmi
+src/Eclat/frontend/parser.cmx : \
+    src/Eclat/typing/types.cmx \
+    src/prelude.cmx \
+    src/Eclat/syntax/pattern.cmx \
+    src/operators.cmx \
+    src/Eclat/frontend/current_filename.cmx \
+    src/Eclat/syntax/ast_pprint.cmx \
+    src/Eclat/syntax/ast_mk.cmx \
+    src/Eclat/syntax/ast.cmx \
+    src/Eclat/frontend/parser.cmi
+src/Eclat/frontend/parser.cmi : \
+    src/Eclat/typing/types.cmo \
+    src/prelude.cmo \
+    src/Eclat/syntax/ast.cmo
 src/Eclat/interp/interp.cmo : \
     src/Eclat/typing/typing.cmo \
     src/Eclat/typing/types.cmo \

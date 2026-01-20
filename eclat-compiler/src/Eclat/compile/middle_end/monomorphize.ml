@@ -5,11 +5,12 @@ let add_annot e =
   let rec mapper e =
     match e with
     | E_app(E_var f,e1) ->
-        let annot_f arg = 
-          E_app(E_app(E_const(Op(TyConstr (Types.new_ty_unknown()))),E_var f),arg)
+        let annot_f () = 
+          E_app(E_app(E_const(Op(TyConstr (Types.new_ty_unknown()))),E_var f),
+                E_app(E_const(Op(TyConstr (Types.new_ty_unknown()))),e1))
         in
         (* assume [e1] does not contain function calls *)
-        annot_f e1
+        annot_f ()
     | e -> Ast_mapper.map mapper e
   in
   mapper e
@@ -47,7 +48,8 @@ let monomorphize_exp e =
             (* is monomorphic: can be shared *)
             let sigty' = extract_arg_res_fun ty0 in
             E_letIn(P_var f,ty0,E_fix(f,(p,sigty',aux ds e1)),aux ds e2))
-    | E_app(E_app(E_const(Op(TyConstr ty')), E_var f),arg) ->
+    | E_app(E_app(E_const(Op(TyConstr ty')), E_var f),
+            E_app(E_const(Op(TyConstr ty_arg)), arg)) ->
        (match Hashtbl.find_opt h f with
         | None -> 
             assert false (* should not happend *)
@@ -55,8 +57,10 @@ let monomorphize_exp e =
             (match SMap.find_opt f ds with
             | None -> assert false
             | Some (p,e1) ->
-            let sigty' = extract_arg_res_fun ty' in
-            E_letIn(P_var f,ty',E_fix(f,(p,sigty',aux ds e1)),E_app(E_var f,arg)))
+            let (tyA,tyB) = extract_arg_res_fun ty' in
+            Typing.unify_ty ~loc:Prelude.dloc tyA ty_arg;
+            Inline.subst_ty @@
+            E_letIn(P_var f,ty',E_fix(f,(p,(tyA,tyB),aux ds e1)),E_app(E_var f,arg)))
         | Some (`Ty ty0) -> 
             match ty0 with
             | Ty_fun(Ty_base tyB,_,_) -> E_app(E_var f,arg)

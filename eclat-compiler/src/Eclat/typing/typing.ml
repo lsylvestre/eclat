@@ -228,7 +228,7 @@ let unify_ty ~loc ty1 ty2 =
   let ty1,ty2 = canon_ty ty1, canon_ty ty2 in
   let rec unify ~loc ty1 ty2 =
     let ty1,ty2 = canon_ty ty1, canon_ty ty2 in
-    (* Format.fprintf Format.std_formatter "          [ty]====> %a / %a\n"  pp_ty  ty1  pp_ty  ty2; *)
+    (* Format.fprintf Format.std_formatter "          [ty]====> %a / %a\n"  pp_ty  ty1  pp_ty  ty2;*)
     match ty1,ty2 with
     | Ty_var {contents=(Unknown n)},
       Ty_var ({contents=Unknown m} as v) ->
@@ -443,8 +443,8 @@ let rec typ_exp ?(collect_sig=false) ~statics ~externals ~sums ~ctors ?(toplevel
   match e with
   | E_const (Op (Runtime(External_fun(x,tyx)))) ->
       let t = typ_ident ~loc g x in
-      unify_ty ~loc tyx t;
-      t, Dur_zero
+      unify_ty ~loc tyx (Types.copy_ty t);
+      tyx, Dur_zero
   | E_app(E_const (Op(GetTuple{pos;arity})),e1) ->
       let ty_list = List.init arity (fun _ -> new_ty_unknown ()) in
       assert (0 <= pos && pos <= arity);

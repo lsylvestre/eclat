@@ -1,7 +1,7 @@
 
 type print_mode = Any | Front | Let_floating | Lambda_lifting
                 | Specialize | Inline | Specialize_ref | Propagation
-                | Matching | Anf | MiddleEnd | GlobalizeArrays
+                | Matching | Anf | MiddleEnd | GlobalizeArrays | Monomorphize
 
 let string_of_print_mode s =
   match s with
@@ -17,6 +17,7 @@ let string_of_print_mode s =
   | "anf" -> Anf
   | "middle-end" -> MiddleEnd
   | "glob-arrays" -> GlobalizeArrays
+  | "mono" -> Monomorphize
   | _ -> failwith "unknown print mode"
 
 let print_mode = ref Any

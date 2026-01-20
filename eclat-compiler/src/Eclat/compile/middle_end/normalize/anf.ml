@@ -115,6 +115,10 @@ let rec anf (e:e) : e =
       let e2' = glob e2 in
       plug e2' @@ fun x2 ->
       E_app(ec,x2)
+  | E_app(e1,E_tuple es) ->
+      let e1' = glob e1 in
+      plug e1' @@ fun xc1 ->
+      plug_n (List.map glob es) @@ fun xs -> E_app(xc1,E_tuple xs)
   | E_app(e1,e2) ->
       let e1' = glob e1 in
       let e2' = glob e2 in

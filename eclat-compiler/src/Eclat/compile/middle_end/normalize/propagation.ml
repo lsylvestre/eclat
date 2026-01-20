@@ -46,7 +46,7 @@ let rec simple_atom e =
   match e with
     | E_var _ | E_const _ -> true
     | E_tuple es -> List.for_all simple_atom es
-    | E_app(E_const(Op(GetTuple{pos;arity})),e1) -> simple_atom e1
+    (*| E_app(E_const(Op(GetTuple{pos;arity})),e1) -> simple_atom e1*)
     (* | E_app(E_const(Op(op)),e1) -> Combinational.op_combinational op  && simple_atom e1 *)
     | _ -> false
 
@@ -82,7 +82,7 @@ let propagation ~externals e =
               (* _propagable2 is true if x occurs only once in e2:
                  the problem is that the substitution of non atomic expressions
                  can result in a loss of type annotations (especially for sizes) *)
-        then let e3 = subst_e ~when_var:(Inline.subst_ty ty) x e1' e2 in
+        then let e3 = subst_e ~when_var:Inline.subst_ty x e1' e2 in
         (*Format.(fprintf std_formatter "[%a\nGIVE:LET %s = %a IN\n%a]\n\n\n\n\n\n\n" Ast_pprint.pp_exp e x Ast_pprint.pp_exp e1' Ast_pprint.pp_exp e3);*)
              (prop e3)
         else E_letIn(p,ty,e1',prop e2)

@@ -61,12 +61,17 @@ open Types
 
 let has_changed = ref false
 
+let not_tyB ty =
+  match canon_ty ty with
+  | Ty_base _ -> false
+  | _ -> true
+
+
 let rec filter ty = 
   let open Types in
   match ty with
   | Ty_var{contents=Is ty} -> filter ty
   (*   | Ty_var({contents=Is ty1} as r) -> r := Is (filter ty1); ty *)
-  | Ty_var _ -> ty
   | Ty_base _ -> ty
   | Ty_tuple ty_list ->
       Ty_tuple (List.map filter ty_list)
@@ -75,12 +80,10 @@ let rec filter ty =
   | Ty_array _
   | Ty_signal _ 
   | Ty_trap _
-  | Ty_size _ -> Ty_base TyB_unit
+  | Ty_size _
+  -> Ty_base TyB_unit
+| Ty_var _ -> ty
 
-let not_tyB ty =
-  match canon_ty ty with
-  | Ty_base _ -> false
-  | _ -> true
 
 (** in function [f = fun p -> ...],
     transforms the pattern [p] by replacing 
@@ -95,103 +98,80 @@ let p_without_non_basic_values f p ty =
     | (Ty_fun _ | Ty_array _ | Ty_ref _ | Ty_trap _ | Ty_signal _),_ -> P_unit
     | Ty_var{contents=Is t},p ->
         aux t p
-    | _ -> p
+    (* | Ty_var _,_ -> 
+        P_unit (* this case is important to remove function parameters 
+                  that does not occur in the function body, e.g.,
+                  let f(g) = 42 in f(fun x -> x) *)
+    *)| _ -> p
   in
   aux ty p
 
-let specialize ds e = 
-  let open Ast in
-  let rec spec funcs e =
+
+
+(* ok but very slow *)
+let specialize_slow e = 
+  let rec spec e =
     match e with
-    | E_app(E_const _,_) -> e
-    | E_app(E_var f,xc2) ->
-       
-        (match SMap.find_opt f funcs with
-        | None -> e
-        | Some (ty_orig,E_tuple[E_var g;E_fix(_,(p,(ty,tyB),_))]) ->
-           let p' = p_without_non_basic_values f p ty in
-           let rec aux xc2 p =
-             match xc2,p with
-             | _,P_unit -> E_const Unit
-             | E_var _, _ -> xc2
-             | E_tuple es, P_tuple ps -> E_tuple (List.map2 aux es ps)
-             | e,_ -> e
-            in E_app(E_var f,aux xc2 p')
-        (* | Some ((E_var _ | E_tuple _) as pat_e) ->  Ast_subst.subst_p_e (Pattern.exp2pat pat_e) E_app(E_var x,xc2) *)
-        | Some (ty_orig,E_fun(p,(ty,tyB),e1)) -> 
-           (* Format.fprintf Format.std_formatter "==> %a | %s %a %a \n" Types.pp_ty ty f Ast_pprint.pp_pat p Ast_pprint.pp_exp e1; *)
-           (*Format.fprintf Format.std_formatter "==> %a %a \n" Types.pp_ty ty Ast_pprint.pp_exp xc2; *)
-           (* 
-           E_letIn(p,ty_orig,xc2, ty_annot ~ty:(Ty_base tyB) e1)*)
-           let p' = p_without_non_basic_values f p ty in
-           Inline.subst_ty ty_orig @@
-           E_letIn(p,ty_orig,xc2,
-           E_app(E_fun(p',(ty,tyB),e1),Pattern.pat2exp p'))
-        | Some (ty_orig,E_fix(x,(p,(ty,tyB),e1))) ->
+    | E_letIn(P_var x,ty,e1,e2) ->
+        (match e1 with
+        | E_fun(_,(ty,_),_) when not_tyB ty ->  
+              has_changed := true;
+              Ast_subst.subst_e x ~when_var:Inline.subst_ty e1 e2
+        | E_fix(f,(p,(ty,tyB),e0)) when not_tyB ty ->            
               let p' = p_without_non_basic_values f p ty in
-              (* Format.fprintf Format.std_formatter "~~~~~~~> %a %a %a\n" Types.pp_ty ty Ast_pprint.pp_pat p' Ast_pprint.pp_pat p; *)
-              (* Inline.subst_ty ty_orig @@*)
-              (* E_letIn(p,ty_orig,xc2,
-                let z = gensym ~prefix:x () in
-                let e1' = (* Ast_subst.subst_p_e p (Pattern.pat2exp p')*) e1 in
-                E_letIn(P_var z,Types.new_ty_unknown(), E_fix(x,(p',(ty,tyB),e1')), E_app(E_var z,Pattern.pat2exp p')))
-*)
-           Inline.subst_ty ty_orig @@
-           E_letIn(p,ty_orig,xc2,
-           E_app(E_fix(x,(p',(ty,tyB),e1)),Pattern.pat2exp p'))
-        | Some _ ->
-            assert false (* ill typed *)
-      )
-    | E_app(e1,xc) ->
-        E_app(spec funcs e1,xc)
-    | E_letIn(P_var x,ty,E_trap tyB,e2) ->
-        E_letIn(P_var x,ty,E_trap tyB,spec funcs e2)
-    | E_letIn(P_var x,ty,((E_var _ | E_tuple _) as xc1),e2) ->
-        if not_tyB ty then
-          (* copy propagation to remove aliasing of global functions *)
-         (E_letIn(P_var x, ty, xc1, spec funcs e2))
-          (* spec funcs (Ast_subst.subst_e x (ty_annot ~ty xc1) e2)*)
-        else 
-          E_letIn(P_var x,ty,xc1,spec funcs e2)
-    | E_letIn(P_var x,ty0,(E_fix(x',(p,(ty,tyB),e3)) as e1),e2) ->
-        let e3' = spec (SMap.add x'(ty,E_tuple[E_var x;e1]) funcs) e3 in
-        if not_tyB ty then (has_changed := true; spec (SMap.add x (ty,E_fix(x',(p,(filter ty,tyB),e3'))) funcs) e2) 
-        else
-        E_letIn(P_var x,ty0,(E_fix(x',(p,(ty,tyB),e3'))),spec funcs e2)
-    | E_letIn(P_var x,ty0,((E_fun(p,(ty,tyB),e3))),e2) ->
-        let e3' = spec funcs e3 in
-        if not_tyB ty then (
-           has_changed := true; 
-           spec (SMap.add x (ty,E_fun(p,(filter ty,tyB),e3')) funcs) e2)
-        else
-        E_letIn(P_var x,ty0,(E_fun(p,(ty,tyB),e3')),spec funcs e2)
-    | E_letIn(p,ty,e1,e2) ->
-        E_letIn(p,ty,spec funcs e1,spec funcs e2)
-    | e -> Ast_mapper.map (spec funcs) e
+              (* has_changed := true;*)
+              let e0' = Ast_subst.subst_e f ~when_var:Inline.subst_ty 
+                 (E_fun(p,(ty,tyB),E_app(E_var f,Pattern.pat2exp p'))) e0 in
+              let e1' = E_fun(p,(ty,tyB),
+                              E_app(E_fix(f,(p',(filter ty,tyB), e0')),Pattern.pat2exp p')) in
+              Ast_subst.subst_e x ~when_var:Inline.subst_ty e1' e2
+        | _ -> E_letIn(P_var x,ty,spec e1, spec e2))
+    | e -> Ast_mapper.map spec e
+  in
+  spec e
+
+
+
+let specialize e = 
+  let rec spec env e =
+    match e with
+    | E_var x -> (match SMap.find_opt x env with
+                  | None -> e
+                  | Some e0 -> Inline.subst_ty e0)
+    | E_letIn(P_var x,ty,e1,e2) ->
+        (match e1 with
+        | E_fun(_,(ty,_),_) when not_tyB ty ->
+              has_changed := true;
+              spec (SMap.add x (spec env e1) env) e2
+        | E_fix(f,(p,(ty,tyB),e0)) when not_tyB ty ->            
+              has_changed := true;
+              let p' = p_without_non_basic_values f p ty in
+              (* has_changed := true;*)
+              let e0' = spec (SMap.add f
+                 (E_fun(p,(ty,tyB),E_app(E_var f,Pattern.pat2exp p'))) env) e0 in
+              let e1' = E_fun(p,(ty,tyB),
+                              E_app(E_fix(f,(p',(filter ty,tyB), e0')),Pattern.pat2exp p')) in
+              spec (SMap.add x e1' env) e2
+        | _ -> E_letIn(P_var x,ty,spec env e1, spec env e2))
+    | e -> Ast_mapper.map (spec env) e
   in
   spec SMap.empty e
 
 
-
-let rec list_update (x,v) = function
-| [] -> []
-| (y,v')::l -> if x = y then (x,v)::l else (y,v')::list_update (x,v) l
-
 let normalize pi =
   let pi = Ast_rename.rename_pi pi in (* seems needed *)
   let pi = Let_floating.float_pi pi in
-  let pi = Propagation.propagation_pi pi  in 
-  (*Format.(fprintf std_formatter "PROPAGATED: %a\n\n\n\n\n\n\n" Ast_pprint.pp_exp pi.main); *)pi
-  ;;
+  let pi = Propagation.propagation_pi pi in 
+  let pi = Rename_fix.rename_pi pi in
+  pi ;;
 
-let oo = ref 0 ;;
 
 let rec specialize_pi pi =
   has_changed := false;
+  
   let pi_norm = normalize pi in
-  let main = specialize [] pi_norm.main in
-  let pi_res = { pi_norm with main } in 
   flush stdout;
-  (* if !oo > 10 then   assert false else incr oo; *)
-  if !has_changed then specialize_pi pi_res else normalize pi_res
-
+  let main = specialize pi_norm.main in
+  let pi = {pi with main} in
+  let _ = Typing.typing_with_argument pi [] in 
+  if !has_changed then specialize_pi pi else normalize pi

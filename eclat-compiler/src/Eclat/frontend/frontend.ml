@@ -1,6 +1,8 @@
 open Ast
 open Prelude.Errors
 
+let no_stdlib_flag = ref false
+
 let read_phrase () =
   (* phrases terminate with ";;" *)
   let rec loop acc =
@@ -59,7 +61,7 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ _ _ _ _ -> ()))
                          List.concat dss_from_files 
   in
   let (exts, gs, ts, ds) = 
-         (if repl || List.length inputs < 2 then
+         (if repl || List.length inputs < (if !no_stdlib_flag then 1 else 2) then
             (* let () = List.iter (when_repl ([],[]) [] []) ds_from_files in *)
             (Current_filename.current_file_name := "%stdin";
              Printf.printf "=== eclat toploop ===.\nEnter phrases (separated by ';;') then compile (or run) with ``#q.''\n";
