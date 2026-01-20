@@ -111,7 +111,9 @@ The syntax of the Eclat expression language
 is shown below:
 
 ```
-e ::= x                       -- expression
+e ::=                         -- expression
+// ML subset
+    | x
     | c
     | (e1, ... en)
     | e1 e2
@@ -120,6 +122,13 @@ e ::= x                       -- expression
     | if e1 then e2 else e3
     | let rec f = v in e
     | (e1 || ... en)
+
+// Eclat-specific constructs
+    | reg (fun p -> e) init e0
+    | exec e1 defaut e0 reset e2   // [reset e2] is optional
+
+// assertions
+    | assert e
 
 // arrays
     | get(x,e) 
@@ -134,6 +143,9 @@ e ::= x                       -- expression
 // vectors
     | vect_create<sz>(e)
     | {e1, ... en}
+
+// size
+    | << sz >>
 
 // Esterel-like features
     | pause
@@ -159,7 +171,6 @@ c ::= () | true | false      -- constant
     | (c1, ... cn)           * tuple
     | {c1, ... cn}           * vector
     | op                     * operator
-    | <<sz>>                 * size
 
 ```
 
@@ -169,13 +180,26 @@ Types
 Eclat is statically and implicitely typed using a variant of the ML type system. The type language is as follows:
 
 ```
-type        -- ty ::= tyB | ty * ty | ty -dur-> tyB | tyB array<sz> | 'a
-basic type  -- tyB ::= bool | unit | tyB x<sz> | tyB * tyB 
+type        -- ty ::= tyB 
+                    | ty_1 * ... ty_n 
+                    | ty -dur-> tyB 
+                    | tyB array<sz> 
+                    | << sz >>
+                    | 'a
+basic type  -- tyB ::= bool 
+                    | unit
+                    | tyB x<sz>
+                    | tyB_1 * ... tyB_n 
                     | (X_1 of tyB_1 | ... X_n of ty_N)
+                    | string
                     | `a
-duration    -- dur := 0 | 1 | max(dur,dur) | `d
+duration    -- dur := 
+* instantaneous       0
+* multi-cycle       | 1
+                    | max(dur,dur)
+                    | `d
 size        -- sz := n | sz + n | 2 * sz | `s
-type scheme -- sg := ty | forall `a . sg
+type scheme -- sigma := ty | forall `a . sigma
 ```
 
 Immediate values, such as booleans, are typed with basic types.
@@ -210,7 +234,7 @@ abs : forall `sz . int<`sz> => int<`sz>
 (mod) : forall `sz . (int<`sz> * int<`sz>) => int<`sz>
 get_bit : forall `sz . (int<`sz> * int<32>) => bool
 update_bit : forall `sz . (int<`sz> * int<32> * bool) => int<`sz>
-int_resize : : forall `sz1 `sz2 . (<<`sz2>> * int<`sz1>) => int<`sz2>
+int_resize : forall `sz1 `sz2 . (<<`sz2>> * int<`sz1>) => int<`sz2>
 
 vect_nth: forall `sz `a . (`a vect<`sz> * int<32>) => `a
 vect_size: forall `sz `a . `a vect<`sz> => int<32>
@@ -238,6 +262,56 @@ Eclat programs are sequences of declarations:
 - ```external f : tyB1 -> tyB2``` define the external function `f`
 - ```let x = e ;;``` define the value `x`
 
+
+Compile a program
+====
+
+to compile a file `foo.ecl`, enter in the `eclat-compiler` directory
+and execute the command:
+```
+$ ./eclat foo.ecl -arg="i1;i2;i3"
+```
+
+where `i1;i2;i3` is a sequence of input values (used for testbench generation).
+
+This generates two files, `main.vhdl` and `tb_main.vhdl` in the `target` folder.
+To simulate the VHDL design with GHDL:
+```
+$ cd ../target
+$ make NS=50000
+```
+
+where `NS` is the duration of the simulation (in nano-seconds)
+with a frequency of 100 MHz (i.e., a clock period of 10 ns.) 
+
+If the Eclat program is not instantaneous, 
+the type system rejects it with the following message :
+
+```
+Error: This program has type (t1 -{1}-> t2). It is not reactive. 
+```
+
+To disable this check, use the compier flag `-relax` ;
+e.g., 
+
+```
+./eclat gcd.ecl -relax -arg="(5,15)"
+```
+
+If a program `main1` is not instantaneous, its behaviour is equivalent to
+that of the instantanous program:
+```
+let main(i) =
+  exec main1(i) default c0
+```
+with `c0` a constant of same type than `main1(i)`.
+
+
+If several `.ecl` files are passed to the compiler `./eclat`, these files are concatenated with left-to-right order.
+
+By default, the compiler includes the file `eclat-compiler/stdlib.ecl`, which is the Eclat standard library. Operators defined in this file are implemented in the runtime library `target/stdlib.vhdl`.
+
+The compiler flag `-nostdlib` prevents the load of `eclat-compiler/stdlib.ecl`.
 
 
 
