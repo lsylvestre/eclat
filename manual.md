@@ -142,7 +142,7 @@ e ::=                         -- expression
 
 // sum types
     | Ctor e1
-    | match e with Ctor1 p1 -> e1 `|` ... Ctorn pn -> en
+    | match e with Ctor1 p1 -> e1 `|` ... Ctorn pn -> en [ `|` _ -> e] // the last case is optional
 
 // vectors
     | vect_create<sz>(e)
@@ -259,9 +259,9 @@ Eclat programs are sequences of declarations:
 - ```type x = X_1 of tyB_1 | ... X_n of ty_N``` define a sum type ;
 - ```type tyB x<sz> ;;``` defines an abstract basic type parametrized by a basic type `tyB` and a size `sz`, e.g., 'a vect<sz> ;
    * ```type tyB x ;;``` is an abreviation for `tyB x<1>`
-- ```operator M.f : tyB1 -> tyB2``` define the external operator `M.f`
-- ```external f : tyB1 -> tyB2``` define the external function `f`
-- ```let x = e ;;``` define the value `x`
+- ```operator M.f : tyB1 -> tyB2``` defines the external operator `M.f`
+- ```external f : tyB1 -> tyB2``` defines the external function `f`
+- ```let x = e ;;``` defines the value `x`
 
 
 ## Compile a program
