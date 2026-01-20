@@ -723,7 +723,8 @@ app_exp_desc:
 | SIGNAL NEQ { E_sig_create (E_app(E_const (Op(Runtime(External_fun("Default.create",new_ty_unknown ())))),E_const(Unit))) }
 | e=aexp { e }
 | TRAP LPAREN RPAREN { E_trap(new_tyB_unknown()) }
-| TRAP x=UP_IDENT IN e=exp { E_letIn(P_var x,new_ty_unknown(),E_trap(new_tyB_unknown()), e) }
+| TRAP x=UP_IDENT IN e=exp
+| TRAP x=IDENT IN e=exp { E_letIn(P_var x,new_ty_unknown(),E_trap(new_tyB_unknown()), e) }
 | EXIT x=IDENT
 | EXIT x=UP_IDENT { E_exit(x,E_const(Unit)) }
 | SUSPEND e=app_exp WHEN x=IDENT { E_suspend(e,x) }

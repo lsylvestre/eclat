@@ -120,6 +120,7 @@ e ::=                         -- expression
     | if e1 then e2 else e3
     | let rec f = v in e
     | (e1 || ... en)
+    | (e : ty)
 
 // Eclat-specific constructs
     | reg (fun p -> e) init e0
@@ -128,11 +129,17 @@ e ::=                         -- expression
 // assertions
     | assert e
 
-// arrays
+// imperative features
+    | e1 ; e2
+    | for x = e1 to e2 do e3 done
+    | create<sz>()    // create an array
     | get(x,e) 
     | set(x,e,e)
-    | create<sz>() 
     | length(x)
+
+// macro-expansion
+    | parfor x = sz to sz do e done
+    | iterate<sz to sz> (fun p -> e) init e0
 
 // sum types
     | Ctor e1
@@ -147,7 +154,6 @@ e ::=                         -- expression
 
 // Esterel-like features
     | pause
-    | e1 ; e2
     | trap x in e
     | exit x
     | signal<>
