@@ -1,14 +1,45 @@
-Eclat 
-=====
 
-`Eclat` can be seen both as a hardware description 
-with high-level features or an high-level 
-(functional-imperative, OCaml-like) language with RTL semantics.
+# Eclat 
+
+The `Eclat` language is a hardware description language
+with high-level (functional-imperative, OCaml-like) features. 
+It can also be seen as high-level language with RTL semantics
+and hardware implementation.
+
+`Eclat` is compiled to VHDL for simulation and synthesis on FPGA boards.
+
+## Overview
+
+Eclat programs describes circuits processing input streams to produce output streams. A program is a function that read current inputs and computes current outputs. For example, the following program has two input signal a and b and returns their sum as output:
+```
+let main (a,b) = 
+  a + b;;
+```
+
+The body of the program is an expression. The evaluation of an expression computes a value by spaning one or more clock ticks of a synchronizing clock.
+A clock cycle is the duration between two clock ticks.
+
+Any expression evaluable during a single clock tick, is said *instantaneous* : its duration is zero cycle (neglecting the propagation time of electric signal in the hardware implementation).
+
+The duration of an expression depends on the environment (i.e., variables that occurs free in the expression) and the semantics of each programming construct, with a simple rule:
+
+```
+all Eclat constructs are instantaneous, except pauses, recursive function calls and array accesses^(1), which delay the execution until the next clock tick.
+
+(1) Concurrent array accesses are sequentialized, resulting in additional cycles, in a deterministic and predictable way.
+```
+
+A function is said instantaneous if, for any argument, it computes a result instantaneously. 
+
+Below are main Eclat features:
 
 Tail-recursion
-===
+=== 
 
-Executing a tail-recursive function performs a pause of one clock cycle at each (direct or recursive) call, such as:
+Tail-recursion allows for iterative execution with 
+a pause of one clock cycle at each (direct or recursive) call.
+For instance, here is an Eclat definition of the GCD 
+(Greatest Common Diviser) algorithm:
 
 ```
 let rec gcd (a,b) =
@@ -16,45 +47,135 @@ let rec gcd (a,b) =
   if a > b then gcd (a-b,b)
   else a ;;
 ```
-
-Combinational circuits
+Parallelism
 ===
 
-Functions that do not contain tail-recursion nor array accesses are instantaneous:
-```
-let half_add(a,b) = 
-  let s = a xor b in
-  let co = a & b in
-  (s,co) ;;
-``````
+The `(e1||... en)` construct allows for parallel execution of expressions `e1` ... `en` in lock-step.
 
-Here the function `half_add` is a classical combinational circuit taking two boolean input values and returning their sum with a carry output.
-The function is called at each clock tick and is typically connected to physical I/Os or other hardware components.
+For example, the following function computes the greatest common diviser
+of four arguments:
+
+```
+let gcd3 (a,b,c,d) =
+  let (x,y) = (gcd(a,b) || gcd(c,d)) in
+  gcd(x,y) ;;
+```
+
+Arrays
+===
+
+Arrays constitute a regular, mutable data structure, 
+efficiently implemented with RAM blocks on FPGA targets.
+Array reads and writes take 1 cycle. Each array 
+is protected by a single lock for both reads and writes.
+Array creation and accessing the length of an array 
+are instantaneous operations. Type checking avoid dynamic allocation.
+```
+let main() =
+  let a = create<2048>() in
+  for i = 0 to length(a) - 1 do
+    set(a,i,42)
+  end
+```
 
 Sequential circuits
 ===
 
-The Eclat construct `reg f init v` is a register initialized with `v`
-and updated with function `f`. Note that this is a Mealy machine: the first execution of `reg f init v` returns `f(v)`, the next returns `f(f(v))`, etc.
+The Eclat construct `reg f init e0` is a register initialized with expression `e0`
+and updated with function `f`. Note that this is a Mealy machine: the first execution of `reg f init e0` returns `f(e0)`, the next execution returns `f(f(e0))`, etc.
 
-For instance, here is a counter:
+For instance, here is a counter definition starting by 1.
 ```
-let count inc = 
-  reg (fun inc -> c + inc) init 0;;
+let count () = 
+  reg (fun 0 -> c + 1) init 0;;
+```
+
+Mixing interaction and computation
+===
+
+The Eclat construct `exec e defaut e0` aims to repeatedly computes the expression `e`, which is typically a multi-cycle expression, within an instantaneous expression. Each time `exec e defaut e0` is executed, a single step is performed in the computation of `e`. If the obtained redex is a value `v`, then the pair `(v,true)` is returned by `exec`. Otherwise, if the redex is a reductible expression `e1`, then `exec` returns the pair `(e0,false)` where `e0` is an instantaneous expression computing a default value.
+
+For instance, the following program executes the GCD algorithms while incrementing a counter at each cycle:  
+
+```
+let main (a,b) =
+  let (x,rdy) = exec gcd(a,b) default 0 in
+  let c = count () in 
+  (x,rdy,c) ;;
+```
+
+Expression language
+=====
+
+The syntax of the Eclat expression language 
+is shown below:
+
+```
+e ::= x                       -- expression
+    | c
+    | (e1, ... en)
+    | e1 e2
+    | fun p -> e
+    | let p = e1 in e2
+    | if e1 then e2 else e3
+    | let rec f = v in e
+    | (e1 || ... en)
+
+// arrays
+    | get(x,e) 
+    | set(x,e,e)
+    | create<sz>() 
+    | length(x)
+
+// sum types
+    | Ctor e1
+    | match e with Ctor1 p1 -> e1 `|` ... Ctorn pn -> en
+
+// vectors
+    | vect_create<sz>(e)
+    | {e1, ... en}
+
+// Esterel-like features
+    | pause
+    | e1 ; e2
+    | trap x in e
+    | exit x
+    | signal<>
+    | emit x(e)
+    | ?x
+    | suspend e when x
+    | loop: e end
+    | [e1 || e2]
+
+// Lustre-like features
+    | e where rec p1 = e1 and ... pn = en
+    | e fby e
+    | e when e
+    | merge(x,e1,e2)
+
+p ::= () | x | (p1, ... pn)  -- pattern
+
+c ::= () | true | false      -- constant
+    | (c1, ... cn)           * tuple
+    | {c1, ... cn}           * vector
+    | op                     * operator
+    | <<sz>>                 * size
+
 ```
 
 Types
 =====
 
-Eclat is statically typed. The type language is as follows:
+Eclat is statically and implicitely typed using a variant of the ML type system. The type language is as follows:
 
 ```
-type       -- ty ::= tyB | ty * ty | ty -dur-> tyB | tyB array<sz> | 'a
-basic type -- tyB ::= bool | unit | tyB x<sz> | tyB * tyB 
+type        -- ty ::= tyB | ty * ty | ty -dur-> tyB | tyB array<sz> | 'a
+basic type  -- tyB ::= bool | unit | tyB x<sz> | tyB * tyB 
                     | (X_1 of tyB_1 | ... X_n of ty_N)
                     | `a
-duration   -- dur := n | max(dur,dur) | `d
-size       -- sz := n | sz + n | 2 * sz | `s
+duration    -- dur := 0 | 1 | max(dur,dur) | `d
+size        -- sz := n | sz + n | 2 * sz | `s
+type scheme -- sg := ty | forall `a . sg
 ```
 
 Immediate values, such as booleans, are typed with basic types.
@@ -66,12 +187,46 @@ Note that the return type of a function must be a basic type,
 as enforced by the type constructor `ty -dur-> tyB`. 
 As a consequence, all Eclat functions have one argument (e.g., a pair).
 
-Type variables are noted:
+Type variables are noted: ```'a, `a, `d, `s```.
+
+We use some syntactic sugar: 
+* `ty => tyB` for `ty -0-> tyB`
+* `ty -> tyB` for `ty -1-> tyB`
+
+The main Eclat primitives have following type signatures:
+
 ```
-'a, `a, `d, `s
+(=) : forall `a . (`a * `a) => bool
+(or) : (bool * bool) => bool
+(&) : (bool * bool) => bool
+(xor) : (bool * bool) => bool
+not : bool => bool
+
+abs : forall `sz . int<`sz> => int<`sz>
+(+) : forall `sz . (int<`sz> * int<`sz>) => int<`sz>
+(-) : forall `sz . (int<`sz> * int<`sz>) => int<`sz>
+( * ) : forall `sz . (int<`sz> * int<`sz>) => int<`sz>
+(/) : forall `sz . (int<`sz> * int<`sz>) => int<`sz>
+(mod) : forall `sz . (int<`sz> * int<`sz>) => int<`sz>
+get_bit : forall `sz . (int<`sz> * int<32>) => bool
+update_bit : forall `sz . (int<`sz> * int<32> * bool) => int<`sz>
+int_resize : : forall `sz1 `sz2 . (<<`sz2>> * int<`sz1>) => int<`sz2>
+
+vect_nth: forall `sz `a . (`a vect<`sz> * int<32>) => `a
+vect_size: forall `sz `a . `a vect<`sz> => int<32>
+vect_copy_with: forall `sz `a . (`a vect<`sz> * int<32> * `a) => `a vect<`sz> 
+vect_make : forall `sz `a . (<<`sz>> * `a) => `a vect<`sz>
+
+print_string : string => unit
+print_int : forall `sz . int<`sz> => unit
+print_newline : unit => unit
 ```
 
-Syntax of Eclat programs
+Primitives such as `print_string`, `print_int` and `print_newline` are used for simulation only, but are not synthesizable. 
+The compiler flag `-no-print` can be used to remove call to these functions
+in the generated RTL code.
+
+Structure of Eclat programs
 =======
 
 Eclat programs are sequences of declarations:
