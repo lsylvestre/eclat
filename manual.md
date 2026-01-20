@@ -9,6 +9,7 @@ and hardware implementation.
 `Eclat` is compiled to VHDL for simulation and synthesis on FPGA boards.
 
 ## Overview
+===
 
 Eclat programs describes circuits processing input streams to produce output streams. A program is a function that read current inputs and computes current outputs. For example, the following program has two input signal a and b and returns their sum as output:
 ```
@@ -47,8 +48,7 @@ let rec gcd (a,b) =
   if a > b then gcd (a-b,b)
   else a ;;
 ```
-Parallelism
-===
+### Parallelism
 
 The `(e1||... en)` construct allows for parallel execution of expressions `e1` ... `en` in lock-step.
 
@@ -172,7 +172,8 @@ c ::= () | true | false      -- constant
 
 ```
 
-## Types
+## Types and primitives
+===
 
 Eclat is statically and implicitely typed using a variant of the ML type system. The type language is as follows:
 
@@ -260,6 +261,7 @@ Eclat programs are sequences of declarations:
 
 
 ## Compile a program
+===
 
 to compile a file `foo.ecl`, enter in the `eclat-compiler` directory
 and execute the command:
@@ -308,7 +310,7 @@ By default, the compiler includes the file `eclat-compiler/stdlib.ecl`, which is
 
 The compiler flag `-nostdlib` prevents the load of `eclat-compiler/stdlib.ecl`.
 
-If no `.ecl` file is passed to the compiler, the compiler enter in a toplevel read-type-print loop. For instance:
+If no `.ecl` file is passed to the compiler, the compiler enters in a toplevel read-type-print loop. For instance:
 
 ```
 $ ./eclat -arg "6;5;4;3;7;5;8;3;9;5"
