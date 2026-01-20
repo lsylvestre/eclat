@@ -1,9 +1,14 @@
+```
+$ cd examples/ocaml-vm/generated-bytecode ; make BCOPT="-load-data -load-code"
+$ cd examples/ocaml-vm ; make synth ECLAT_FLAGS="-one-hot -intel-max10"
+```
+
 # Hardware implementation of the OCaml virtual machine and runtime using Eclat
 
 dependencies:
 - ghdl
 - dune
-- eclat (see ../ocaml-compiler)
+- eclat (see ../../ocaml-compiler)
 - obytelib & ocamlclean
 
 
@@ -12,7 +17,7 @@ dependencies:
 ```
 $ make bytecode SRC=benchs/apply/apply.ml
 $ make vm FLAGS=-ocaml
-$ cd ../target/ml/
+$ cd ../../target/ml/
 $ ocamlc runtime.ml main_step.ml
 $ ./a.out -run 100000000             # for a given number of clock cycles
 ```
@@ -24,7 +29,7 @@ It is the common way to test hardware at the register transfer level.
 ```
 $ make bytecode SRC=benchs/apply/apply.ml
 $ make simul
-$ cd ../target
+$ cd ../../target
 $ make
 ```
 
@@ -35,4 +40,50 @@ $ make synth SRC=benchs/apply/apply.ml
 $ make code
 $ make data
 ```
+
+
+
+
+
+
+
+Example:
+
+```
+$ cd eclat-compiler
+$ make
+$ cd ../examples/ocaml-vm/
+$ make SRC=tests/fibo.ml
+$ cd ../../target/
+$ make NS=50000
+ghdl -a  runtime.vhdl stdlib.vhdl 
+ghdl -a  main.vhdl
+ghdl -a  tb_main.vhdl
+ghdl -e  tb_main
+ghdl -r  tb_main --vcd=tb.vcd --stop-time=50000ns
+pc:0|acc:1<int>|sp:1000|env:1<int> 
+pc:22|acc:1<int>|sp:1000|env:1<int> 
+GC-ALLOC:(size=2) 
+size:1 
+pc:26|acc:4000<ptr>|sp:1001|env:1<int> 
+pc:28|acc:11<int>|sp:1001|env:1<int> 
+pc:29|acc:4000<ptr>|sp:1002|env:1<int> 
+ENV:1<int> 
+pc:2|acc:4000<ptr>|sp:1005|env:4000<ptr> 
+pc:3|acc:11<int>|sp:1005|env:4000<ptr> 
+pc:9|acc:11<int>|sp:1005|env:4000<ptr> 
+pc:10|acc:11<int>|sp:1005|env:4000<ptr> 
+pc:12|acc:9<int>|sp:1005|env:4000<ptr> 
+pc:13|acc:4000<ptr>|sp:1006|env:4000<ptr> 
+ENV:4000<ptr> 
+pc:2|acc:4000<ptr>|sp:1009|env:4000<ptr> 
+pc:3|acc:9<int>|sp:1009|env:4000<ptr> 
+pc:9|acc:9<int>|sp:1009|env:4000<ptr> 
+pc:10|acc:9<int>|sp:1009|env:4000<ptr> 
+pc:12|acc:7<int>|sp:1009|env:4000<ptr> 
+pc:13|acc:4000<ptr>|sp:1010|env:4000<ptr> 
+ENV:4000<ptr> 
+...
+```
+
 
