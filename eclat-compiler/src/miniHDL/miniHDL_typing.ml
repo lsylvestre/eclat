@@ -138,7 +138,7 @@ let rec translate_tyB =
      if Hashtbl.mem hvar r then 
        Hashtbl.find hvar r else
       (let t = TVar(ref @@ match !r with
-                   | Unknown n -> V (string_of_int n)
+                   | Unknown{id;_} -> V (string_of_int id)
                    | Is t -> T (translate_tyB t)) in
       Hashtbl.add hvar r t;
       t)
@@ -159,7 +159,7 @@ let rec translate_tyB =
     | Sz_var r -> 
       if Hashtbl.mem hvar r then Hashtbl.find hvar r else
         (let t = TVar(ref @@ match !r with
-                    | Unknown n -> V (string_of_int n)
+                    | Unknown{id;_} -> V (string_of_int id)
                     | Is sz -> T (translate_size sz)) in
         Hashtbl.add hvar r t;
         t)
@@ -174,7 +174,7 @@ let rec translate_ty =
   | Ty_var r -> 
      if Hashtbl.mem hvar r then Hashtbl.find hvar r else
       (let t = TVar(ref @@ match !r with
-                   | Unknown n -> V (string_of_int n)
+                   | Unknown{id;_} -> V (string_of_int id)
                    | Is t -> T (translate_ty t)) in
       Hashtbl.add hvar r t;
       t) (*todo*) 

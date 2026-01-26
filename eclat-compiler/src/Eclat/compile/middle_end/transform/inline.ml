@@ -104,7 +104,7 @@ let subst_ty e = (* todo: rename this function and remove the unused parameter *
   let vs = fv_type_in e in
   let unknowns = Hashtbl.create (Vs.cardinal vs) in
   (* Ast_pprint.pp_exp Format.std_formatter e; *)
-   Vs.iter (fun n -> Hashtbl.add unknowns n (new_unknown_generic())) vs;
+   Vs.iter (fun n -> Hashtbl.add unknowns n.id (new_unknown_generic ())) vs;
   
   let rec ss e =
     let open Operators in

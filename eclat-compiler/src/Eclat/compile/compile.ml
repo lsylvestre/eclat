@@ -60,6 +60,8 @@ let compile ?(vhdl_comment="") ?(prop_fsm=true) arg_list name ty fmt pi =
   (* let fsm = Remove_assigned_but_not_read_vars.clean_fsm ~rdy ~result fsm _typing_env in *)
   let typing_env = MiniHDL_typing.typing_circuit ~externals:pi.externals ~statics ty (rdy,result,fsm) in
 
+  Collect_state_variables.collect_main fsm;
+  
   ignore(MiniHDL_causality.check fsm);
 
   let (argument,result) = 

@@ -35,21 +35,21 @@
   let decl_size_var x =
     if Hashtbl.mem hash_size_tvar x then
     Hashtbl.find hash_size_tvar x else
-    (let v = (new_size_unknown ()) in
+    (let v = (new_size_unknown ~name:x ()) in
      Hashtbl.add hash_size_tvar x v; v)
 
   let hash_ty_tvar = Hashtbl.create 10 ;;
   let decl_ty_var x =
     if Hashtbl.mem hash_ty_tvar x then
     Hashtbl.find hash_ty_tvar x else
-    (let v = (new_ty_unknown ()) in
+    (let v = (new_ty_unknown ~name:x ()) in
      Hashtbl.add hash_ty_tvar x v; v)
 
   let hash_tyB_tvar = Hashtbl.create 10 ;;
   let decl_tyB_var x =
     if Hashtbl.mem hash_tyB_tvar x then
     Hashtbl.find hash_tyB_tvar x else
-    (let v = (new_tyB_unknown ()) in
+    (let v = (new_tyB_unknown ~name:x ()) in
      Hashtbl.add hash_tyB_tvar x v; v)
 
 
@@ -266,10 +266,17 @@ ty_case:
 | x=UP_IDENT OF tyB=tyB { x,tyB }
 
 fun_decl(In_kw):
-| f=IDENT szs=size_param_fun_decl* p_ty_opt=arg_ty_atomic
+| f=IDENT /* szs=size_param_fun_decl*  */
+         p_ty_opt_list=arg_ty_atomic+
                   ty_opt_ret=ret_ty_annot_eq
     e1=exp In_kw
-        { let p_ty_opt = 
+        { let ps, ts = List.split @@
+                            List.map (fun (p,ty_opt) -> 
+                            match ty_opt with
+                            | None -> p, new_ty_unknown()
+                            | Some ty -> p,ty) p_ty_opt_list in
+          let p_ty_opt = group_ps ps, Some (group_ts ts) in
+        (*  let p_ty_opt = 
             match szs,p_ty_opt with
             | [],p_ty_opt -> p_ty_opt
             | szs,(p,ty_opt) ->
@@ -278,7 +285,7 @@ fun_decl(In_kw):
                   Some (Ty_tuple(List.map (fun sz -> Ty_size sz) szs @ 
                                 [match ty_opt with
                                  | None -> new_ty_unknown ()
-                                 | Some ty -> ty]))) in
+                                 | Some ty -> ty]))) in *)
            let ef = mk_let_fun ~loc:(with_file ($startpos(f),$endpos(e1)))
                                ~p_ty_opt
                                ~ty_opt_ret
@@ -410,9 +417,16 @@ ty_next:
 | LPAREN ty=ty RPAREN { ty }
 
 size:
+| LPAREN sz=size RPAREN { sz }
 | n=INT_LIT { Sz_lit n }
 | x=TVAR_IDENT {
-    decl_size_var x
+    (* TODO: avoid confusion between size variables 
+       and type variables in source programs 
+       by systematically using a question mark *)
+    decl_size_var ("?"^x)
+}
+| QUESTION_MARK x=IDENT {
+    decl_size_var ("?"^x)
   }
 | sz=size PLUS n=INT_LIT { Sz_add(sz,n) }
 | n=INT_LIT TIMES sz=size { 
@@ -472,6 +486,7 @@ arg_ty:
 
 arg_ty_atomic:
 | LPAREN p=pat RPAREN { p, None }
+| sz=size_param_fun_decl { P_var (gensym ()), Some (Ty_size sz) }
 | LPAREN p=apat COL ty=ty RPAREN {p, Some ty}
 | p=apat { p, None }
 

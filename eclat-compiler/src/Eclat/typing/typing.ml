@@ -39,24 +39,25 @@ let rec unify_size ~loc sz1 sz2 =
   match sz1, sz2 with
   | sz1,Sz_var {contents=Is sz2}
   | Sz_var {contents=Is sz1},sz2 -> unify_size ~loc sz1 sz2
-  | Sz_var {contents=(Unknown n)},
-    Sz_var ({contents=Unknown m} as v) ->
-    if n = m then () else v := Is sz1
-  | Sz_var ({contents=(Unknown n)} as r1),sz2 ->
+  | Sz_var ({contents=(Unknown{id=n;_})} as v),
+    Sz_var {contents=Unknown{id=m;_}} ->
+    if n = m then () else v := Is sz2
+  | Sz_var ({contents=(Unknown{id=n;_})} as r1),sz2 ->
     if test_occur (occur_size n) sz2 then (
       r1 := Is (Sz_lit 0)
       (* raise (Cyclic_size(n,sz2,loc)) *)
     ) else
     r1 := Is sz2
-  | sz1,Sz_var ({contents=(Unknown n)} as r2) ->
+  | sz1,Sz_var ({contents=(Unknown{id=n;_})} as r2) ->
     if test_occur (occur_size n) sz1 then (
       (* raise (Cyclic_size(n,sz1,loc)); *)
-      r2 := Is (Sz_lit 0)
+      r2 := Is (Sz_lit 0);
+      unify_size ~loc sz1 (Sz_var r2)
     ) else
     r2 := Is sz1
   | Sz_lit n1, Sz_lit n2 ->
-    if n1 <= 0 || n2 <= 0 then
-      Prelude.Errors.error ~loc (fun fmt -> Format.fprintf fmt "type size should be strictly positive")
+    if n1 < 0 || n2 < 0 then
+      Prelude.Errors.error ~loc (fun fmt -> Format.fprintf fmt "type size should be positive")
     else 
       if n1 <> n2 then raise @@ CannotUnify(loc,[Size(sz1,sz2)])
   | Sz_add(sz,n),Sz_add(sz',n') -> 
@@ -127,13 +128,13 @@ let rec unify_dur ~loc d1 d2 =
   | d1,Dur_var {contents=Is d2}
   | Dur_var {contents=Is d1},d2 ->
       unify_dur ~loc d1 d2
-  | Dur_var {contents=(Unknown n)},
-    Dur_var ({contents=Unknown m} as v) ->
-      if n = m then () else v := Is d1
-  | d1,Dur_var ({contents=Unknown n} as r2) ->
+  | Dur_var ({contents=(Unknown{id=n;_})} as v),
+    Dur_var {contents=Unknown{id=m;_}} ->
+      if n = m then () else v := Is d2
+  | d1,Dur_var ({contents=Unknown{id=n;_}} as r2) ->
       if test_occur (occur_dur n) d1 then raise (Cyclic_dur(n,d1,loc));
       r2 := Is d1
-  | Dur_var ({contents=Unknown n} as r1),d2 ->
+  | Dur_var ({contents=Unknown{id=n;_}} as r1),d2 ->
       if test_occur (occur_dur n) d2 then raise (Cyclic_dur(n,d2,loc));
       r1 := Is d2
   | Dur_max(Dur_zero,d1),d2
@@ -149,12 +150,12 @@ let rec unify_dur ~loc d1 d2 =
   | Dur_zero,Dur_max(d1,d2) ->
       unify_dur ~loc d1 Dur_zero;
       unify_dur ~loc d1 Dur_zero;
-  | Dur_max(Dur_var ({contents=(Unknown n)} as r1),Dur_var ({contents=(Unknown m)} as r2)),d2 ->
+  | Dur_max(Dur_var ({contents=(Unknown{id=n;_})} as r1),Dur_var ({contents=(Unknown{id=m;_})} as r2)),d2 ->
     if n = m then let d = Dur_var r1 in r2 := Is d; unify_dur ~loc d d2 else
       (warning_loss_of_precision d1 d2 r1;
        r1 := Is Dur_one;
        unify_dur ~loc Dur_one d2)
-  | _,Dur_max(Dur_var ({contents=(Unknown n)} as r3),Dur_var ({contents=(Unknown m)} as r4)) ->
+  | _,Dur_max(Dur_var ({contents=(Unknown{id=n;_})} as r3),Dur_var ({contents=(Unknown{id=m;_})} as r4)) ->
     if n = m then let d = Dur_var r3 in r4 := Is d; unify_dur ~loc d1 d else
       (warning_loss_of_precision d1 d2 r3;
        r3 := Is Dur_one;
@@ -169,16 +170,20 @@ let rec unify_dur ~loc d1 d2 =
 
 let rec unify_tyB ~loc tyB1 tyB2 =
   let tyB1,tyB2 = canon_tyB tyB1, canon_tyB tyB2 in
-  (* Format.fprintf Format.std_formatter "&&      [tyB]====> %a / %a\n"  pp_tyB  tyB1  pp_tyB  tyB2; *)
-  match tyB1, tyB2 with
-  | TyB_var {contents=(Unknown n)},
-    TyB_var ({contents=Unknown m} as v) ->
-    if n = m then () else v := Is tyB1;
-  | TyB_var ({contents=(Unknown n)} as r1),tyB2 ->
+  (* Format.fprintf Format.std_formatter "&&      [tyB]====> %a / %a\n"  pp_tyB  tyB1  pp_tyB  tyB2;
+ *) match tyB1, tyB2 with
+  | TyB_var ({contents=(Unknown{id=n;name})} as v),
+    TyB_var {contents=Unknown({id=m;_} as r)} ->
+    if n = m then () else 
+       begin 
+            v := Is tyB2;
+            (match r.name with None -> r.name <- name | _ -> ());   
+      end
+  | TyB_var ({contents=(Unknown{id=n;_})} as r1),tyB2 ->
     if test_occur (occur_tyB n) tyB2 then 
       raise @@ CannotUnify(loc,(Cyclic_Ty(n,Ty_base tyB2))::[]);
     r1 := Is tyB2
-  | tyB1,TyB_var ({contents=(Unknown n)} as r2) ->
+  | tyB1,TyB_var ({contents=(Unknown{id=n;_})} as r2) ->
     if test_occur (occur_tyB n) tyB1 then
       raise @@ CannotUnify(loc,(Cyclic_Ty(n,Ty_base tyB1))::[]);
     r2 := Is tyB1
@@ -228,17 +233,29 @@ let unify_ty ~loc ty1 ty2 =
   let ty1,ty2 = canon_ty ty1, canon_ty ty2 in
   let rec unify ~loc ty1 ty2 =
     let ty1,ty2 = canon_ty ty1, canon_ty ty2 in
-    (* Format.fprintf Format.std_formatter "          [ty]====> %a / %a\n"  pp_ty  ty1  pp_ty  ty2;*)
-    match ty1,ty2 with
-    | Ty_var {contents=(Unknown n)},
-      Ty_var ({contents=Unknown m} as v) ->
-        if n = m then () else v := Is ty1
-    | (Ty_base(TyB_var {contents=(Unknown n)}),
-       Ty_var ({contents=Unknown m} as v)) ->
-        (* if n = m then () else*) v := Is ty1
-    | (Ty_var ({contents=Unknown m} as v),
-       Ty_base(TyB_var {contents=(Unknown n)})) ->
-      (* if n = m then () else*) v := Is ty2
+   (* Format.fprintf Format.std_formatter "          [ty]====> %a / %a\n"  pp_ty  ty1  pp_ty  ty2;
+   *) match ty1,ty2 with
+    | Ty_var ({contents=(Unknown{id=n;name})} as v),
+      Ty_var {contents=Unknown({id=m;_} as u)} ->
+        if n = m then () else 
+          begin  
+            v := Is ty2;
+            (match u.name with None -> u.name <- name | _ -> ())
+          end
+    | (Ty_base(TyB_var {contents=Unknown u}),
+       Ty_var ({contents=Unknown{id=m;name}} as v)) ->
+        (* if n = m then () else*) 
+          begin
+            v := Is ty1;
+            (match u.name with None -> u.name <- name | _ -> ())
+          end
+    | (Ty_var ({contents=Unknown{id=m;name}} as v),
+       Ty_base(TyB_var {contents=Unknown u})) ->
+      (* if n = m then () else*) 
+         begin
+            v := Is ty2;
+            (match u.name with None -> u.name <- name | _ -> ())
+         end
     (*| (Ty_base(TyB_var {contents=(Is tyB1)}),
       Ty_var ({contents=Unknown n} as r2)) ->
         if test_occur (occur_ty n) ty2 then raise (Cyclic_ty(n,ty2,loc));
@@ -247,11 +264,11 @@ let unify_ty ~loc ty1 ty2 =
       Ty_base(TyB_var {contents=(Is tyB2)}) ->
         if test_occur (occur_ty n) ty1 then raise (Cyclic_ty(n,ty1,loc));
         r1 := Is (Ty_base tyB2)*)
-    | Ty_var ({contents=(Unknown n)} as r1),ty2 ->
+    | Ty_var ({contents=(Unknown{id=n;_})} as r1),ty2 ->
       if test_occur (occur_ty n) ty2 then
         raise @@ CannotUnify(loc,(Cyclic_Ty(n,ty2))::[]);
       r1 := Is ty2
-    | ty1,Ty_var ({contents=(Unknown n)} as r2) ->
+    | ty1,Ty_var ({contents=(Unknown{id=n;_})} as r2) ->
       if test_occur (occur_ty n) ty1 then
         raise @@ CannotUnify(loc,(Cyclic_Ty(n,ty1))::[]);
       r2 := Is ty1
@@ -317,7 +334,7 @@ let rec subtyping_dur ~loc d1 d2 =
   | _,Dur_one -> ()
   | d1,Dur_var {contents=Is d2} -> subtyping_dur ~loc d1 d2
   | Dur_var {contents=Is d1},d2 -> subtyping_dur ~loc d1 d2
-  | Dur_var ({contents=Unknown n} as r),Dur_zero ->
+  | Dur_var ({contents=Unknown{id=n;_}} as r),Dur_zero ->
     r := Is (Dur_zero)
   | Dur_one,Dur_var ({contents=Unknown n} as r) ->
     r := Is (Dur_one)
@@ -514,7 +531,9 @@ let rec typ_exp ?(collect_sig=false) ~statics ~externals ~sums ~ctors ?(toplevel
            (match p with P_var x -> (let (Forall(xs,_)) = SMap.find x g' in
                if Vs.cardinal xs > 0 then (
                  fprintf std_formatter "forall ";
-                 Vs.iter (fun x -> fprintf std_formatter "'%d " x) xs;
+                 Vs.iter (fun x -> match x.name with
+                                   | None -> fprintf std_formatter "'%d " x.id
+                                   | Some y -> fprintf std_formatter "%s%d " y x.id) xs;
                  fprintf std_formatter " . "))
            | _ -> ());
            fprintf std_formatter "%a | %a\n"
@@ -522,7 +541,7 @@ let rec typ_exp ?(collect_sig=false) ~statics ~externals ~sums ~ctors ?(toplevel
          end
        end);
 
-    let ty2,d2 = typ_exp ~collect_sig ~statics ~externals ~sums ~ctors ~toplevel:true ~loc:(loc_of e2) g' e2 in
+    let ty2,d2 = typ_exp ~collect_sig ~statics ~externals ~sums ~ctors ~toplevel ~loc:(loc_of e2) g' e2 in
 
     (ty2, Dur_max(d1,d2))
 
@@ -1017,7 +1036,9 @@ let when_repl externals statics sums : bool -> ((p * e) * Prelude.loc) -> unit =
            (match p with P_var x -> (let (Forall(xs,_)) = SMap.find x !r in
                if Vs.cardinal xs > 0 then (
                  fprintf std_formatter "forall ";
-                 Vs.iter (fun x -> fprintf std_formatter "'%d " x) xs;
+                 Vs.iter (fun x -> match x.name with
+                                   | None -> fprintf std_formatter "'%d " x.id
+                                   | Some y -> fprintf std_formatter "%s%d " y x.id) xs;
                  fprintf std_formatter " . "))
            | _ -> ());
            fprintf std_formatter "%a | %a@."

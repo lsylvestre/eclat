@@ -1,4 +1,3 @@
-
 (* 
 reject:
 (emit A || pause; emit A)

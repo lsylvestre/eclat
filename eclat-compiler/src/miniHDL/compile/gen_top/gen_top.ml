@@ -116,7 +116,7 @@ let pp_top ?(top="top") ~vhdl_comment ~argument:(_,ta) ~result:(_,tr) ?(clock="c
 use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;
 
-use work.runtime.all;
+use work.all;
 
 @[<v 2>entity %s is@,@[<v>port (@[<v>signal %s : in std_logic" top clock;
   List.iter (fun (xi,size) ->
@@ -135,16 +135,16 @@ architecture rtl of %s is
     component main is
         port (signal clk : in std_logic;
               signal reset : in std_logic;
-              signal argument : in value(0 to %d);
-              signal result : out value(0 to %d)
+              signal argument : in Values.t(0 to %d);
+              signal result : out Values.t(0 to %d)
         );
     end component;" top (argument_size-1) (result_size-1);
 
   fprintf fmt "
     signal RST : std_logic := '1';
-    signal argument : value(0 to %d);
-    signal result : value(0 to %d);
-    signal ready : value (0 to 0);" (argument_size-1) (result_size-1);
+    signal argument : Values.t(0 to %d);
+    signal result : Values.t(0 to %d);
+    signal ready : Values.t (0 to 0);" (argument_size-1) (result_size-1);
 
   fprintf fmt "
     begin

@@ -88,6 +88,7 @@ OBJS= $(SRC_DIR)/prelude.cmx \
       \
       $(SRC_DIR)/miniHDL/optim/miniHDL_propagation.cmx \
       $(SRC_DIR)/miniHDL/optim/remove_assigned_but_not_read_vars.cmx \
+      $(SRC_DIR)/miniHDL/optim/collect_state_variables.cmx \
       \
       $(SRC_DIR)/miniHDL/compile/gen_vhdl_aux.cmx \
       $(SRC_DIR)/miniHDL/compile/gen_vhdl.cmx \

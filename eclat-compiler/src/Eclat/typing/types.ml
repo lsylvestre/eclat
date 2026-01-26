@@ -23,7 +23,8 @@ let find_ctor x sums =
 
 
 type 'a var = 'a var_content ref
-and 'a var_content = Unknown of int
+and unknown = {id:int;mutable name:string option}
+and 'a var_content = Unknown of unknown
                    | Is of 'a
 
 type size = Sz_var of size var
@@ -116,8 +117,8 @@ let rec canon_dur = function
      (match d1,d2 with
      | Dur_zero,d | d,Dur_zero -> d
      | Dur_one,_ | _,Dur_one -> Dur_one
-     | Dur_var {contents=(Unknown n)},
-       Dur_var {contents=(Unknown m)} ->
+     | Dur_var {contents=(Unknown{id=n;name=_})},
+       Dur_var {contents=(Unknown{id=m;name=_})} ->
          if n = m then d1 else Dur_max(d1,d2)
      | _ -> Dur_max(d1,d2)
    )
@@ -160,7 +161,10 @@ let pp_dur fmt (d:dur) : unit =
   let open Format in
   let rec pp fmt d =
   match canon_dur d with
-  | Dur_var{contents=Unknown n} -> fprintf fmt "d%d" n
+  | Dur_var{contents=Unknown{id=n;name}} ->
+      (match name with
+      | None -> fprintf fmt "'dur%d" n
+      | Some x -> fprintf fmt "%s%d" x n)
   | Dur_var{contents=Is d} -> pp fmt d
   | Dur_zero -> fprintf fmt "0"
   | Dur_one -> fprintf fmt "1"
@@ -172,7 +176,10 @@ let pp_size fmt (sz:size) : unit =
   let open Format in
   let rec pp fmt sz =
   match canon_size sz with
-  | Sz_var{contents=Unknown n} -> fprintf fmt "~z%d" n
+  | Sz_var{contents=Unknown{id=n;name}} ->
+       (match name with
+        | None -> fprintf fmt "?%d" n
+        | Some x -> fprintf fmt "%s%d" x n)
   | Sz_var{contents=Is sz} -> pp fmt sz
   | Sz_lit k -> fprintf fmt "%d" k
   | Sz_add(sz,n) -> fprintf fmt "(%a + %d)" pp sz n
@@ -191,7 +198,10 @@ let pp_tyB fmt (tyB:tyB) : unit =
   let open Format in
   let rec pp fmt tyB =
   match canon_tyB tyB with
-  | TyB_var{contents=Unknown n} -> fprintf fmt "`b%d" n
+  | TyB_var{contents=Unknown{id=n;name}} ->
+       (match name with
+        | None -> fprintf fmt "~%d" n
+        | Some x -> fprintf fmt "%s%d" x n)
   | TyB_var{contents=Is tyB} -> pp fmt tyB
   | TyB_bool -> fprintf fmt "bool"
   | TyB_unit -> fprintf fmt "unit"
@@ -224,7 +234,10 @@ let pp_ty fmt (ty:ty) : unit =
   let open Format in
   let rec pp fmt ty =
   match canon_ty ty with
-  | Ty_var{contents=Unknown n} -> fprintf fmt "'a%d" n
+  | Ty_var{contents=Unknown{id=n;name}} ->
+       (match name with
+        | None -> fprintf fmt "'%d" n
+        | Some x -> fprintf fmt "%s%d" x n)
   | Ty_var{contents=Is ty} -> pp fmt ty
   | Ty_base tyB -> pp_tyB fmt tyB
   | Ty_tuple ty_list -> pp_tuple fmt pp ty_list
@@ -246,37 +259,40 @@ let new_unknown : unit -> int =
 let n = ref 0 in
 fun () -> n := !n + 1; !n
 
-let new_unknown_generic() =
-  (ref (Unknown (new_unknown ())))
+let new_unknown_generic ?name () =
+  (ref (Unknown{id=new_unknown ();name}))
 
 let find_unsafe 
     (unknowns : (int,'a var_content ref) Hashtbl.t) 
-    (n : int) : 'b var_content ref = 
+    (u : unknown) : 'b var_content ref = 
     (* TODO: avoid Obj. (it is difficult 
       to do it differently while preserving sharing) *)
-    Obj.magic @@ Hashtbl.find unknowns n
+    Obj.magic @@ Hashtbl.find unknowns u.id
 
-let new_size_unknown() =
-Sz_var (ref (Unknown (new_unknown ())))
+let new_size_unknown ?name () =
+Sz_var (ref (Unknown {id=new_unknown ();name}))
 
-let new_dur_unknown() =
-Dur_var (ref (Unknown (new_unknown ())))
+let new_dur_unknown ?name () =
+Dur_var (ref (Unknown {id=new_unknown ();name}))
 
-let new_tyB_unknown() =
-TyB_var (ref (Unknown (new_unknown ())))
+let new_tyB_unknown ?name () =
+TyB_var (ref (Unknown {id=new_unknown ();name}))
 
-let new_ty_unknown() =
-Ty_var (ref (Unknown (new_unknown ())))
+let new_ty_unknown ?name () =
+Ty_var (ref (Unknown {id=new_unknown ();name}))
 
 
-module Vs = Set.Make(Int)
+module Vs = Set.Make(struct
+                       type t = unknown 
+                       let compare {id=n;_} {id=m;_} = compare n m
+                     end)
 type scheme = Forall of (Vs.t * ty)
 
 exception Found
 
 let rec occur_size v sz =
 let rec occ = function
-| Sz_var {contents=Unknown v'} ->
+| Sz_var {contents=Unknown{id=v';name=_}} ->
     if v = v' then raise Found
 | Sz_var {contents=Is sz} -> occ sz
 | Sz_lit _ -> ()
@@ -286,7 +302,7 @@ in occ sz
 
 let rec occur_dur v d =
 let rec occ = function
-| Dur_var {contents=Unknown v'} ->
+| Dur_var {contents=Unknown{id=v';name=_}} ->
     if v = v' then raise Found
 | Dur_var {contents=Is d} -> occ d
 | Dur_zero | Dur_one -> ()
@@ -295,7 +311,7 @@ in occ d
 
 let rec occur_tyB v tyB =
 let rec occ = function
-| TyB_var {contents=Unknown v'} ->
+| TyB_var {contents=Unknown{id=v';name}} ->
     if v = v' then raise Found
 | TyB_var {contents=Is tyB} -> occ tyB
 | TyB_bool | TyB_unit -> ()
@@ -311,7 +327,7 @@ in occ tyB
 
 let rec occur_ty v ty =
   let rec occ = function
-  | Ty_var {contents=Unknown v'} ->
+  | Ty_var {contents=Unknown{id=v';name}} ->
       if v = v' then raise Found
   | Ty_var {contents=Is ty} -> occ ty
   | Ty_base tyB ->
@@ -340,7 +356,7 @@ try occ o; false with Found -> true
 
 let vars_of_size ?(s=Vs.empty) sz =
 let rec vars s = function
-  | Sz_var {contents=Unknown n} -> Vs.add n s
+  | Sz_var {contents=Unknown u} -> Vs.add u s
   | Sz_var {contents=Is sz} -> vars s sz
   | Sz_lit _ -> s
   | Sz_add(sz,_) -> vars s sz
@@ -349,7 +365,8 @@ in vars s sz
 
 let vars_of_dur ?(s=Vs.empty) d =
 let rec vars s = function
-  | Dur_var {contents=Unknown n} -> Vs.add n s
+  | Dur_var {contents=Unknown u} ->
+      Vs.add u s
   | Dur_var {contents=Is sz} -> vars s sz
   | Dur_zero | Dur_one -> s
   | Dur_max(d1,d2) -> vars (vars s d1) d2
@@ -357,7 +374,8 @@ in vars s d
 
 let vars_of_tyB ?(s=Vs.empty) tyB =
 let rec vars s = function
-  | TyB_var {contents=Unknown n} -> Vs.add n s
+  | TyB_var {contents=Unknown u} ->
+      Vs.add u s
   | TyB_var {contents=Is tyB} -> vars s tyB
   | TyB_bool | TyB_unit -> s
   | TyB_int sz -> vars_of_size ~s:s sz
@@ -374,7 +392,8 @@ vars s tyB
 
 let vars_of_ty ?(s=Vs.empty) ty =
 let rec vars s = function
-| Ty_var {contents=Unknown n} -> Vs.add n s
+| Ty_var {contents=Unknown u} ->
+    Vs.add u s
 | Ty_var {contents=Is ty} -> vars s ty
 | Ty_base t -> vars_of_tyB ~s t
 | Ty_tuple ty_list ->
@@ -401,10 +420,11 @@ let free_vars_of_type (bv,t) =
 
 let instance (Forall(vs,ty)) =
   let unknowns = Hashtbl.create (Vs.cardinal vs) in
-  Vs.iter (fun n -> Hashtbl.add unknowns n (new_unknown_generic())) vs;
+  Vs.iter (fun u -> let name = u.name in
+        Hashtbl.add unknowns u.id (new_unknown_generic ?name ())) vs;
   let rec inst_size = function
-  | Sz_var {contents=Unknown n} as sz ->
-          (try Sz_var(find_unsafe unknowns n)
+  | Sz_var {contents=Unknown u} as sz ->
+          (try Sz_var (find_unsafe unknowns u)
            with Not_found -> sz)
   | Sz_var {contents=Is sz} ->
       inst_size sz
@@ -413,8 +433,8 @@ let instance (Forall(vs,ty)) =
   | Sz_twice(sz) -> Sz_twice(inst_size sz)
   in
   let rec inst_dur = function
-  | Dur_var {contents=Unknown n} as d ->
-          (try Dur_var(find_unsafe unknowns n)
+  | Dur_var {contents=Unknown u} as d ->
+          (try Dur_var (find_unsafe unknowns u)
            with Not_found -> d)
   | Dur_var {contents=Is d} ->
       inst_dur d
@@ -423,8 +443,8 @@ let instance (Forall(vs,ty)) =
       Dur_max(inst_dur d1,inst_dur d2)
   in
   let rec inst_tyB = function
-  | TyB_var {contents=Unknown n} as tyB ->
-          (try TyB_var(find_unsafe unknowns n)
+  | TyB_var {contents=Unknown u} as tyB ->
+          (try TyB_var(find_unsafe unknowns u)
            with Not_found -> tyB)
   | TyB_var {contents=Is tyB} ->
       inst_tyB tyB
@@ -440,8 +460,8 @@ let instance (Forall(vs,ty)) =
   in
 
   let rec inst_ty = function
-  | Ty_var {contents=Unknown n} as ty ->
-          (try Ty_var(Obj.magic @@ Hashtbl.find unknowns n)
+  | Ty_var {contents=Unknown u} as ty ->
+          (try Ty_var(find_unsafe unknowns u)
            with Not_found -> ty)
   | Ty_var {contents=Is ty} ->
       inst_ty ty
@@ -541,8 +561,8 @@ let rec no_unknown_in_ty t =
 
 
 let rec rename_size unknowns = function
-| Sz_var {contents=Unknown n} as sz ->
-        (try Sz_var(find_unsafe unknowns n)
+| Sz_var {contents=Unknown u} as sz ->
+        (try Sz_var(find_unsafe unknowns u)
          with Not_found -> sz)
 | Sz_var ({contents=Is sz} as _v) ->
     (* _v := Is ( *) rename_size unknowns sz (* ); Sz_var _v *)
@@ -551,8 +571,8 @@ let rec rename_size unknowns = function
 | Sz_twice(sz) -> Sz_twice(rename_size unknowns sz)
 
 let rec rename_dur unknowns = function
-| Dur_var {contents=Unknown n} as d ->
-        (try Dur_var(find_unsafe unknowns n)
+| Dur_var {contents=Unknown u} as d ->
+        (try Dur_var(find_unsafe unknowns u)
          with Not_found -> d)
 | Dur_var ({contents=Is d} as _v) ->
     rename_dur unknowns d
@@ -562,8 +582,8 @@ let rec rename_dur unknowns = function
             rename_dur unknowns d2) 
 
 let rec rename_tyB unknowns = function
-| TyB_var {contents=Unknown n} as tyB ->
-        (try TyB_var(find_unsafe unknowns n)
+| TyB_var {contents=Unknown u} as tyB ->
+        (try TyB_var(find_unsafe unknowns u)
          with Not_found -> tyB)
 | TyB_var ({contents=Is tyB} as _v) ->
     rename_tyB unknowns tyB
@@ -579,8 +599,8 @@ let rec rename_tyB unknowns = function
 
 
 let rec rename_ty unknowns = function
-| Ty_var {contents=Unknown n} as ty ->
-        (try Ty_var(Obj.magic @@ Hashtbl.find unknowns n)
+| Ty_var {contents=Unknown u} as ty ->
+        (try Ty_var(find_unsafe unknowns u)
          with Not_found -> ty)
 | Ty_var ({contents=Is ty} as _v) ->
     rename_ty unknowns ty

@@ -28,39 +28,39 @@ let print_ascii = Print.print_value ;;
 (************* int *************)
 (*******************************)
 
-(* int<'N> *)
+(* int<?n> *)
 
-operator Int.print :  int<'N> => unit  @impure ;;
+operator Int.print : int<?n> => unit  @impure ;;
 let print_int = Int.print ;;
 
-operator Int.absv :    int<'N> => int<'N> ;;
+operator Int.absv :    int<?n> => int<'N> ;;
 
-operator%with_sizes Int.resize : int<'s2> => int<'s1> ;;
-let int_resize<<'s>> (x) : int<'s> = Int.resize(x) ;;
+operator%with_sizes Int.resize : int<?m> => int<?n> ;;
+let int_resize<<?n>> (x) : int<?m> = Int.resize(x) ;;
 
-operator Int.logical_not : int<'s> => int<'s> ;;
-operator Int.get_bit : (int<'s> * int<32>) => bool ;;
-operator Int.update_bit : (int<'s> * int<32> * bool) => int<'s> ;;
-operator Int.add :    (int<'N> * int<'N>) => int<'N> ;;
-operator Int.sub :    (int<'N> * int<'N>) => int<'N> ;;
-operator Int.neg :    int<'N> => int<'N> ;;
-operator Int.mul :    (int<'N> * int<'N>) => int<'N>  ;;
-operator Int.div :    (int<'N> * int<'N>) => int<'N> ;;
-operator Int.modulo : (int<'N> * int<'N>) => int<'N> ;;
-operator Int.eq :     (int<'N> * int<'N>) => bool  ;;
-operator Int.neq :    (int<'N> * int<'N>) => bool  ;; 
-operator Int.lt :     (int<'N> * int<'N>) => bool ;;
-operator Int.le :     (int<'N> * int<'N>) => bool ;;
-operator Int.gt :     (int<'N> * int<'N>) => bool  ;;
-operator Int.ge :     (int<'N> * int<'N>) => bool ;;
-operator Int.land :   (int<'N> * int<'N>) => int<'N> ;;
-operator Int.lor :    (int<'N> * int<'N>) => int<'N> ;;
-operator Int.lnot :   int<'N> => int<'N> ;;
-operator Int.lxor :   (int<'N> * int<'N>) => int<'N> ;;
-operator Int.land :   (int<'N> * int<'N>) => int<'N> ;;
-operator Int.lsl :    (int<'N> * int<'OFFSET>) => int<'N> ;;
-operator Int.lsr :    (int<'N> * int<'OFFSET>) => int<'N> ;;
-operator Int.asr :    (int<'N> * int<'OFFSET>) => int<'N> ;;
+operator Int.logical_not : int<?n> => int<?n> ;;
+operator Int.get_bit : (int<?n> * int<32>) => bool ;;
+operator Int.update_bit : (int<?n> * int<32> * bool) => int<?n> ;;
+operator Int.add :    (int<?n> * int<?n>) => int<?n> ;;
+operator Int.sub :    (int<?n> * int<?n>) => int<?n> ;;
+operator Int.neg :    int<?n> => int<?n> ;;
+operator Int.mul :    (int<?n> * int<?n>) => int<?n>  ;;
+operator Int.div :    (int<?n> * int<?n>) => int<?n> ;;
+operator Int.modulo : (int<?n> * int<?n>) => int<?n> ;;
+operator Int.eq :     (int<?n> * int<?n>) => bool  ;;
+operator Int.neq :    (int<?n> * int<?n>) => bool  ;; 
+operator Int.lt :     (int<?n> * int<?n>) => bool ;;
+operator Int.le :     (int<?n> * int<?n>) => bool ;;
+operator Int.gt :     (int<?n> * int<?n>) => bool  ;;
+operator Int.ge :     (int<?n> * int<?n>) => bool ;;
+operator Int.land :   (int<?n> * int<?n>) => int<?n> ;;
+operator Int.lor :    (int<?n> * int<?n>) => int<?n> ;;
+operator Int.lnot :   int<?n> => int<?n> ;;
+operator Int.lxor :   (int<?n> * int<?n>) => int<?n> ;;
+operator Int.land :   (int<?n> * int<?n>) => int<?n> ;;
+operator Int.lsl :    (int<?n> * int<?ofs>) => int<?n> ;;
+operator Int.lsr :    (int<?n> * int<?ofs>) => int<?n> ;;
+operator Int.asr :    (int<?n> * int<?ofs>) => int<?n> ;;
 
 let lnot = Int.logical_not ;;
 let get_bit = Int.get_bit ;;
@@ -104,21 +104,21 @@ operator Uint.ge :     (uint<'N> * uint<'N>) => bool ;;
 
 type `a vect<'b> ;;
 
-operator%with_sizes Vect.create : `a => `a vect<'size> ;;
+operator%with_sizes Vect.create : `a => `a vect<?n> ;;
 let vect_make <<'s>> (x:`a) : `a vect<'s> = Vect.create(x) ;;
 
-operator%with_sizes Vect.nth : (`a vect<'size> * int<32>) => `a;;
-operator Vect.copy_with : (`a vect<'size> * int<32> * `a) => `a vect<'size>;;
+operator%with_sizes Vect.nth : (`a vect<?n> * int<32>) => `a;;
+operator Vect.copy_with : (`a vect<?n> * int<32> * `a) => `a vect<?n>;;
 
-operator%with_sizes Vect.infos : `a vect<'size> => int<32> * `a;;
+operator%with_sizes Vect.infos : `a vect<?n> => int<32> * `a;;
 
-operator Vect.cons : (`a * `a vect<'size>) => `a vect<'size+1>;;
-operator%with_sizes Vect.head : (`a vect<'size+1>) => `a;;
-operator%with_sizes Vect.tail : (`a vect<'size+1>) => `a vect<'size>;;
-operator Vect.split : (`a vect<2*'size>) => (`a vect<'size>*`a vect<'size>);;
-operator Vect.concat : (`a vect<'size>*`a vect<'size>) => `a vect<2*'size>;;
-operator Vect.of_int : int<'size> => bool vect<'size>;;
-operator Vect.to_int : bool vect<'size> => int<'size>;;
+operator Vect.cons : (`a * `a vect<?n>) => `a vect<?n+1>;;
+operator%with_sizes Vect.head : (`a vect<?n+1>) => `a;;
+operator%with_sizes Vect.tail : (`a vect<?n+1>) => `a vect<?n>;;
+operator Vect.split : (`a vect<2*?n>) => (`a vect<?n>*`a vect<?n>);;
+operator Vect.concat : (`a vect<?n>*`a vect<?n>) => `a vect<2*?n>;;
+operator Vect.of_int : int<?n> => bool vect<?n>;;
+operator Vect.to_int : bool vect<?n> => int<?n>;;
 
 let vect_nth (v,n) = Vect.nth(v,n) ;;
 
@@ -306,13 +306,13 @@ operator Char.print : char => unit @impure ;; (* @impure denotes the side effect
     requires two additional parameters : the size of the argument 
     and the size of the result **)
 
-operator%with_sizes Bytes.make : char => bytes<'s> ;; 
-operator            Bytes.len : bytes<'s> => int ;;
-operator%with_sizes Bytes.get : (bytes<'s> * int) => char ;;
-operator            Bytes.print : bytes<'s> => unit  @impure ;;
-operator            Bytes.to_vect : bytes<'s> => char vect<'s> ;;
-operator            Bytes.from_vect : char vect<'s> => bytes<'s> ;;
-operator            Bytes.to_hex : bytes<'s> => int<2*2*'s> ;;
+operator%with_sizes Bytes.make : char => bytes<?n> ;; 
+operator            Bytes.len : bytes<?n> => int ;;
+operator%with_sizes Bytes.get : (bytes<?n> * int) => char ;;
+operator            Bytes.print : bytes<?n> => unit  @impure ;;
+operator            Bytes.to_vect : bytes<?n> => char vect<?n> ;;
+operator            Bytes.from_vect : char vect<?n> => bytes<?n> ;;
+operator            Bytes.to_hex : bytes<?n> => int<2*2*?n> ;;
 
 let char_code = Char.code ;;
 let char_chr = Char.chr ;;

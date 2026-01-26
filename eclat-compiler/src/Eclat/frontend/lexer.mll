@@ -116,10 +116,10 @@ let tyB_var_ident = ['`''~'] ['a'-'z''A'-'Z''0'-'9''_''A'-'Z']*
 let op_ident = up_ident '.' ident
 
 rule token = parse
-| ident as id         { try Hashtbl.find keywords id with
-                        | Not_found -> IDENT id }
-| up_ident as id      { UP_IDENT id }
-| tvar_ident as lxm   { TVAR_IDENT lxm }
+| ident as id            { try Hashtbl.find keywords id with
+                           | Not_found -> IDENT id }
+| up_ident as id         { UP_IDENT id }
+| tvar_ident as lxm      { TVAR_IDENT lxm }
 | tyB_var_ident as lxm   { TYB_VAR_IDENT lxm }
 | op_ident as id{ OPERATOR_IDENT id }
 | '('                 { incr paren_lvl; LPAREN }
