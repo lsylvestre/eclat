@@ -77,16 +77,18 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ _ _ _ _ -> ()))
                else
                try
                  (let lexbuf = (Lexing.from_string l) in
-                  let (exts1',exts2'),gs',ts',ds' = Parser.pi Lexer.token lexbuf in
                   caml_error_handler ~on_error:(fun _ ->
                       Format.print_flush ();
                       let () = List.iter (when_repl (exts1,exts2) gs ts false) ds in
                       loop (exts1,exts2) gs ts ds)
-                  (fun () -> let exts1'' = exts1@exts1' in
-                             let exts2'' = exts2@exts2' in
-                             let gs'' = gs@gs' in
-                             let ts'' = ts@ts' in
-                             let ds'' = ds@ds' in
+                  (fun () -> 
+                       let (exts1',exts2'),gs',ts',ds' = syntax_error_handler (fun lexbuf ->
+                                                           Parser.pi Lexer.token lexbuf) lexbuf in
+                       let exts1'' = exts1@exts1' in
+                       let exts2'' = exts2@exts2' in
+                       let gs'' = gs@gs' in
+                       let ts'' = ts@ts' in
+                       let ds'' = ds@ds' in
                        let w = (when_repl (exts1'', exts2'') gs'' ts'') in
                        List.iter (w false) ds;
                        List.iter (w true) ds'; 
