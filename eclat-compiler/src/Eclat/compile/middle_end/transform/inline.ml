@@ -195,5 +195,5 @@ let inline_with_statics ~statics e =
 
 let inl_pi pi =
   has_changed := false;
-  let main = inline_with_statics ~statics:pi.statics pi.main in
+  let main = inline_with_statics ~statics:pi.genv.statics pi.main in
   { pi with main }

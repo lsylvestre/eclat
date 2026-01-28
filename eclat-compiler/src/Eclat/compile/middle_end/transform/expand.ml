@@ -125,7 +125,7 @@ let rec expand ~statics e =
             E_letIn(P_var x, Types.new_ty_unknown(),E_letIn(P_var z,Types.new_ty_unknown(),
                                   E_app(E_const(Op(Runtime (External_fun("Vect.nth",Types.new_ty_unknown())))),
                                   E_tuple[E_var y;ii]),
-                              Ast_subst.subst_p_e p (E_tuple[ii;E_var z]) (Ast_rename.rename_e ~statics:(List.map fst statics) e1')),
+                              Ast_subst.subst_p_e p (E_tuple[ii;E_var z]) (Ast_rename.rename_e ~statics e1')),
             loop (x::xs) (i+1)) in loop [] 0)
             (* Ast_pprint.pp_exp Format.std_formatter e0; *)
       | _ -> assert false (* todo error *)
@@ -140,5 +140,5 @@ let rec expand_e ~statics e =
   if !has_changed then expand_e ~statics e' else e' ;;
 *)
 let expand_pi pi =
-  let main = expand ~statics:pi.statics pi.main in
+  let main = expand ~statics:pi.genv.statics pi.main in
   { pi with main }

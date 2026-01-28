@@ -236,9 +236,9 @@ let main () : unit =
   let fmt_vhdl = Format.formatter_of_out_channel oc_vhdl in
   let fmt_tb = Format.formatter_of_out_channel oc_tb in
   let (argument,result,typing_env) = Compile.compile ~vhdl_comment ~prop_fsm:!prop_fsm_flag arg_list name ty fmt_vhdl pi in
-  let args = List.map (Gen_miniHDL.to_a ~externals:pi.externals ~sums:pi.sums) arg_list in
+  let args = List.map (Gen_miniHDL.to_a ~genv:pi.genv) arg_list in
 
-  Gen_testbench.gen_testbench fmt_tb ~vhdl_comment ~externals:pi.externals typing_env name ty (argument,result) args;
+  Gen_testbench.gen_testbench fmt_tb ~vhdl_comment ~operators:pi.genv.operators ~externals:pi.genv.externals typing_env name ty (argument,result) args;
 
   Format.fprintf Format.std_formatter
       "\nvhdl code generated in %s/%s.vhdl\

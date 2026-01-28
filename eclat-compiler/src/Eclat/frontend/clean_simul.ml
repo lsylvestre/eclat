@@ -3,7 +3,7 @@ open Ast_subst
 
 (* remove simulation primitives like print and assert *)
 
-let clean_exp ~no_print ~no_assert ~externals e =
+let clean_exp ~no_print ~no_assert ~genv e =
   let rec clean e =
     match e with
     | E_letIn(p,ty,E_fun(p2,sigty,e1),e2) ->
@@ -16,7 +16,7 @@ let clean_exp ~no_print ~no_assert ~externals e =
         let opt = match un_annot e1 with
                   | E_const(Op(Runtime(External_fun(x,_)))) ->
                       if no_print then
-                          (match List.assoc_opt x (snd externals) with
+                          (match SMap.find_opt x genv.operators with
                            | Some (t,(_,_,is_imp)) ->
                               if is_imp 
                               then (Some (E_letIn(P_var x,Types.new_ty_unknown(),e2,E_const(Unit))))
@@ -35,4 +35,4 @@ let clean_exp ~no_print ~no_assert ~externals e =
   in clean e
 
 let clean_pi ~no_print ~no_assert pi =
-  Map_pi.map (clean_exp ~no_print ~no_assert ~externals:pi.externals) pi
+  Map_pi.map (clean_exp ~no_print ~no_assert ~genv:pi.genv) pi

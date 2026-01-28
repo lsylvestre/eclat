@@ -45,6 +45,7 @@ src/Eclat/compile/compile.cmo : \
     src/Eclat/compile/inspect/display_target.cmo \
     src/Eclat/compile/inspect/display_internal_steps.cmo \
     src/miniHDL/count_externals.cmo \
+    src/miniHDL/optim/collect_state_variables.cmo \
     src/Eclat/syntax/ast.cmo
 src/Eclat/compile/compile.cmx : \
     src/Eclat/typing/typing.cmx \
@@ -63,6 +64,7 @@ src/Eclat/compile/compile.cmx : \
     src/Eclat/compile/inspect/display_target.cmx \
     src/Eclat/compile/inspect/display_internal_steps.cmx \
     src/miniHDL/count_externals.cmx \
+    src/miniHDL/optim/collect_state_variables.cmx \
     src/Eclat/syntax/ast.cmx
 src/Eclat/compile/inspect/display_internal_steps.cmo : \
     src/Eclat/syntax/ast_pprint.cmo
@@ -625,7 +627,8 @@ src/miniHDL/compile/gen_vhdl.cmo : \
     src/miniHDL/compile/list_machines.cmo \
     src/miniHDL/compile/gen_vhdl_aux.cmo \
     src/Eclat/compile/backend/gen_miniHDL.cmo \
-    src/miniHDL/count_externals.cmo
+    src/miniHDL/count_externals.cmo \
+    src/Eclat/syntax/ast.cmo
 src/miniHDL/compile/gen_vhdl.cmx : \
     src/prelude.cmx \
     src/operators.cmx \
@@ -635,21 +638,24 @@ src/miniHDL/compile/gen_vhdl.cmx : \
     src/miniHDL/compile/list_machines.cmx \
     src/miniHDL/compile/gen_vhdl_aux.cmx \
     src/Eclat/compile/backend/gen_miniHDL.cmx \
-    src/miniHDL/count_externals.cmx
+    src/miniHDL/count_externals.cmx \
+    src/Eclat/syntax/ast.cmx
 src/miniHDL/compile/gen_vhdl_aux.cmo : \
     src/Eclat/typing/types.cmo \
     src/prelude.cmo \
     src/operators.cmo \
     src/miniHDL/miniHDL_typing.cmo \
     src/miniHDL/miniHDL_syntax.cmo \
-    src/miniHDL/count_externals.cmo
+    src/miniHDL/count_externals.cmo \
+    src/Eclat/syntax/ast.cmo
 src/miniHDL/compile/gen_vhdl_aux.cmx : \
     src/Eclat/typing/types.cmx \
     src/prelude.cmx \
     src/operators.cmx \
     src/miniHDL/miniHDL_typing.cmx \
     src/miniHDL/miniHDL_syntax.cmx \
-    src/miniHDL/count_externals.cmx
+    src/miniHDL/count_externals.cmx \
+    src/Eclat/syntax/ast.cmx
 src/miniHDL/compile/list_machines.cmo : \
     src/miniHDL/miniHDL_syntax.cmo \
     src/Eclat/syntax/ast.cmo
@@ -690,6 +696,8 @@ src/miniHDL/miniHDL_typing.cmx : \
     src/miniHDL/miniHDL_syntax.cmx \
     src/Eclat/frontend/fix_int_lit_size.cmx \
     src/Eclat/syntax/ast.cmx
+src/miniHDL/optim/collect_state_variables.cmo :
+src/miniHDL/optim/collect_state_variables.cmx :
 src/miniHDL/optim/miniHDL_propagation.cmo : \
     src/miniHDL/miniHDL_syntax.cmo \
     src/Eclat/syntax/ast.cmo

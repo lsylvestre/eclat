@@ -69,7 +69,7 @@
 %}
 
 %token LPAREN RPAREN LCUR RCUR LBRACKET RBRACKET COMMA PIPE_PIPE PIPE_COMMA_PIPE EQ EQ_EQ COL SEMI HAT STATIC DOT_LENGTH ARRAY_LENGTH
-%token SHARP_PIPE_LBRACKET LBRACKET_PIPE PIPE_RBRACKET
+%token LBRACKET_PIPE PIPE_RBRACKET
 %token FUN AMP DOT REGISTER EXEC INIT DEFAULT RESET WHERE RETURNS PERCENT
 %token NODE IMPLY
 %token MATCH WITH PIPE END
@@ -95,7 +95,6 @@
 %token EOF
 %token SEMI_SEMI
 %token LEFT_ARROW RIGHT_ARROW
-%token EXIT_REPL
 %token <string> STRING_LIT
 %token QUOTE TYPE
 %token MACRO_GENERATE
@@ -820,8 +819,6 @@ aexp_desc:
             | "_" -> Prelude.Errors.raise_error ~loc:(with_file $loc)
                          ~msg:"wildcard \"_\" not expected." ()
             | _ -> E_var x }
-| SHARP_PIPE_LBRACKET separated_list(COMMA,app_exp) PIPE_RBRACKET
-    { (* Buffer n *) assert false (*todo*)  }
 
 | MATCH e=exp WITH
     PIPE? cases=match_case_const*

@@ -209,10 +209,10 @@ let rec typing_c = function
       assert (size_ty ty <= n);
       TVect n
 
-let rec typing_op ~externals h t op =
+let rec typing_op ~operators ~externals h t op =
   match op with
   | Runtime (External_fun (x,tyy)) ->
-      (match List.assoc_opt x (snd externals) with
+      (match Ast.SMap.find_opt x operators with
        | Some (ty,_) -> 
           let ty = Types.(instance (generalize [] ty)) in
           Typing.unify_ty ~loc:Prelude.dloc ty tyy;
@@ -223,7 +223,7 @@ let rec typing_op ~externals h t op =
            | _ -> assert false)
        | _ -> assert false)
   | Runtime p ->
-      (match Operators.ty_op ~externals p with
+      (match Operators.ty_op ~externals:operators p with
        | Types.Ty_fun(arg,dur,ret) ->
           unify (translate_ty arg) t;
           translate_tyB ret
@@ -243,7 +243,7 @@ let rec typing_op ~externals h t op =
 
 let trace_last_exp = ref (A_const Unit)
 
-let rec typing_a ~externals h a =
+let rec typing_a ~operators ~externals h a =
   trace_last_exp := a;
   match a with
   | A_const c ->
@@ -253,18 +253,18 @@ let rec typing_a ~externals h a =
       add_typing_env h x t;
       t
   | A_call(op,args) ->
-      let t = typing_a ~externals h args in
-      typing_op ~externals h t op
+      let t = typing_a ~operators ~externals h args in
+      typing_op ~operators ~externals h t op
   | A_tuple es ->
-      TTuple (List.map (typing_a ~externals h) es)
+      TTuple (List.map (typing_a ~operators ~externals h) es)
   | A_vector es ->
        let v = new_tvar() in
-       List.iter (fun a -> unify (typing_a ~externals h a) v) es;
+       List.iter (fun a -> unify (typing_a ~operators ~externals h a) v) es;
        TAbstract("vect",[TSize (List.length es)],[v])
   | A_letIn(x,a1,a2) ->
-      let t = typing_a ~externals h a1 in
+      let t = typing_a ~operators ~externals h a1 in
       add_typing_env h x t;
-      typing_a ~externals h a2
+      typing_a ~operators ~externals h a2
   | A_string_get(sx,ix) ->
       add_typing_env h sx (TString (new_tvar()));
       add_typing_env h ix (TInt (TSize 32));
@@ -303,16 +303,16 @@ let error_unbound_external x =
     Format.fprintf fmt "@,unbound external %s" x
   ) 
 
-let rec typing_s ~externals ~result h s =
+let rec typing_s ~operators ~externals ~result h s =
   (* Printf.printf "==> %d\n" (Hashtbl.length h); flush stdout; *)
   match s with
   | S_skip -> ()
   | S_set(x,a) ->
-      let t = typing_a ~externals h a in
+      let t = typing_a ~operators ~externals h a in
       (* (Format.fprintf Format.std_formatter "======> (%s : %a)\n" x Fsm_syntax.Debug.pp_ty (canon t)); *)
       add_typing_env h x t
   | S_sig_set(x,a) ->
-      let t = typing_a ~externals h a in
+      let t = typing_a ~operators ~externals h a in
       (* (Format.fprintf Format.std_formatter "======> (%s : %a)\n" x Fsm_syntax.Debug.pp_ty (canon t)); *)
       add_typing_env h x (TSig(t))
   | S_acquire_lock(l) 
@@ -325,7 +325,7 @@ let rec typing_s ~externals ~result h s =
       let tz = new_tvar () in
       let tz2 = new_tvar () in
       add_typing_env h x (TStatic{elem=telem;size=tz});
-      let tidx = typing_a ~externals h idx in
+      let tidx = typing_a ~operators ~externals h idx in
       unify tidx (TInt tz2)
   | S_read_stop(x,l) ->
       let telem = new_tvar () in
@@ -333,14 +333,14 @@ let rec typing_s ~externals ~result h s =
       add_typing_env h x telem;
       add_typing_env h l (TStatic{elem=telem;size=tz})
   | S_write_start(x,idx,a) ->
-      let telem = typing_a ~externals h a in
+      let telem = typing_a ~operators ~externals h a in
       let tz = new_tvar () in
       let tz2 = new_tvar () in
       add_typing_env h x (TStatic{elem=telem;size=tz});
-      let tidx = typing_a ~externals h idx in
+      let tidx = typing_a ~operators ~externals h idx in
       unify tidx (TInt tz2)
   | S_array_set(x,idx,a) ->
-      let telem = typing_a ~externals h a in
+      let telem = typing_a ~operators ~externals h a in
       let tz = new_tvar () in
       let tz2 = new_tvar () in
       add_typing_env h x (TStatic{elem=telem;size=tz});
@@ -353,57 +353,58 @@ let rec typing_s ~externals ~result h s =
       let telem = new_tvar() in
       let tz = new_tvar () in
       add_typing_env h y (TStatic{elem=telem;size=tz});
-      let tname = typing_a ~externals h a in
+      let tname = typing_a ~operators ~externals h a in
       let tz2 = new_tvar () in
       unify tname (TString tz2);
   | S_if(x,s,so) ->
       add_typing_env h x TBool;
-      typing_s ~externals ~result h s;
-      Option.iter (typing_s ~externals ~result h) so
+      typing_s ~operators ~externals ~result h s;
+      Option.iter (typing_s ~operators ~externals ~result h) so
   | S_case(x,hs,os) ->
       let t = new_tvar () in
       add_typing_env h x t;
       List.iter (fun (cs,s) ->
           List.iter (fun c -> unify (typing_c c) t) cs;
-          typing_s ~externals ~result h s) hs;
+          typing_s ~operators ~externals ~result h s) hs;
       (match os with
       | None -> ()
-      | Some s_els -> typing_s ~externals ~result h s_els)
+      | Some s_els -> typing_s ~operators ~externals ~result h s_els)
   | S_seq(s1,s2) ->
-      typing_s ~externals ~result h s1; typing_s ~externals ~result h s2
+      typing_s ~operators ~externals ~result h s1; 
+      typing_s ~operators ~externals ~result h s2
   | S_continue _ ->
       ()
   | S_letIn(x,a,s) ->
-      (add_typing_env h x (typing_a ~externals h a));
-      typing_s ~externals ~result h s
+      (add_typing_env h x (typing_a ~operators ~externals h a));
+      typing_s ~operators ~externals ~result h s
   | S_fsm(_,rdy,result2,_,ts,s) ->
-      typing_fsm h ~externals ~rdy ~result:result2 ~ty_result:(new_tvar()) (ts,s)
+      typing_fsm h ~operators ~externals ~rdy ~result:result2 ~ty_result:(new_tvar()) (ts,s)
   | S_in_fsm(_,s) ->
-      typing_s ~externals ~result h s
+      typing_s ~operators ~externals ~result h s
   | S_call(op,args) ->
-      let t = typing_a ~externals h args in
-      unify (typing_op ~externals h t (Runtime op)) TUnit
+      let t = typing_a ~operators ~externals h args in
+      unify (typing_op ~operators ~externals h t (Runtime op)) TUnit
   | S_external_run(f,i,res,rdy,a) ->
-      (match List.assoc_opt f (fst externals) with
+      (match List.assoc_opt f externals with
       | None -> error_unbound_external(f)
       | Some (ty,_) -> 
           (match Types.canon_ty ty with
           | Types.Ty_fun(arg,_,ret_ty) ->
               add_typing_env h res (translate_tyB ret_ty);
               add_typing_env h rdy TBool;
-              unify (translate_ty arg) (typing_a ~externals h a)
+              unify (translate_ty arg) (typing_a ~operators ~externals h a)
           | _ -> assert false))
   | S_assert(a,_) ->
-      let t = typing_a ~externals h a in
+      let t = typing_a ~operators ~externals h a in
       unify t TBool
 
 (* typing of an fsm *)
-and typing_fsm h ~externals ~rdy ~result ~ty_result (ts,s) =
+and typing_fsm h ~operators ~externals ~rdy ~result ~ty_result (ts,s) =
   add_typing_env h rdy TBool;
   add_typing_env h result ty_result;
-  typing_s ~externals ~result h s;
+  typing_s ~operators ~externals ~result h s;
   List.iter (fun (q,s) ->
-      typing_s ~externals ~result h s) ts
+      typing_s ~operators ~externals ~result h s) ts
 
 
 let typing_error_handler f =
@@ -418,7 +419,7 @@ let typing_error_handler f =
                (emph_pp green Debug.pp_ty) t2)
 
 
-let typing_circuit ~statics ~externals ty (rdy,result,fsm) =
+let typing_circuit ~statics ~operators ~externals ty (rdy,result,fsm) =
   Hashtbl.clear hashtbl_array_from_file;
 
   typing_error_handler @@ fun () ->
@@ -440,7 +441,7 @@ let typing_circuit ~statics ~externals ty (rdy,result,fsm) =
 
     let t1,t2 = match ty with Types.Ty_fun(t1,_,t2) -> t1,t2 | _ -> assert false (* err *)
     in
-    typing_fsm h ~externals ~rdy ~result ~ty_result:(translate_tyB t2) fsm;
+    typing_fsm h ~operators ~externals ~rdy ~result ~ty_result:(translate_tyB t2) fsm;
 
 
     (* why two times ? *)

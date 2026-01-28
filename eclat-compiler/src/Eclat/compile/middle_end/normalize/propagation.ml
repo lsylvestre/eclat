@@ -51,15 +51,15 @@ let rec simple_atom e =
     | _ -> false
 
 
-let propagation ~externals e =
+let propagation ~genv e =
   let _propagable e =
-    if !flag_propagate_combinational_linear then Instantaneous.combinational ~with_sig_get:false ~externals e 
+    if !flag_propagate_combinational_linear then Instantaneous.combinational ~with_sig_get:false ~externals:genv.operators e 
                                   && (SMap.cardinal (linear_bindings e) <= 1) else
     simple_atom e
   in
   let _propagable2 x e1 e2 =
     let b = if !flag_propagate_combinational_linear then
-      (Instantaneous.combinational ~with_sig_get:false ~externals e1
+      (Instantaneous.combinational ~with_sig_get:false ~externals:genv.operators e1
       && linear_bindings2 x e2) || simple_atom e1 else
     simple_atom e1 in (*Printf.printf "=====> %s %b\n" x b;*) b
   in
@@ -95,4 +95,4 @@ let propagation ~externals e =
    prop e 
 
 let propagation_pi pi =
-  {pi with main = propagation ~externals:pi.externals pi.main }
+  {pi with main = propagation ~genv:pi.genv pi.main }

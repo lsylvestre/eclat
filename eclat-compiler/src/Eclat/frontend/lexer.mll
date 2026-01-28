@@ -135,8 +135,6 @@ rule token = parse
                         else ();
                         decr brack_lvl; RBRACKET }
 | "%with_sizes"       { WITH_SIZES }
-| "#exit"             { EXIT_REPL }
-| "#[|"               { SHARP_PIPE_LBRACKET }
 | "|]"                { PIPE_RBRACKET }
 | "[|"                { LBRACKET_PIPE }
 | "{"                { LCUR }

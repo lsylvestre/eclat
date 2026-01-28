@@ -5,7 +5,7 @@ open Pattern
 
     Lambda-lifting [Johnsson, 1982]:
 
-    make explicit all lexical environments
+    make all lexical environments explicit
     and globalize all functions.
 
     Our version of the algorithmic works in two steps:
@@ -86,21 +86,15 @@ let lifting ~statics (env:env) (e:e) : e =
         | P_var f,(E_fun(p,(ty1,tyB2),e1) as phi) ->
             let e1' = lift env e1 in
             let xs = fv ~statics phi in
-            let vp = (vars_of_p p) in
-            let vp = xs |> SMap.filter (fun x _ ->
+            assert (not @@ SMap.mem f xs); (* assume all names are unique *)
+            let vp = vars_of_p p in
+            let env_f = xs |> SMap.filter (fun x _ ->
                                  not (SMap.mem x vp) && not (SMap.mem x env)) in
-            let p_env' = vp |> SMap.bindings
-                            |> List.map (fun (x,_) -> (* Printf.printf "--->%s\n" x;*) P_var x)
-                            |> group_ps in
+            let p_env' = env_f |> vars_of_smap
+                               |> List.rev_map (fun x -> P_var x)
+                               |> group_ps in
             if not (SMap.is_empty (vars_of_p p_env')) then
               (has_changed := true;
-               let f,e2 = (* renaming in the case a same name [f]
-                             is in the environment of function [f] *)
-                          if SMap.mem f vp
-                          then let f' = gensym ~prefix:f () in
-                               let e2' = Ast_subst.subst_e f (E_var f') e2
-                               in (f',e2')
-                          else f,e2 in
                let env2, ef = (SMap.add f p_env' env, E_fun(P_tuple[p;p_env'],(Ty_tuple[ty1;Types.new_ty_unknown ()],tyB2),e1')) in
                E_letIn(P_var f,Types.new_ty_unknown (),ef,lift env2 e2) )
             else
@@ -342,7 +336,7 @@ let lambda_lifting ~statics ~globalize (e:e) : ((x * _ * e) list * e) =
 
 (** [lambda_lifting_pi ~globalize:true pi] lambda-lifts program [pi]. *)
 let lambda_lifting_pi ?(globalize=true) (pi:pi) : pi =
-  let statics = smap_of_list pi.statics in
+  let statics = smap_of_list pi.genv.statics in
   let (ds,e) = lambda_lifting ~statics ~globalize pi.main in
   let main = declare ds e in
   {pi with main}

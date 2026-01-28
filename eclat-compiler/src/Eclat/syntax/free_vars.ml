@@ -133,7 +133,6 @@ let fv ?(get_sig=true) ?(get_arrays=true) ?(xs=SMap.empty) e =
   in
   aux xs e
 
-
 let fv_arrays ?(xs=SMap.empty) e =
   let open Ast in
   let rec fv_list xs es =
@@ -250,4 +249,5 @@ let fv_arrays ?(xs=SMap.empty) e =
       aux xs e1
   in
   aux xs e
+
 

@@ -27,7 +27,6 @@ type token =
   | STATIC
   | SIZE_CREATE
   | SIGNAL
-  | SHARP_PIPE_LBRACKET
   | SHARED
   | SET
   | SEMI_SEMI
@@ -105,7 +104,6 @@ type token =
   | FIX
   | FBY
   | EXTERNAL
-  | EXIT_REPL
   | EXIT
   | EXEC
   | EQ_EQ

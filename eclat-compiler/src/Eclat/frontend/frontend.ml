@@ -3,12 +3,15 @@ open Prelude.Errors
 
 let no_stdlib_flag = ref false
 
+(* read a sequence of phrases (each phrase finishes with `;;`)
+   upto the character '#' marking end of the program 
+ *)
 let read_phrase () =
   (* phrases terminate with ";;" *)
   let rec loop acc =
     let s = read_line () in
-    let new_acc = acc^"\n"^s in (* todo (improvment): use a buffer to avoid multiple concatenation *)
-    if String.contains s '.' 
+    let new_acc = acc^"\n"^s in (* todo (improvment): use a buffer to avoid multiple concatenations *)
+    if String.contains s '#' 
     then new_acc 
     else
     (* since the "end of phrase" marker is ";;", we detect the last occurring ';'
@@ -26,7 +29,7 @@ let syntax_error_handler f lexbuf =
     with Parser.Error -> 
            Prelude.Errors.syntax_error (Lexer.get_loc lexbuf)
 
-let frontend ~(inputs : string list) repl ?(when_repl=(fun _ _ _ _ _ -> ())) 
+let frontend ~(inputs : string list) repl ?(when_repl=(fun _ ~genv:_ _ _ -> ())) 
              ?(relax=false) main str_arg : pi * e list =
   let (ess_from_files, 
        gss_from_files, 
@@ -79,7 +82,8 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ _ _ _ _ -> ()))
                  (let lexbuf = (Lexing.from_string l) in
                   caml_error_handler ~on_error:(fun _ ->
                       Format.print_flush ();
-                      let () = List.iter (when_repl (exts1,exts2) gs ts false) ds in
+                      let genv = {statics=gs;operators=smap_of_list exts2;externals=exts1;sums=ts} in
+                      let () = List.iter (when_repl gs ~genv false) ds in
                       loop (exts1,exts2) gs ts ds)
                   (fun () -> 
                        let (exts1',exts2'),gs',ts',ds' = syntax_error_handler (fun lexbuf ->
@@ -89,7 +93,8 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ _ _ _ _ -> ()))
                        let gs'' = gs@gs' in
                        let ts'' = ts@ts' in
                        let ds'' = ds@ds' in
-                       let w = (when_repl (exts1'', exts2'') gs'' ts'') in
+                       let genv = {statics=gs'';operators=smap_of_list exts2''; externals=exts1'';sums=ts''} in
+                       let w = (when_repl gs'' ~genv) in
                        List.iter (w false) ds;
                        List.iter (w true) ds'; 
                        loop (exts1'', exts2'') gs'' ts'' ds'')
@@ -138,5 +143,5 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ _ _ _ _ -> ()))
   *)
 
   (* return both parsed program and its inputs *)
-  ({statics=gs_from_files;externals=exts;sums=ts_from_files;main}, values_list)
+  ({genv={statics=gs_from_files;operators=smap_of_list (snd exts); externals=(fst exts);sums=ts_from_files};main}, values_list)
 

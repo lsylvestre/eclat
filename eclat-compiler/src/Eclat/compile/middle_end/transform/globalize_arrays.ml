@@ -64,5 +64,5 @@ let globalize_arrays pi =
              | _ -> assert false) in
             loop (d'::acc) ds
   in
-  { pi with main=e ; statics=loop (List.rev pi.statics) ds }
+  { main=e ; genv={pi.genv with statics=loop (List.rev pi.genv.statics) ds} }
  

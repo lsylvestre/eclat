@@ -110,7 +110,7 @@ let pp_exp (fmt:fmt) (e:e) : unit =
           pp_pat p
           Types.pp_ty ty
           Types.pp_tyB tyB
-          (pp_e ~paren:false) e
+          (pp_e ~paren:true) e
   | E_fix (f,(p,(ty,tyB),e)) ->
        fprintf fmt "(fix %a (fun (%a:%a) : %a ->@,  @[%a@]))"
           pp_ident f
@@ -152,7 +152,7 @@ let pp_exp (fmt:fmt) (e:e) : unit =
           pp_pat p
           Types.pp_ty ty
           (pp_e ~paren:false) e1
-          (pp_e ~paren:true) e2) fmt ()
+          (pp_e ~paren:false) e2) fmt ()
   | E_app(e1,e2) ->
       parenthesize ~paren (fun fmt () ->
         fprintf fmt "@[<v>%a %a@]"
@@ -282,7 +282,8 @@ let pp_static (fmt:fmt) (g:static) : unit =
 
 (** pretty printer for programs *)
 let pp_pi (fmt:fmt) (pi:pi) : unit =
-  let {statics;main} = pi in
+  let {genv;main} = pi in
+  let {statics;_} = genv in
   fprintf fmt "@[<v>";
   List.iter (fun (x,g) -> fprintf fmt "let %s = %a;;@," x pp_static g) statics;
   fprintf fmt "%a@]" pp_exp main

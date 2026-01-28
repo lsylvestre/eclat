@@ -140,7 +140,7 @@ let rec pp_c fmt c =
       fprintf fmt "%a & %s" pp_c c (const_zero (n - size_const c))
 
 (** code generator for tuples deconstruction *)
-let rec pp_tuple_access externals fmt (i:int) ty (a:a) : unit =
+let rec pp_tuple_access operators fmt (i:int) ty (a:a) : unit =
 
   let rec tuple_access i ty_a a =
       (* compute bounds of the value to be accessed at index [i_to_find]
@@ -180,21 +180,21 @@ let rec pp_tuple_access externals fmt (i:int) ty (a:a) : unit =
         (* this case is use to avoid a strange failure (a GHDL bug ?)
            during simulation (overflow detected)
            when using slice x(j to k) of size 1 (i.e., j = k) *)
-        fprintf fmt "\"\"&%a(%d)" (pp_a externals) a j
+        fprintf fmt "\"\"&%a(%d)" (pp_a operators) a j
       else
       let pp_slice fmt (j,k) =
         fprintf fmt "%d to %d" j k
       in
-      fprintf fmt "%a(%a)" (pp_a externals) a pp_slice (j,k)
-  | `Atom(a) -> pp_a externals fmt a
+      fprintf fmt "%a(%a)" (pp_a operators) a pp_slice (j,k)
+  | `Atom(a) -> pp_a operators fmt a
 
 
 (** code generator for operator call *)
-and pp_call externals fmt (op,a) =
+and pp_call operators fmt (op,a) =
   match op with
-  | GetTuple(i,_,ty) -> pp_tuple_access externals fmt i ty a
+  | GetTuple(i,_,ty) -> pp_tuple_access operators fmt i ty a
   | Runtime(External_fun (x,ty)) ->
-      let annot_with_sizes,arity = match List.assoc_opt x (snd externals) with
+      let annot_with_sizes,arity = match Ast.SMap.find_opt x operators with
                                    | Some (_,(b,n,_)) -> (b,n)
                                    | None -> false,1 in
       (* let rec extract_tyB tyB =
@@ -205,7 +205,7 @@ and pp_call externals fmt (op,a) =
         | _ -> []
       in*)
       fprintf fmt "@[work.%s(" x;
-      (match List.assoc_opt x (snd externals) with
+      (match Ast.SMap.find_opt x operators with
        | Some (t,(_,_,is_imp)) -> if is_imp then  fprintf fmt "clk," else ()
        | None -> Prelude.Errors.raise_error ~msg:("unbound operator "^x) ()
       );
@@ -220,11 +220,11 @@ and pp_call externals fmt (op,a) =
       (match a with
       | A_tuple aa when arity > 1 -> 
          fprintf fmt "@[%a)@]"
-            (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt ", ") (pp_a externals)) aa
-      | _ -> fprintf fmt "@[%a)@]" (pp_a externals) a);
+            (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt ", ") (pp_a operators)) aa
+      | _ -> fprintf fmt "@[%a)@]" (pp_a operators) a);
       fprintf fmt "@]"
-  | Runtime p -> Operators.gen_op ~externals fmt p (pp_a externals) a
-  | _ -> fprintf fmt "@[%a(%a)@]" pp_op op (pp_a externals) a
+  | Runtime p -> Operators.gen_op ~operators fmt p (pp_a operators) a
+  | _ -> fprintf fmt "@[%a(%a)@]" pp_op op (pp_a operators) a
 
 (** code generator for operator *)
 and pp_op fmt = function
@@ -235,16 +235,16 @@ and pp_op fmt = function
 
 (** code generator for atoms (i.e. combinatorial expression) *)
 (* assumes that the let-bindings of atoms are not nested *)
-and pp_a externals fmt = function
+and pp_a operators fmt = function
 | A_const c -> pp_c fmt c
 | A_var x
 | A_sig_get x -> fprintf fmt "%a" pp_ident x
 | A_call(op,a) ->
-   pp_call externals fmt (op,a)
+   pp_call operators fmt (op,a)
 | A_letIn(x,a1,a2) ->
-   assert false (* flattening needed before *) (* fprintf fmt "@[%a := %a;@,%a@]" pp_ident x pp_a externals a1 pp_a externals a2*)
-| A_tuple aas -> pp_tuple fmt (pp_a externals) aas
-| A_vector aas -> pp_vector fmt (pp_a externals) aas
+   assert false (* flattening needed before *) (* fprintf fmt "@[%a := %a;@,%a@]" pp_ident x pp_a operators a1 pp_a operators a2*)
+| A_tuple aas -> pp_tuple fmt (pp_a operators) aas
+| A_vector aas -> pp_vector fmt (pp_a operators) aas
 | A_string_get(s,i) ->
     let i_norm = norm_ident i in
     fprintf fmt "@[%a(to_integer(unsigned(%s&\"000\")) to to_integer(unsigned(%s&\"000\"))+7)@]"

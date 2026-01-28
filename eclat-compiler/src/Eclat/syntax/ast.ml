@@ -89,14 +89,68 @@ type static =                         (** static toplevel data *)
   | Static_array of c * int           (** static global array [c^n] *)
   | Static_const of c
 
+
+(** associative array having key of type [string] *)
+module SMap = Map.Make(String)
+
+(** type of these associative arrays *)
+type 'a smap = 'a SMap.t
+type 'a env = 'a SMap.t
+
+type set = unit SMap.t
+
+(** [m1 + m2] merges the bindings from [m1] and [m2]. In case of conflict,
+   the bindings from [m2] is keeped. *)
+let (++) (m1 : 'a smap) (m2 : 'a smap)  : 'a smap =
+  SMap.union (fun _ _ v2 -> Some v2) m1 m2
+
+(** [smap_of_list l] constructs an associative array from the associative list [l] *)
+let smap_of_list (l : (x * 'a) list) : 'a smap =
+  List.fold_right (fun (x,v) m -> SMap.add x v m) l SMap.empty
+
+(** [vars_of_smap m] builds the list of variable 
+    that are bound in map [m] *)
+let vars_of_smap m : x list =
+  SMap.fold (fun x _ acc -> x :: acc) m [] ;;
+
+(** [vars_of_p p] returns the (free) variables used in the pattern [p] *)
+let rec vars_of_p (p:p) : unit smap =
+  match p with
+  | P_unit -> SMap.empty
+  | P_var x -> SMap.singleton x ()
+  | P_tuple ps ->
+    List.fold_left (fun m p -> vars_of_p p ++ m) SMap.empty ps
+
+(** [un_deco e] removes decoration (i.e., position in the source file)
+   around expression [e] *)
+let rec un_deco (e:e) : e =
+  match e with
+  | E_deco(e1,_) -> e1
+  | e -> e
+
 (** each program is a sequence of toplevel definitions (static arrays
     and functions) coupled with an entry point, e.g. the variable [main]
     referting to one of those definitions *)
 type pi = {
-  statics : (x * static) list ;         (** static global arrays *)
- externals : (x * (ty * bool)) list * (x * (ty * (bool * int * bool))) list ; (* circuits - functions *)
-  sums : (x * (x * tyB) list) list ;    (** sum types *)
-  main : e                              (** body *)
+   genv : genv;
+   main : e    (** body *)
+}
+and genv = {
+  statics : 
+    (** ordered sequence of static global arrays *)
+    (x * static) list ; 
+  
+  operators : 
+    (* external,combinational operators (e.g., VHDL functions) *)
+    (ty * (bool * int * bool)) SMap.t ;
+  
+  externals :
+     (* external functions (e.g., VHDL modules) *)
+     (x * (ty * bool)) list ;
+  
+  sums : 
+     (** sum types, non recursive *)
+     (x * (x * tyB) list) list ;
 }
 
 
@@ -134,40 +188,6 @@ let gensym : ?prefix:string -> unit -> x =
   let c = ref 0 in
   (fun ?(prefix="$v") () ->
     incr c; prefix^string_of_int !c)
-
-(** associative array having key of type [string] *)
-module SMap = Map.Make(String)
-
-(** type of these associative arrays *)
-type 'a smap = 'a SMap.t
-type 'a env = 'a SMap.t
-
-type set = unit SMap.t
-
-
-(** [m1 + m2] merges the bindings from [m1] and [m2]. In case of conflict,
-   the bindings from [m2] is keeped. *)
-let (++) (m1 : 'a smap) (m2 : 'a smap)  : 'a smap =
-  SMap.union (fun _ _ v2 -> Some v2) m1 m2
-
-(** [smap_of_list l] constructs an associative array from the associative list [l] *)
-let smap_of_list (l : (x * 'a) list) : 'a smap =
-  List.fold_right (fun (x,v) m -> SMap.add x v m) l SMap.empty
-
-(** [vars_of_p p] returns the (free) variables used in the pattern [p] *)
-let rec vars_of_p (p:p) : unit smap =
-  match p with
-  | P_unit -> SMap.empty
-  | P_var x -> SMap.singleton x ()
-  | P_tuple ps ->
-    List.fold_left (fun m p -> vars_of_p p ++ m) SMap.empty ps
-
-(** [un_deco e] removes decoration (i.e., position in the source file)
-   around expression [e] *)
-let rec un_deco (e:e) : e =
-  match e with
-  | E_deco(e1,_) -> e1
-  | e -> e
 
 (** [un_annot e] removes both decorations
    and type constraints around expression [e] *)

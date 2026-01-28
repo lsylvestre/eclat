@@ -89,24 +89,24 @@ let rec pp_c fmt c =
       fprintf fmt "Bitvector.encode(%a)" pp_c c  (* ok ? *)
 
 (** code generator for call of operator *)
-let rec pp_call externals typing_env res fmt (op,a) =
+let rec pp_call operators typing_env res fmt (op,a) =
   (match res with None -> () | Some x -> fprintf fmt "%a := " pp_ident x);
   match op with
   | GetTuple(i,_,ty) ->
       let ts = match MiniHDL_typing.canon ty with TTuple ts -> ts | _ -> assert false in
       (match a with
-      | A_tuple aa -> (pp_a typing_env externals) fmt (List.nth aa i)
-      | _ -> fprintf fmt "(tuple_get_ (%d,%a) : %s)" i (pp_a typing_env externals) a (ocaml_type (List.nth ts i)))
+      | A_tuple aa -> (pp_a typing_env operators) fmt (List.nth aa i)
+      | _ -> fprintf fmt "(tuple_get_ (%d,%a) : %s)" i (pp_a typing_env operators) a (ocaml_type (List.nth ts i)))
           (* let z = gensym () in
              fprintf fmt "(let (";
              let ps = List.mapi (fun j _ -> if i = j then z else "_") ts in
              pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt ",")
                pp_ident fmt ps;
-             fprintf fmt ") = %a in %a)" (pp_a typing_env externals) a pp_ident z)*)
+             fprintf fmt ") = %a in %a)" (pp_a typing_env operators) a pp_ident z)*)
   | Runtime(Int_of_tuple n) ->
       let xs = List.init n (fun _ -> norm_ident @@ gensym ()) in
       fprintf fmt "(let %a =" (pp_tuple (fun fmt x -> fprintf fmt "%s" x)) xs;
-      fprintf fmt "%a" (pp_a typing_env externals) a;
+      fprintf fmt "%a" (pp_a typing_env operators) a;
       fprintf fmt "in\n";
       let rec loop acc xs =
         match xs with
@@ -120,7 +120,7 @@ let rec pp_call externals typing_env res fmt (op,a) =
   | Runtime(Tuple_of_int n) ->
      let z = norm_ident @@ gensym () in
      fprintf fmt "(let %s = %a in\n" z 
-       (pp_a typing_env externals) a;
+       (pp_a typing_env operators) a;
      fprintf fmt "(";
      let ns = (List.init n (fun i -> i)) in
      pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt ", ")
@@ -132,7 +132,7 @@ let rec pp_call externals typing_env res fmt (op,a) =
           but add caracter '_' for ensuring [x_] is a valid 
           qualified identifier in OCaml
           e.g. VHDL function Int.lor becomes OCaml value Int.lor_ *)
-      let annot_with_sizes,arity = match List.assoc_opt x (snd externals) with
+      let annot_with_sizes,arity = match SMap.find_opt x operators with
                                    | Some (_,(b,n,_)) -> (b,n)
                                    | None -> false,1 in
       fprintf fmt "%s_ " x;
@@ -147,13 +147,13 @@ let rec pp_call externals typing_env res fmt (op,a) =
                                     (fun fmt d -> fprintf fmt "%d" d)) fmt extra;
                                 fprintf fmt ")");
       fprintf fmt "(%a)"
-        (pp_a typing_env externals) a
+        (pp_a typing_env operators) a
   | Runtime p ->
-      Operators.gen_op ~externals fmt p (fun fmt a -> 
+      Operators.gen_op ~operators fmt p (fun fmt a -> 
         fprintf fmt "(%a)" 
-          (pp_a typing_env externals) a
+          (pp_a typing_env operators) a
         ) a
-  | _ -> fprintf fmt "@[%a(%a)@]" pp_op op (pp_a typing_env externals) a
+  | _ -> fprintf fmt "@[%a(%a)@]" pp_op op (pp_a typing_env operators) a
 
 (** code generator for operator *)
 and pp_op fmt = function
@@ -164,14 +164,14 @@ and pp_op fmt = function
 
 (** code generator for atoms (i.e. combinatorial expression) *)
 (* assumes that the let-bindings of atoms are not nested *)
-and pp_a typing_env externals fmt = function
+and pp_a typing_env operators fmt = function
 | A_const c -> pp_c fmt c
 | A_var x -> fprintf fmt "!%a" pp_ident x
 | A_call(op,a) ->
-   pp_call externals typing_env None fmt (op,a)
+   pp_call operators typing_env None fmt (op,a)
 | A_letIn _ -> assert false (* flattening needed before *)
-| A_tuple aas -> pp_tuple (pp_a typing_env externals) fmt aas
-| A_vector aas -> pp_vector fmt (pp_a typing_env externals) aas
+| A_tuple aas -> pp_tuple (pp_a typing_env operators) fmt aas
+| A_vector aas -> pp_vector fmt (pp_a typing_env operators) aas
 | A_string_get(s,i) ->
     fprintf fmt "%a.(%a)" pp_ident s pp_ident i
 | A_array_get(x,y) ->
@@ -189,22 +189,22 @@ and pp_a typing_env externals fmt = function
 | A_sig_get(x) -> assert false (* todo *)
 
 
-let pp_a2 typing_env x externals fmt a =
+let pp_a2 typing_env x operators fmt a =
   fprintf fmt "%a := %a" 
     pp_ident x 
-    (pp_a typing_env externals) a
+    (pp_a typing_env operators) a
 
 
 (** code generator for statements *)
-let rec pp_s typing_env externals ~st fmt = function
+let rec pp_s typing_env operators externals ~st fmt = function
 | S_skip -> fprintf fmt "()"
 | S_continue q -> fprintf fmt "%a := %a" pp_ident st pp_state q
 | S_if(z,s1,so) ->
     fprintf fmt "(@[<v 2>if !%a then@,(%a)@]"
       pp_ident z 
-      (pp_s typing_env externals ~st) s1;
+      (pp_s typing_env operators externals ~st) s1;
     Option.iter (fun s2 -> fprintf fmt "@,@[<v 2>else@,(%a)@,@]" 
-                             (pp_s typing_env externals ~st) s2) so;
+                             (pp_s typing_env operators externals ~st) s2) so;
     fprintf fmt ")"
 | S_case(y,hs,so) ->
     fprintf fmt "@[<v>(match !%a with@," pp_ident y;
@@ -215,17 +215,17 @@ let rec pp_s typing_env externals ~st fmt = function
     List.iter (fun (cs,s) ->
       fprintf fmt "@[<v 2>| %a -> @[<v 0>%a@]@]@," 
         pp_cs cs 
-        (pp_s typing_env externals ~st) s) hs;
+        (pp_s typing_env operators externals ~st) s) hs;
     Option.iter (fun s ->
       fprintf fmt "@[<v 2>| _ -> @,%a@]@," 
-        (pp_s typing_env externals ~st) s) so;
+        (pp_s typing_env operators externals ~st) s) so;
     fprintf fmt ")@]";
 | S_set(x,a) -> 
     fprintf fmt "%a" 
-      (pp_a2 typing_env x externals) a
+      (pp_a2 typing_env x operators) a
 | S_sig_set(x,a) ->
     fprintf fmt "%a" 
-      (pp_a2 typing_env x externals) a
+      (pp_a2 typing_env x operators) a
 | S_acquire_lock(l) ->
       fprintf fmt "@[Lock.acquire(%a)@]" 
         pp_ident (ptr_taken l)
@@ -237,7 +237,7 @@ let rec pp_s typing_env externals ~st fmt = function
       fprintf fmt "@[%a_value := %a.(Int64.to_int (%a))@]" 
         pp_ident x 
         pp_ident x 
-        (pp_a typing_env externals) idx;
+        (pp_a typing_env operators) idx;
   | S_read_stop(x,l) ->
         fprintf fmt "@[%a := !%a@]" 
             pp_ident x
@@ -245,58 +245,58 @@ let rec pp_s typing_env externals ~st fmt = function
   | S_write_start(x,idx,a) ->
       fprintf fmt "@[(%a.(Int64.to_int (%a)) <- %a)@]"
         pp_ident x
-        (pp_a typing_env externals) idx
-        (pp_a typing_env externals) a;
+        (pp_a typing_env operators) idx
+        (pp_a typing_env operators) a;
   | S_write_stop _ ->
       fprintf fmt "()"
   | S_array_set(x,idx,a) ->
       fprintf fmt "Array.set(%a,%a,%a)"
         pp_ident x 
         pp_ident idx 
-        (pp_a typing_env externals) a
+        (pp_a typing_env operators) a
   | S_array_from_file _ -> assert false (* not supported yet *)
 | ( S_seq(S_skip,s) 
   | S_seq(s,S_skip) ) -> 
-      pp_s typing_env externals ~st fmt s
+      pp_s typing_env operators externals ~st fmt s
 | S_seq(s1,s2) ->
     fprintf fmt "@[<v>%a;@,%a@]" 
-      (pp_s typing_env externals ~st) s1 
-      (pp_s typing_env externals ~st) s2
+      (pp_s typing_env operators externals ~st) s1 
+      (pp_s typing_env operators externals ~st) s2
 | S_letIn(x,a,s) ->
     fprintf fmt "@[<v>%a;@,%a@]"
-      (pp_a2 typing_env x externals) a 
-      (pp_s typing_env externals ~st) s
+      (pp_a2 typing_env x operators) a 
+      (pp_s typing_env operators externals ~st) s
 | S_fsm(id,rdy,x,cp,ts,s) ->
      let (st2,_,_) = List.assoc id !List_machines.extra_machines in
-     pp_fsm typing_env externals fmt
+     pp_fsm typing_env operators externals fmt
         ~state_var:st2 ~idle:cp ~rdy (id,ts,s)
 | S_in_fsm(id,s) ->
      let (st2,_,_) = List.assoc id !List_machines.extra_machines in
-     pp_s typing_env externals ~st:st2 fmt s
+     pp_s typing_env operators externals ~st:st2 fmt s
 | S_call(op,a) ->
-   fprintf fmt "%a" (pp_call externals typing_env None) (Runtime(op),a)
+   fprintf fmt "%a" (pp_call operators typing_env None) (Runtime(op),a)
 | S_external_run(f,id,res,rdy,a) ->
      fprintf fmt "%a := %a(true,%a);@,"
        pp_ident res
        pp_prog_name f
-       (pp_a typing_env externals) a;
+       (pp_a typing_env operators) a;
      fprintf fmt "%a := snd %a" pp_ident rdy pp_ident res
 | S_assert(a,loc) ->
    fprintf fmt "if %a then () else (print_string \"%a\"; assert false);@,"
-        (pp_a typing_env externals) a Prelude.Errors.pp_loc loc
+        (pp_a typing_env operators) a Prelude.Errors.pp_loc loc
 
 
 
 (** code generator for FSMs *)
-and pp_fsm typing_env externals fmt ~state_var:st ~idle ~rdy (id,ts,s) =
+and pp_fsm typing_env operators externals fmt ~state_var:st ~idle ~rdy (id,ts,s) =
   fprintf fmt "(match !%a with@," pp_ident st;
   List.iter (fun (x,s) ->
       fprintf fmt "@[<v 2>| %a ->@,@[<v 2> %a@,@]@]@,"
         pp_state x 
-        (pp_s typing_env externals ~st) s) ts;
+        (pp_s typing_env operators externals ~st) s) ts;
   fprintf fmt "@[<v 2>| %a -> @,@[<v 2>%a@,@]@]@,"
     pp_state idle 
-    (pp_s typing_env externals ~st) s;
+    (pp_s typing_env operators externals ~st) s;
   fprintf fmt ")@]"
 
 (* default value as bitvector where each bit is at '0' *)
@@ -389,7 +389,7 @@ let array_decl fmt x n default_value_pp =
   fprintf fmt "let %a_lock : Lock.t = (Lock.init ()) ;;\n" pp_ident x;
   fprintf fmt "let %a_value = ref %a ;;\n" pp_ident x default_value_pp ()
 
-let pp_component fmt ~vhdl_comment ~name ~externals ~state_var 
+let pp_component fmt ~vhdl_comment ~name ~(operators : _ Ast.SMap.t) ~externals ~state_var 
                      ~argument ~result ~idle ~rdy ~statics 
                      typing_env infos (ts,s) arg_list =
 
@@ -450,7 +450,7 @@ let pp_component fmt ~vhdl_comment ~name ~externals ~state_var
   fprintf fmt "@,@[<v 2>let %a =@," pp_prog_name name;
   fprintf fmt "@[<v 2>fun arg ->@,let %a = ref arg in@," pp_ident argument;
 
-  pp_fsm typing_env externals fmt ~state_var ~idle ~rdy (name,ts,s);
+  pp_fsm typing_env operators externals fmt ~state_var ~idle ~rdy (name,ts,s);
 
   fprintf fmt ";@,!%s@,@]@]@]" result;
 
@@ -464,7 +464,7 @@ let run n =
   done;;
   " 
   (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "; ") 
-      (pp_a typing_env externals)) arg_list
+      (pp_a typing_env operators)) arg_list
   pp_prog_name name;
 
   fprintf fmt "

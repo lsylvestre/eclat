@@ -458,7 +458,7 @@ let prepare_statics (statics: (x * static) list) : c array SMap.t =
             | Static_const c -> Array.make 1 c)
 
 let interp_pi ~nb_iterations (pi : pi) (value_list : e list) ty : (e * r) =
-  let r = { r_init with statics = prepare_statics pi.statics } in
+  let r = { r_init with statics = prepare_statics pi.genv.statics } in
   let targ = Types.new_ty_unknown () in
   Typing.unify_ty ~loc:Prelude.dloc ty (Ty_fun(targ,Types.new_dur_unknown(), Types.new_tyB_unknown ()));
   eval nb_iterations r (* (ty_annot ~ty*) pi.main value_list targ;

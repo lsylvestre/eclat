@@ -11,17 +11,17 @@ let single_read_write_lock_flag = Gen_vhdl_aux.single_read_write_lock_flag
 
 
 (** code generator for statements *)
-let rec pp_s externals ~st fmt = function
+let rec pp_s operators externals ~st fmt = function
 | S_skip -> ()
 | S_continue q -> fprintf fmt "%a := %a;" pp_ident st pp_state q
 | S_if(z,s1,so) ->
-    fprintf fmt "@[<v 2>if %a(0) = '1' then@,%a@]" pp_ident z (pp_s externals ~st) s1;
-    Option.iter (fun s2 -> fprintf fmt "@,@[<v 2>else@,%a@]" (pp_s externals ~st) s2) so;
+    fprintf fmt "@[<v 2>if %a(0) = '1' then@,%a@]" pp_ident z (pp_s operators externals ~st) s1;
+    Option.iter (fun s2 -> fprintf fmt "@,@[<v 2>else@,%a@]" (pp_s operators externals ~st) s2) so;
      fprintf fmt "@,end if;"
 | S_case(y,hs,so) ->
     (match hs,so with 
     | [(_,s)], (None|Some S_skip) -> (* optimization *)
-        pp_s externals ~st fmt s
+        pp_s operators externals ~st fmt s
     | _ ->
       fprintf fmt "@[<v>case %a is@," pp_ident y;
       let pp_cs fmt cs = 
@@ -29,12 +29,12 @@ let rec pp_s externals ~st fmt = function
           pp_c fmt cs
       in
       List.iter (fun (cs,s) ->
-        fprintf fmt "@[<v 2>when %a =>@,%a@]@," pp_cs cs (pp_s externals ~st) s) hs;
+        fprintf fmt "@[<v 2>when %a =>@,%a@]@," pp_cs cs (pp_s operators externals ~st) s) hs;
       Option.iter (fun s ->
-        fprintf fmt "@[<v 2>when others =>@,%a@]@," (pp_s externals ~st) s) so;
+        fprintf fmt "@[<v 2>when others =>@,%a@]@," (pp_s operators externals ~st) s) so;
       fprintf fmt "@]end case;")
-| S_set(x,a) -> fprintf fmt "@[<v>%a := %a;@]" pp_ident x (pp_a externals) a
-| S_sig_set(x,a) -> fprintf fmt "@[<v>%a <= %a;@]" pp_ident x (pp_a externals) a
+| S_set(x,a) -> fprintf fmt "@[<v>%a := %a;@]" pp_ident x (pp_a operators) a
+| S_sig_set(x,a) -> fprintf fmt "@[<v>%a <= %a;@]" pp_ident x (pp_a operators) a
 | S_acquire_lock(l) ->
       fprintf fmt
          "@[Lock.acquire(%a);@]" 
@@ -51,7 +51,7 @@ let rec pp_s externals ~st fmt = function
          "%d" n
     | _ ->
        fprintf fmt
-         "to_integer(unsigned(%a))" (pp_a externals) idx);
+         "to_integer(unsigned(%a))" (pp_a operators) idx);
    fprintf fmt ";@]"
 | S_read_stop(x,l) ->
         fprintf fmt
@@ -66,47 +66,47 @@ let rec pp_s externals ~st fmt = function
            "%d" n
       | _ ->
          fprintf fmt
-           "to_integer(unsigned(%a))" (pp_a externals) idx);
+           "to_integer(unsigned(%a))" (pp_a operators) idx);
       fprintf fmt ";@]";
       fprintf fmt
         "@[%a <= %a; %a <= '1';@]" 
           pp_ident ("$"^x^"_write")
-          (pp_a externals) a
+          (pp_a operators) a
           pp_ident ("$"^x^"_write_request")
     | S_write_stop(x) ->
         fprintf fmt
          "@[%a <= '0';@]" 
               pp_ident ("$"^x^"_write_request")
 | S_seq(S_skip,s) | S_seq(s,S_skip) ->
-    pp_s externals ~st fmt s
+    pp_s operators externals ~st fmt s
 | S_seq(s1,s2) ->
     fprintf fmt "@[<v>%a@,%a@]" 
-      (pp_s externals ~st) s1 
-      (pp_s externals ~st) s2
+      (pp_s operators externals ~st) s1 
+      (pp_s operators externals ~st) s2
 | S_letIn(x,a,s) ->
     fprintf fmt "@[<v>%a := %a;@,%a@]"
       pp_ident x 
-      (pp_a externals) a 
-      (pp_s externals ~st) s
+      (pp_a operators) a 
+      (pp_s operators externals ~st) s
 | S_fsm(id,rdy,x,cp,ts,s) ->
      let (st2,_,_) = List.assoc id !List_machines.extra_machines in
-     pp_fsm externals fmt
+     pp_fsm operators externals fmt
         ~state_var:st2 ~idle:cp ~rdy (id,ts,s)
 | S_in_fsm(id,s) ->
      let (st2,_,_) = List.assoc id !List_machines.extra_machines in
-     pp_s externals ~st:st2 fmt s
+     pp_s operators externals ~st:st2 fmt s
 | S_array_set(x,y,a) ->
     fprintf fmt "@[%a(to_integer(unsigned(%a&\"000\"))) := %a;@]"
       pp_ident x
       pp_ident y
-      (pp_a externals) a
+      (pp_a operators) a
 | S_array_from_file(y,a) ->
     if !Operators.flag_no_print then () else (
     fprintf fmt "@[%a := %a;@,%a := %a;@,@]"
-        pp_ident ("$"^y^"_from_file") (pp_a externals) (A_const (Bool true))
-        pp_ident ("$"^y^"_file_name") (pp_a externals) a)
+        pp_ident ("$"^y^"_from_file") (pp_a operators) (A_const (Bool true))
+        pp_ident ("$"^y^"_file_name") (pp_a operators) a)
 | S_call(op,a) ->
-   fprintf fmt "%a;@," (pp_call externals) (Runtime(op),a)
+   fprintf fmt "%a;@," (pp_call operators) (Runtime(op),a)
 | S_external_run(f,l,res,rdy,a) ->
    fprintf fmt "%a := %s_result_%a(0 to %s_result_%a'length - 2);@,"
           pp_ident res
@@ -119,31 +119,31 @@ let rec pp_s externals ~st fmt = function
           f pp_ident l;
    fprintf fmt "%s_argument_%a_var := \"1\" & %a;@,"
           f pp_ident l
-          (pp_a externals) a
+          (pp_a operators) a
 | S_assert(a,loc) ->
    fprintf fmt "-- ===================================@,";
    fprintf fmt "assert %a = \"1\" report \"from %a\" severity error;@,"
-        (pp_a externals) a Prelude.Errors.pp_loc loc;
+        (pp_a operators) a Prelude.Errors.pp_loc loc;
    fprintf fmt "-- ===================================@,"
 
 
 (** code generator for FSMs *)
-and pp_fsm externals fmt ~state_var:st ~idle ~rdy (id,ts,s) =
+and pp_fsm operators externals fmt ~state_var:st ~idle ~rdy (id,ts,s) =
   match ts with 
   | [] -> (* optimization *)
       fprintf fmt "@[<v> -- case %a is when %a =>@," pp_ident st pp_state idle;
-      pp_s externals ~st fmt s;
+      pp_s operators externals ~st fmt s;
       fprintf fmt "@,-- end case;@,@]"
   | _ ->
       fprintf fmt "@[<v>case %a is@," pp_ident st;
       List.iter (fun (x,s) ->
           fprintf fmt "@[<v 2>when %a =>@,%a@]@," 
             pp_state x 
-            (pp_s externals ~st) 
+            (pp_s operators externals ~st) 
             s) ts;
       fprintf fmt "@[<v 2>when %a =>@,%a@]@," 
         pp_state idle 
-        (pp_s externals ~st) s;
+        (pp_s operators externals ~st) s;
       fprintf fmt "@]end case;@,"
 
 (* default value as bitvector where each bit is at '0' *)
@@ -246,7 +246,7 @@ let declare_variable ~argument ~statics typing_env fmt =
 
 
 (* code generator for the whole design *)
-let pp_component fmt ~vhdl_comment ~name ~externals ~state_var ~argument ~result ~idle ~rdy ~statics typing_env infos (ts,s) =
+let pp_component fmt ~vhdl_comment ~name ~operators ~(externals : _ list) ~state_var ~argument ~result ~idle ~rdy ~statics typing_env infos (ts,s) =
    
   let arty = List.fold_left (fun arty (_,g) ->
       match g with
@@ -348,7 +348,7 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
     ) statics;
 
 
-  List.iter (print_external fmt) (fst externals);
+  List.iter (print_external fmt) externals;
 
 
 
@@ -356,8 +356,8 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
   let variables = List.filter (fun (x,t) -> 
           (match t with TSig _ -> false | _ -> true) &&
           x <> argument && not (List.mem_assoc x statics) 
-          && not (List.mem_assoc x (fst externals))
-          && not (List.mem_assoc x (snd externals))
+          && not (List.mem_assoc x externals)
+          && not (Ast.SMap.mem x operators)
   )
     @@ List.of_seq (Hashtbl.to_seq typing_env) in
   
@@ -369,8 +369,8 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
   let variables = List.filter (fun (x,t) -> 
           (match t with TSig _ -> false | _ -> true) &&
           x <> argument && not (List.mem_assoc x statics) 
-          && not (List.mem_assoc x (fst externals))
-          && not (List.mem_assoc x (snd externals))
+          && not (List.mem_assoc x externals)
+          && not (Ast.SMap.mem x operators)
   )
     @@ List.of_seq (Hashtbl.to_seq typing_env) in
 
@@ -381,7 +381,7 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
 
 
   (* instantiate externals *)
-  List.iter (instantiate_external fmt) (fst externals);
+  List.iter (instantiate_external fmt) externals;
 
   List.iter (fun (x,st) ->
     match st with
@@ -502,7 +502,7 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
         fprintf fmt ", %s_result_%a" n pp_ident l
       ) instances
     in    
-    List.iter (sensibility_external fmt) (fst externals);
+    List.iter (sensibility_external fmt) externals;
     (* ***************** *)
 
   fprintf fmt ")@,";
@@ -522,7 +522,7 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
       if shared then decl_locks fmt x
   ) (fst externals);*)
 
-  List.iter (variable_decl_go_external fmt) (fst externals);
+  List.iter (variable_decl_go_external fmt) externals;
 
   
 
@@ -546,7 +546,7 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
         fprintf fmt "%a <= %a;@," pp_ident ("$"^x^"_write") pp_ident ("$"^x^"_write%pre")
     ) statics;
 
-  List.iter (variable_init_go_external fmt) (fst externals);
+  List.iter (variable_init_go_external fmt) externals;
 
   
   (* fprintf fmt "@,@[<v 2>if rising_edge(clk) then@,";
@@ -572,7 +572,7 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
     | Static_array_of _
     | Static_array _ ->
         fprintf fmt "@[%a := %a;@,@]" (* avoid reading at each clock tick *)
-        pp_ident ("$"^x^"_from_file") (pp_a externals) (A_const (Bool false))
+        pp_ident ("$"^x^"_from_file") (pp_a operators) (A_const (Bool false))
     ) statics
   );
   
@@ -584,7 +584,7 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
 (*  List.iter (fun (_,(sv,cp,xs)) -> fprintf fmt "%a <= %a;@," pp_ident sv pp_ident cp) !List_machines.extra_machines;
 *)
 
-  pp_fsm externals fmt ~state_var ~idle ~rdy ("main",ts,s);
+  pp_fsm operators externals fmt ~state_var ~idle ~rdy ("main",ts,s);
 
   fprintf fmt "%a <= %a;@," pp_ident (state_var^"%next") pp_ident state_var;
   
@@ -600,7 +600,7 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
   (* fprintf fmt "rdy <= %a;@," pp_ident rdy; *)
 
 
-  List.iter (variable_set_go_external fmt) (fst externals);
+  List.iter (variable_set_go_external fmt) externals;
 
   fprintf fmt
     "end process;

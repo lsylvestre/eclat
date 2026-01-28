@@ -5,7 +5,7 @@ open Pattern
 (* rename all variables that are not statics *)
 
 (* custom symbol generator *)
-module Gensym : sig val gensym : statics:x list -> x -> x end = struct
+module Gensym : sig val gensym : statics:(x * _) list -> x -> x end = struct
 
   let of_int (n:int) : x =
     "$"^string_of_int n
@@ -25,7 +25,7 @@ module Gensym : sig val gensym : statics:x list -> x -> x end = struct
     else make_name !c x
 
   let gensym ~statics x =
-    if List.mem x statics then x else
+    if List.mem_assoc x statics then x else
     rename x 
 
 end
@@ -84,8 +84,7 @@ let rename_e ~statics e =
   ren_e e
 
 let rename_pi pi =
-  let statics = List.map fst pi.statics in
-  let main = rename_e ~statics pi.main in
+  let main = rename_e ~statics:pi.genv.statics pi.main in
   { pi with main }
 
 

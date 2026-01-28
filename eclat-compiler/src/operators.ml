@@ -2,6 +2,7 @@
 let flag_no_assert = ref false
 let flag_no_print = ref false
 
+module SMap = Map.Make(String) (* todo: share this definition *)
 
 (* instantaneous primitives which do not require an encoding *)
 type op =
@@ -13,7 +14,7 @@ type op =
 
 let combinational ~externals p =
   match p with
-  | External_fun (x,_) -> (match List.assoc_opt x (snd externals) with
+  | External_fun (x,_) -> (match SMap.find_opt x externals with
                            | Some (_,(_,_,pure)) -> not(pure)
                            | None -> true)
   | _ -> true
@@ -38,7 +39,7 @@ let ty_op ~externals op =
       let v' = new_tyB_unknown() in
       Ty_fun((Ty_tuple[Ty_fun(v,d,v'); v]),d,v')
   | External_fun (x,_) ->
-    (match List.assoc_opt x (snd externals) with
+    (match SMap.find_opt x externals with
     | Some (t,_) -> t
     | None -> Prelude.Errors.raise_error ~msg:("unbound operator "^x) ())
 
@@ -52,7 +53,7 @@ let pp_op fmt (op:op) : unit =
 
 
 (** code generator for operators *)
-let gen_op ~externals fmt (op:op) pp a : unit =
+let gen_op ~operators fmt (op:op) pp a : unit =
   let open Format in
   let funcall fmt s = fprintf fmt "%s(%a)" s pp a in
   let procall fmt s = fprintf fmt "%s(clk,%a)" s pp a in
@@ -63,7 +64,7 @@ let gen_op ~externals fmt (op:op) pp a : unit =
       pp fmt a (* should add a primitive call (identity ?) *)
   | Unroll _ -> assert false (* should be eliminated before *)
   | External_fun (x,_) ->
-      (match List.assoc_opt x (snd externals) with
+      (match SMap.find_opt x operators with
        | Some (t,(_,_,is_imp)) ->
           if is_imp 
           then procall fmt (Printf.sprintf "work.%s" x)

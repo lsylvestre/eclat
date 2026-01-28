@@ -88,27 +88,27 @@ let test_main () =
 
   if get(w_src,0) then 0 else 1 ;;
 
-(*
 
-(** ./eclat -relax ../benchs/game-of-life/v1/v1.ecl  -intel-max10  -main=main_intel *)
+
+(** ./eclat -relax ../examples/benchs/game-of-life/v1/v1.ecl  -intel-max10  -main=main_intel *)
 
 let main_intel (_:int<12>) : int<58> =
   let v = test_main() in
   resize_int<58>(v) ;;
 
-(** ./eclat -relax ../benchs/game-of-life/v1/v1.ecl  -xilinx-zybo  -main=main_xilinx *)
+(** ./eclat -relax ../examples/benchs/game-of-life/v1/v1.ecl  -xilinx-zybo  -main=main_xilinx *)
 
 let main_xilinx (i:int<8>) : int<4> =
   let v = test_main() in
   resize_int<4>(v) ;;
 
-(** ./eclat -relax ../benchs/game-of-life/v1/v1.ecl  -yosys-ecp5  -main=main_yosys *)
+(** ./eclat -relax ../examples/benchs/game-of-life/v1/v1.ecl  -yosys-ecp5  -main=main_yosys *)
 
 let main_yosys (i:int<1>) : int<1> =
   let v = test_main() in
   resize_int<1>(v) ;;
 
-*)
+
 
 (** ==== measure execution time ==== *)
 
