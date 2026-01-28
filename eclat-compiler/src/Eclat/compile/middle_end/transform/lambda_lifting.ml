@@ -40,7 +40,7 @@ let rec rename_fun_e = function
   | e -> Ast_mapper.map rename_fun_e e
 
 
-let version2 = ref false 
+let version2 = ref true 
 
 (** [lifting ~statics ~decls e] lifts expression [e]
     considering [~statics] and [~decls] as toplevel definitions
@@ -54,14 +54,14 @@ let lifting ~statics (env:env) (e:e) : e =
     let open Ast in
     match e with
      | E_var f ->
-         if !version2 then 
         (match SMap.find_opt f env with
-         | None -> E_var f
-         | Some p -> 
+         | None -> e
+         | Some P_unit -> e
+         | Some p ->
             let x =gensym () in 
-            E_fun(P_var x,(Types.new_ty_unknown(),Types.new_tyB_unknown()),E_app(E_var f,E_tuple[E_var x;pat2exp p])))
+            E_fun(P_var x,(Types.new_ty_unknown(),Types.new_tyB_unknown()),
+                  E_app(E_var f,E_tuple[E_var x;pat2exp p])))
             (* E_letIn(P_var g,E_fun(P_var x,E_app(E_var f,E_tuple[E_var x;pat2exp p])), E_var g)) *)
-      else e
     (*| E_app((E_const (Op(TyConstr _))),_) ->
         assert false*)
     | E_app(e1,e2) ->
@@ -72,13 +72,13 @@ let lifting ~statics (env:env) (e:e) : e =
         | E_var f -> 
             let e2' = lift env e2 in
             (match SMap.find_opt f env with
-             | None | Some (P_unit) -> E_app(e1,e2')
+             | None | Some P_unit -> E_app(e1,e2')
              | Some p -> (* Printf.printf "=====>%d\n" (SMap.cardinal  (vars_of_p p)); *)
                  E_app(e1,E_tuple[e2'; pat2exp p]))
-        | _ ->
-         (* assert (evaluated e1);*) lift env @@
-         let f = gensym () in
-         E_letIn(P_var f,Types.new_ty_unknown(),e1,E_app(E_var f,e2)))
+        | _ -> (* has_changed := true;*) 
+                lift env @@
+                 let f = gensym () in
+                 E_letIn(P_var f,Types.new_ty_unknown(),e1,E_app(E_var f,e2)))
     | E_letIn(px,ty,ex,e2) ->
         let _ty,ex' = ty,(* Ast_undecorated.remove_tyconstr*) ex in
         (* todo: deal with ty or emit warning *)

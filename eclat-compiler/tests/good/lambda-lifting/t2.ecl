@@ -1,4 +1,4 @@
-(* ./eclat -arg="()" tests/todo/lambda-lifting/t2.ecl -nostdlib *)
+(* ./eclat -arg="()" tests/good/lambda-lifting/t2.ecl -nostdlib *)
 
 operator M.add : (int * int) => int  ;;
 
