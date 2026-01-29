@@ -3,25 +3,30 @@ open Prelude.Errors
 
 let no_stdlib_flag = ref false
 
+let main_function_undefined fmt main_name =
+  Format.fprintf fmt "@[<v>The main function (%a) is not defined.@]"
+    (emph_pp blue (fun fmt () -> Format.fprintf fmt "%s" main_name)) ()
+
 (* read a sequence of phrases (each phrase finishes with `;;`)
    upto the character '#' marking end of the program 
  *)
 let read_phrase () =
   (* phrases terminate with ";;" *)
-  let rec loop acc =
+  let rec loop ~first_call acc =
     let s = read_line () in
-    let new_acc = acc^"\n"^s in (* todo (improvment): use a buffer to avoid multiple concatenations *)
+    let new_acc = if first_call then s 
+                  else acc^"\n"^s in (* todo (improvment): use a buffer to avoid multiple concatenations *)
     if String.contains s '#' 
     then new_acc 
     else
     (* since the "end of phrase" marker is ";;", we detect the last occurring ';'
        of each line and we test if the previous caracter is also a ';' *) 
     match String.rindex_opt s ';' with
-    | None -> loop new_acc
+    | None -> loop ~first_call:false new_acc
     | Some n ->
        if n < String.length s && s.[n-1] = ';' then new_acc else
-       loop new_acc
-  in loop ""
+       loop ~first_call:false new_acc
+  in loop ~first_call:true ""
   (* todo: accept comments in the input *)
 
 let syntax_error_handler f lexbuf =
@@ -30,7 +35,7 @@ let syntax_error_handler f lexbuf =
            Prelude.Errors.syntax_error (Lexer.get_loc lexbuf)
 
 let frontend ~(inputs : string list) repl ?(when_repl=(fun _ ~genv:_ _ _ -> ())) 
-             ?(relax=false) main str_arg : pi * e list =
+             ?(relax=false) main_name str_arg : pi * e list =
   let (ess_from_files, 
        gss_from_files, 
        tss_from_files, 
@@ -73,8 +78,11 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ ~genv:_ _ _ -> ()))
                Printf.printf "\n> ";
                let l = read_phrase () in
                if String.contains l '#' then 
-                 (if List.exists (fun ((p,_),_) -> SMap.mem main @@ vars_of_p p) ds then (exts1,exts2),gs,ts,ds else
-                    (Format.fprintf Format.std_formatter "entry point *%s* not set\n" main;
+                 (if List.exists (fun ((p,_),_) -> SMap.mem main_name @@ vars_of_p p) ds then (exts1,exts2),gs,ts,ds else
+                    (main_function_undefined Format.std_formatter main_name;
+                     emph_pp purple (fun fmt () -> 
+                                          Format.fprintf fmt " Please continue, or quit with ^C.") 
+                                    Format.std_formatter ();
                      Format.print_flush ();
                      loop (exts1,exts2) gs ts ds))
                else
@@ -118,29 +126,24 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ ~genv:_ _ _ -> ()))
         Parser.exp_eof Lexer.token lexbuf)
         lexbuf)
   in
-  let entry_point = (* if relax then (E_var main) else (Ast.ty_annot ~ty:(Ast_mk.fresh_node ())*) (E_var main) in
+
+  let find_main = ref false in
   let ds = List.concat @@
            List.map (function ((p,e),loc) ->
-                       try Pattern.bindings p e |> SMap.bindings with
+                       let bs = try Pattern.bindings p e |> SMap.bindings with
                        | Pattern.CannotMatch _ ->
                            error ~loc (fun fmt ->
                                   Format.fprintf fmt
-                                    "@[<v>This global pattern does not match statically the right-hand side.@]")) ds in
+                                    "@[<v>This global pattern does not match statically the right-hand side.@]") 
+                       in
+                       find_main := !find_main || (List.exists (fun (x,_) -> x = main_name) bs);
+                       bs) ds 
+  in
+  if !find_main then () 
+  else error (fun fmt -> main_function_undefined fmt main_name);
+  let entry_point = E_var main_name in
   let main = List.fold_right (fun (x,v) e -> E_letIn(P_var x,Types.new_ty_unknown(),v,e)) ds (let y = gensym () in 
       E_fun (P_var y,(Types.new_ty_unknown(),Types.new_tyB_unknown()), E_app(entry_point,E_var y))) in
-
-
-  (*
-
-  (** check that the given inputs are combinational *)
-  List.iteri (fun i a ->
-    if Combinatorial.combinatorial a then ()
-    else error (fun fmt ->
-                  Format.fprintf fmt
-                    "@[<v>Input %d should be combinatorial, but I found:@,%a@,@]" i
-                       (emph_pp purple Ast_pprint.pp_exp) a)) values_list;
-
-  *)
 
   (* return both parsed program and its inputs *)
   ({genv={statics=gs;operators=smap_of_list (snd exts); externals=(fst exts);sums=ts};main}, values_list)

@@ -33,7 +33,7 @@ let print_ascii = Print.print_value ;;
 operator Int.print : int<?n> => unit  @impure ;;
 let print_int = Int.print ;;
 
-operator Int.absv :    int<?n> => int<'N> ;;
+operator Int.absv :    int<?n> => int<?n> ;;
 
 operator%with_sizes Int.resize : int<?m> => int<?n> ;;
 let int_resize<<?n>> (x) : int<?m> = Int.resize(x) ;;
@@ -79,24 +79,24 @@ let min(a,b) =
 (************* uint *************)
 (********************************)
 
-type uint<'N> ;;
+type uint<?n> ;;
 
-operator Uint.print :  uint<'N> => unit @impure ;;
+operator Uint.print :  uint<?n> => unit @impure ;;
 
-operator Uint.of_int : int<'N> => uint<'N> ;;
-operator Uint.to_int : uint<'N> => int<'N> ;;
+operator Uint.of_int : int<?n> => uint<?n> ;;
+operator Uint.to_int : uint<?n> => int<?n> ;;
 
-operator Uint.add :    (uint<'N> * uint<'N>) => uint<'N> ;;
-operator Uint.sub :    (uint<'N> * uint<'N>) => uint<'N> ;;
-operator Uint.mul :    (uint<'N> * uint<'N>) => uint<'N> ;;
-operator Uint.div :    (uint<'N> * uint<'N>) => uint<'N> ;;
-operator Uint.modulo : (uint<'N> * uint<'N>) => uint<'N> ;;
-operator Uint.eq :     (uint<'N> * uint<'N>) => bool ;;
-operator Uint.neq :    (uint<'N> * uint<'N>) => bool ;;
-operator Uint.lt :     (uint<'N> * uint<'N>) => bool ;;
-operator Uint.le :     (uint<'N> * uint<'N>) => bool  ;;
-operator Uint.gt :     (uint<'N> * uint<'N>) => bool ;;
-operator Uint.ge :     (uint<'N> * uint<'N>) => bool ;;
+operator Uint.add :    (uint<?n> * uint<?n>) => uint<?n> ;;
+operator Uint.sub :    (uint<?n> * uint<?n>) => uint<?n> ;;
+operator Uint.mul :    (uint<?n> * uint<?n>) => uint<?n> ;;
+operator Uint.div :    (uint<?n> * uint<?n>) => uint<?n> ;;
+operator Uint.modulo : (uint<?n> * uint<?n>) => uint<?n> ;;
+operator Uint.eq :     (uint<?n> * uint<?n>) => bool ;;
+operator Uint.neq :    (uint<?n> * uint<?n>) => bool ;;
+operator Uint.lt :     (uint<?n> * uint<?n>) => bool ;;
+operator Uint.le :     (uint<?n> * uint<?n>) => bool  ;;
+operator Uint.gt :     (uint<?n> * uint<?n>) => bool ;;
+operator Uint.ge :     (uint<?n> * uint<?n>) => bool ;;
 
 (*******************************)
 (************ vect *************)
@@ -105,7 +105,7 @@ operator Uint.ge :     (uint<'N> * uint<'N>) => bool ;;
 type `a vect<'b> ;;
 
 operator%with_sizes Vect.create : `a => `a vect<?n> ;;
-let vect_make <<'s>> (x:`a) : `a vect<'s> = Vect.create(x) ;;
+let vect_make<<?n>> (x:`a) : `a vect<?n> = Vect.create(x) ;;
 
 operator%with_sizes Vect.nth : (`a vect<?n> * int<32>) => `a;;
 operator Vect.copy_with : (`a vect<?n> * int<32> * `a) => `a vect<?n>;;
@@ -136,21 +136,23 @@ let vect_split v = Vect.split v ;;
 let vect_concat v = Vect.concat v ;;
 
 let vect_forall (f,v) =
-  let _ : 'a vect<'N> = v in
-  generate<1 to 'N>(fun (i,acc) -> acc & vect_nth(v,i)) init false ;; 
+  let _ : 'a vect<?n> = v in
+  generate<1 to ?n>(fun (i,acc) -> acc & vect_nth(v,i)) init false ;; 
 
 let vect_of_int = Vect.of_int;;
 let int_of_vect = Vect.to_int;;
 
-(********************************
-type `a matrix<'d1,'d2> ;;
+(**** ============================
+    (* commented part: no matrix nor fixed_point
+       for the moment at the moment *)
 
-operator%with_sizes Matrix.create : `a => `a matrix<'d1,'d2> ;;
-operator%with_sizes Matrix.get_line : (`a matrix<'d1,'d2> * int<16>) => `a vector<'d2> ;;
+type `a matrix<?d1,?d2> ;;
+
+operator%with_sizes Matrix.create : `a => `a matrix<?d1,?d2> ;;
+operator%with_sizes Matrix.get_line : (`a matrix<?d1,?d2> * int<16>) => `a vector<?d2> ;;
 operator%with_sizes Matrix.copy_with_line : 
-  (`a matrix<'d1,'d2> * int<16> * `a vector<'size>) => `a vector<'d2> ;;
-operator%with_sizes Matrix.infos : `a matrix<'d1,'d2> => int<32> * `a;;
-
+  (`a matrix<?d1,?d2> * int<16> * `a vect<?d2>) => `a matrix<?d1,?d2> ;;
+operator%with_sizes Matrix.infos : `a matrix<?d1,?d2> => int<32> * `a;;
 
 let matrix_create = Matrix.create ;;
 let matrix_get_line = Matrix.get_line ;;
@@ -178,22 +180,22 @@ let matrix_iter(f,m) =
     done
   done ;;
 
-type fixed_point<'sf,'exp>@only_size_sum ;;
+type fixed_point<?sf,?exp>@only_size_sum ;;
 
-operator%with_sizes FixedPoint.create : int<'sf> => fixed_point<'sf,'exp> ;;
+operator%with_sizes FixedPoint.create : int<?sf> => fixed_point<?sf,'exp> ;;
 
-operator%with_sizes FixedPoint.significand : fixed_point<'sf,'exp> => uint<'sf> ;;
-operator%with_sizes FixedPoint.exponent : fixed_point<'sf,'exp> => uint<'exp> ;;
+operator%with_sizes FixedPoint.significand : fixed_point<?sf,'exp> => uint<'sf> ;;
+operator%with_sizes FixedPoint.exponent : fixed_point<?sf,'exp> => uint<'exp> ;;
 
-operator FixedPoint.add : (fixed_point<'sf,'exp> * fixed_point<'sf,'exp>) => fixed_point<'sf,'exp> ;;
-operator FixedPoint.sub : (fixed_point<'sf,'exp> * fixed_point<'sf,'exp>) => fixed_point<'sf,'exp> ;;
+operator FixedPoint.add : (fixed_point<?sf,?exp> * fixed_point<?sf,?exp>) => fixed_point<?sf,?exp> ;;
+operator FixedPoint.sub : (fixed_point<?sf,?exp> * fixed_point<?sf,?exp>) => fixed_point<?sf,?exp> ;;
 
 let print_fixed_point (f) =
   let x = FixedPoint.significand f in
   let y = FixedPoint.exponent f in
   Uint.print x; print_string " * 2^{"; 
   Uint.print y; print_string "}" ;; 
-***************************)
+=========================== *)
 
 
 (********************************)
@@ -327,14 +329,14 @@ let bytes_to_vect = Bytes.to_vect ;;
 let bytes_from_vect = Bytes.from_vect ;;
 let bytes_to_hex = Bytes.to_hex ;;
 
-let bytes_vect_map ((f,b):(char vect<'s1> => char vect<'s2>) * bytes<'s1>) : bytes<'s2> = 
+let bytes_vect_map ((f,b):(char vect<?n> => char vect<?m>) * bytes<?n>) : bytes<?m> = 
   bytes_from_vect(f(bytes_to_vect b));;
 
-let bytes_cons ((x,b):char * bytes<'s>) : bytes<'s+1> =
-  let cons (v:char vect<'s1>) : char vect<'s1+1> = vect_cons(x,v) in  
+let bytes_cons ((x,b):char * bytes<'n>) : bytes<'n+1> =
+  let cons (v:char vect<'n>) : char vect<'n+1> = vect_cons(x,v) in  
   bytes_from_vect(cons(bytes_to_vect b));;
 
-let bytes_tail (b:bytes<'s+1>) : bytes<'s> = 
+let bytes_tail (b:bytes<'n+1>) : bytes<'n> = 
   bytes_vect_map(vect_tail,b);;
 
 let print_char = char_print ;;
@@ -343,8 +345,8 @@ let print_bytes = bytes_print ;;
 (************** file manipulations ****************)
 (**************************************************)
 
-operator%with_sizes IOFile.read_file : string => bytes<'s> @impure ;;
-operator            IOFile.write_file : (string * bytes<'s>) => unit @impure ;;
+operator%with_sizes IOFile.read_file : string => bytes<'n> @impure ;;
+operator            IOFile.write_file : (string * bytes<'n>) => unit @impure ;;
 
 let input_file = IOFile.read_file ;;
 let output_file = IOFile.write_file ;;
@@ -365,3 +367,4 @@ let vect2mif v =
 
 let bytes2mif b =
   vect2mif (bytes_to_vect b) ;;
+

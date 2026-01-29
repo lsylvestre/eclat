@@ -35,7 +35,6 @@ exception Cyclic_ty of int * ty * Prelude.loc
 
 let rec unify_size ~loc sz1 sz2 =
   let sz1, sz2 = canon_size sz1, canon_size sz2 in
-  (* Format.fprintf Format.std_formatter "####-- ====> %a / %a\n"  pp_size  sz1  pp_size  sz2; *)
   match sz1, sz2 with
   | sz1,Sz_var {contents=Is sz2}
   | Sz_var {contents=Is sz1},sz2 -> unify_size ~loc sz1 sz2
@@ -44,13 +43,12 @@ let rec unify_size ~loc sz1 sz2 =
     if n = m then () else v := Is sz2
   | Sz_var ({contents=(Unknown{id=n;_})} as r1),sz2 ->
     if test_occur (occur_size n) sz2 then (
-      r1 := Is (Sz_lit 0)
-      (* raise (Cyclic_size(n,sz2,loc)) *)
+      r1 := Is (Sz_lit 0);
+      unify_size ~loc sz2 (Sz_var r1)
     ) else
     r1 := Is sz2
   | sz1,Sz_var ({contents=(Unknown{id=n;_})} as r2) ->
     if test_occur (occur_size n) sz1 then (
-      (* raise (Cyclic_size(n,sz1,loc)); *)
       r2 := Is (Sz_lit 0);
       unify_size ~loc sz1 (Sz_var r2)
     ) else
@@ -170,8 +168,8 @@ let rec unify_dur ~loc d1 d2 =
 
 let rec unify_tyB ~loc tyB1 tyB2 =
   let tyB1,tyB2 = canon_tyB tyB1, canon_tyB tyB2 in
-  (* Format.fprintf Format.std_formatter "&&      [tyB]====> %a / %a\n"  pp_tyB  tyB1  pp_tyB  tyB2;
- *) match tyB1, tyB2 with
+   (*Format.fprintf Format.std_formatter "&&      [tyB]====> %a / %a\n"  pp_tyB  tyB1  pp_tyB  tyB2;
+  *)match tyB1, tyB2 with
   | TyB_var ({contents=(Unknown{id=n;name})} as v),
     TyB_var {contents=Unknown({id=m;_} as r)} ->
     if n = m then () else 
@@ -233,8 +231,8 @@ let unify_ty ~loc ty1 ty2 =
   let ty1,ty2 = canon_ty ty1, canon_ty ty2 in
   let rec unify ~loc ty1 ty2 =
     let ty1,ty2 = canon_ty ty1, canon_ty ty2 in
-   (* Format.fprintf Format.std_formatter "          [ty]====> %a / %a\n"  pp_ty  ty1  pp_ty  ty2;
-   *) match ty1,ty2 with
+    (* Format.fprintf Format.std_formatter "          [ty]====> %a / %a\n"  pp_ty  ty1  pp_ty  ty2;
+    *)match ty1,ty2 with
     | Ty_var ({contents=(Unknown{id=n;name})} as v),
       Ty_var {contents=Unknown({id=m;_} as u)} ->
         if n = m then () else 
@@ -508,6 +506,7 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
     unify_ty ~loc:(loc_of e1) typ ty1;
     (* Format.fprintf Format.std_formatter "--->%a\n" pp_ty  ty1;*)
     let gen = evaluated e1 (* && match un_deco e1 with E_fix _ -> false | _ -> true *) in
+    (* Format.fprintf Format.std_formatter "----->|||%b (%a)\n" gen Ast_pprint.pp_pat p;*)
     let g' = env_extend ~loc:(loc_of e1) ~gen g p ty1 in (* todo: loc of pattern *)
 
     (if toplevel && !print_signature_flag then
@@ -850,38 +849,38 @@ let typing_handler ?(msg="") f () =
         ((match cannot with
          | Ty(ty1,ty2) ->
               fprintf fmt "This expression has type %a but was expected of type %a"
-                (emph_pp bold pp_ty) ty1
-                (emph_pp bold pp_ty) ty2
+                (emph_pp bold pp_ty) (canon_ty ty1)
+                (emph_pp bold pp_ty) (canon_ty ty2)
          | TyB(tyB1,tyB2) ->
              fprintf fmt "This expression has basic type %a but was expected of basic type %a"
-                (emph_pp bold pp_tyB) tyB1
-                (emph_pp bold pp_tyB) tyB2
+                (emph_pp bold pp_tyB) (canon_tyB tyB1)
+                (emph_pp bold pp_tyB) (canon_tyB tyB2)
           | Ty_TyB(ty1,tyB2) ->
              fprintf fmt "This expression has type %a but was expected of basic type %a"
               
-              (emph_pp bold pp_ty) ty1
-              (emph_pp bold pp_tyB) tyB2
+              (emph_pp bold pp_ty) (canon_ty ty1)
+              (emph_pp bold pp_tyB) (canon_tyB tyB2)
           | TyB_Ty(tyB1,ty2) ->
              fprintf fmt "@[<v>This expression has basic type %a but was expected of type %a@]"
               
-              (emph_pp bold pp_tyB) tyB1
-              (emph_pp bold pp_ty) ty2
+              (emph_pp bold pp_tyB) (canon_tyB tyB1)
+              (emph_pp bold pp_ty) (canon_ty ty2)
           | Size(sz1,sz2) ->
               fprintf fmt "A type has size %a but was expected of size %a"
-                (emph_pp bold pp_size) sz1
-                (emph_pp bold pp_size) sz2
+                (emph_pp bold pp_size) (canon_size sz1)
+                (emph_pp bold pp_size) (canon_size sz2)
           | Dur(d1,d2) ->
               fprintf fmt "response time %a should be %a"        
-                (emph_pp bold pp_dur) d1
-                (emph_pp bold pp_dur) d2
+                (emph_pp bold pp_dur) (canon_dur d1)
+                (emph_pp bold pp_dur) (canon_dur d2)
           | Imcompatible_length(ty1, ty2) ->
               fprintf fmt "wrong number of elements:@,this expression has type %a but was expected of type %a"
-                (emph_pp bold pp_ty) ty1
-                (emph_pp bold pp_ty) ty2
+                (emph_pp bold pp_ty) (canon_ty ty1)
+                (emph_pp bold pp_ty) (canon_ty ty2)
           | Pat_ty (p,ty) ->
               fprintf fmt "pattern %a should have type %a"
                 (emph_pp bold Ast_pprint.pp_pat) p 
-                (emph_pp bold pp_ty) ty
+                (emph_pp bold pp_ty) (canon_ty ty)
           | AbstractTy_mismatch(x1,x2) ->
                 fprintf fmt "This expression has type %a but was expected of type %a"
                 (emph_pp bold (fun fmt () -> fprintf fmt "%s" x1)) () 
@@ -889,13 +888,13 @@ let typing_handler ?(msg="") f () =
           | Cyclic_Ty(n,t) ->
               fprintf fmt "%s@,An expression %a has a cyclic type %a\n"
                 msg  (emph_pp purple Ast_pprint.pp_exp) !trace_last_exp
-                (emph_pp bold pp_ty) t
+                (emph_pp bold pp_ty) (canon_ty t)
           | Cyclic_Dur(n,dur) ->
               fprintf fmt "The type of response time %a is cyclic\n"
-              (emph_pp bold pp_dur) dur
+              (emph_pp bold pp_dur) (canon_dur dur)
           | Cyclic_Size(n,sz) ->
               fprintf fmt "The type of size %a is cyclic\n"
-              (emph_pp bold pp_size) sz
+              (emph_pp bold pp_size) (canon_size sz)
           );
           List.iter (fun _ -> fprintf fmt "@]") l;
           fprintf fmt "@,"
@@ -908,36 +907,36 @@ let typing_handler ?(msg="") f () =
          (match v with
           | Ty(ty1,ty2) ->
               fprintf fmt "An expression has type %a but was expected of type %a"
-                (emph_pp bold pp_ty) ty1
-                (emph_pp bold pp_ty) ty2
+                (emph_pp bold pp_ty) (canon_ty ty1)
+                (emph_pp bold pp_ty) (canon_ty ty2)
           | TyB(tyB1,tyB2) ->
              fprintf fmt "An expression has basic type %a but was expected of basic type %a"
-                (emph_pp bold pp_tyB) tyB1
-                (emph_pp bold pp_tyB) tyB2
+                (emph_pp bold pp_tyB) (canon_tyB tyB1)
+                (emph_pp bold pp_tyB) (canon_tyB tyB2)
           | Ty_TyB(ty1,tyB2) ->
              fprintf fmt "An expression has type %a but was expected of basic type %a"
-              (emph_pp bold pp_ty) ty1
-              (emph_pp bold pp_tyB) tyB2
+              (emph_pp bold pp_ty) (canon_ty ty1)
+              (emph_pp bold pp_tyB) (canon_tyB tyB2)
           | TyB_Ty(tyB1,ty2) ->
              fprintf fmt "@[<v>An expression has basic type %a but was expected of type %a@]"
-              (emph_pp bold pp_tyB) tyB1
-              (emph_pp bold pp_ty) ty2
+              (emph_pp bold pp_tyB) (canon_tyB tyB1)
+              (emph_pp bold pp_ty) (canon_ty ty2)
           | Size(sz1,sz2) ->
               fprintf fmt "A type has size %a but was expected of size %a"
-                (emph_pp bold pp_size) sz1
-                (emph_pp bold pp_size) sz2
+                (emph_pp bold pp_size) (canon_size sz1)
+                (emph_pp bold pp_size) (canon_size sz2)
           | Dur(d1,d2) ->
               fprintf fmt "response time %a should be %a"  
-                (emph_pp bold pp_dur) d1
-                (emph_pp bold pp_dur) d2
+                (emph_pp bold pp_dur) (canon_dur d1)
+                (emph_pp bold pp_dur) (canon_dur d2)
           | Imcompatible_length(ty1, ty2) ->
               fprintf fmt "wrong number of elements:@,an expression has type %a but was expected of type %a"
-                (emph_pp bold pp_ty) ty1
-                (emph_pp bold pp_ty) ty2
+                (emph_pp bold pp_ty) (canon_ty ty1)
+                (emph_pp bold pp_ty) (canon_ty ty2)
           | Pat_ty (p,ty) ->
               fprintf fmt "pattern %a should have type %a"
                 (emph_pp purple Ast_pprint.pp_pat) p 
-                (emph_pp purple pp_ty) ty
+                (emph_pp purple pp_ty) (canon_ty ty)
           | AbstractTy_mismatch(x1,x2) ->
                 fprintf fmt "An expression has type %a but was expected of type %a"
                 (emph_pp bold (fun fmt () -> fprintf fmt "%s" x1)) () 
@@ -945,13 +944,13 @@ let typing_handler ?(msg="") f () =
        | Cyclic_Ty(n,t) ->
           fprintf fmt "%s@,An expression %a has a cyclic type %a\n"
             msg  (emph_pp purple Ast_pprint.pp_exp) !trace_last_exp
-            (emph_pp bold pp_ty) t
+            (emph_pp bold pp_ty) (canon_ty t)
        | Cyclic_Dur(n,dur) ->
           fprintf fmt "The type of response time %a is cyclic\n"
-          (emph_pp bold pp_dur) dur
+          (emph_pp bold pp_dur) (canon_dur dur)
        | Cyclic_Size(n,sz) ->
           fprintf fmt "The type of size %a is cyclic\n"
-          (emph_pp bold pp_size) sz
+          (emph_pp bold pp_size) (canon_size sz)
         );
           inspect l';
           List.iter (fun _ -> fprintf fmt "@]") l;
