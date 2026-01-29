@@ -96,7 +96,7 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ ~genv:_ _ _ -> ()))
                        let genv = {statics=gs'';operators=smap_of_list exts2''; externals=exts1'';sums=ts''} in
                        let w = (when_repl gs'' ~genv) in
                        List.iter (w false) ds;
-                       List.iter (w true) ds'; 
+                       List.iter (w true) ds';
                        loop (exts1'', exts2'') gs'' ts'' ds'')
                   ())
                 with End_of_file -> (exts1,exts2),gs,ts,ds
@@ -143,5 +143,5 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ ~genv:_ _ _ -> ()))
   *)
 
   (* return both parsed program and its inputs *)
-  ({genv={statics=gs_from_files;operators=smap_of_list (snd exts); externals=(fst exts);sums=ts_from_files};main}, values_list)
+  ({genv={statics=gs;operators=smap_of_list (snd exts); externals=(fst exts);sums=ts};main}, values_list)
 

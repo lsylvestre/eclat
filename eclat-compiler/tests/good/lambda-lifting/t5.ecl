@@ -1,11 +1,11 @@
 (* ./eclat -arg="()" tests/good/lambda-lifting/t5.ecl -nostdlib *)
 
-operator M.add : (int * int) => int  ;;
+operator Int.add : (int * int) => int  ;;
 
-let x = M.add(42, 1);;
+let x = Int.add(42, 1);;
 
 let f (y,()) =
-  M.add(y,x) ;;
+  Int.add(y,x) ;;
 
 let main () =
   let g z = z (1,()) (* because the environment is made 

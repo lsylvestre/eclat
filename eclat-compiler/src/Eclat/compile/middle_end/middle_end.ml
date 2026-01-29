@@ -49,6 +49,7 @@ let compile ?globalize
   (** ensure that each function is defined by a let-binding *)
   let pi = Fun_assign_name.name_pi pi in
   let pi = Unroll.unroll_pi pi in
+  let pi = Let_floating.float_pi pi in
   let pi = Anf.anf_pi pi in
   display_pi Anf pi;
   let _ = Typing.typing_with_argument pi arg_list in
