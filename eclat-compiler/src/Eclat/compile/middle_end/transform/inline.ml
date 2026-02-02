@@ -138,6 +138,11 @@ let subst_ty e = (* todo: rename this function and remove the unused parameter *
                           | _ -> prim)
                         | op -> op)
         in E_const (ss_const c)
+    | E_for(x,sz1,sz2,e1,deco) -> 
+        E_for(x,rename_size unknowns sz1,rename_size unknowns sz2,ss e1,deco)
+    | E_generate((p,(ty,tyB),e1),e2,sz1,sz2,deco) ->
+        E_generate((p,(rename_ty unknowns ty, rename_tyB unknowns tyB),ss e1),ss e2,
+                    rename_size unknowns sz1,rename_size unknowns sz2,deco)
     | e -> Ast_mapper.map ss e
   in
   let e'= ss e in
