@@ -294,6 +294,7 @@ end if_then_else;
 library ieee; 
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+use std.textio.all;
 
 package int is
   alias t is std_logic_vector;
@@ -327,18 +328,56 @@ end package;
 
 package body int is -- signed int
 
-  impure function print(signal clk: std_logic; arg: t) return t is
-      variable res : t(0 to 0) := "0";
+  procedure print_bigint(v : in t) is
+    constant k : unsigned(0 to 31)
+      := to_unsigned(10 ** 9,32); -- the largest power of 10 
+                              -- that fits into 31/32 bits 
+                              -- https://www.thecodingforums.com/threads/how-to-print-a-long-unsigned.21724/
+    variable num : signed(0 to v'length-1) := signed(v);
+    variable num_unsigned : unsigned(0 to v'length-1);
+    variable w : unsigned(0 to 31);
+    type tab_w is array (positive range <>) of unsigned(0 to 31);
+    variable a : tab_w(0 to v'length/32) := (others => to_unsigned(0,32));
+    variable i : integer := 0;
+    variable b : boolean := FALSE;
+  begin
+    if num < 0 then 
+      work.Util.echo("-"); 
+      num_unsigned := unsigned(abs(num));
+    else
+      num_unsigned := unsigned(num);
+    end if;
+    while (num_unsigned /= 0) loop
+      w := num_unsigned mod k;
+      a(a'length-1-i) := unsigned(w);
+      i := i + 1;
+      num_unsigned := num_unsigned / k;
+    end loop;
+    for j in 0 to a'length-1 loop
+      if a(j) = 0 then
+        if b then
+          work.Util.echo("000000000");
+        end if;
+      else
+        b := TRUE;
+        work.Util.echo(integer'image(to_integer(unsigned(a(j)))));
+      end if;
+    end loop;
+  end;
+
+  impure function print(signal clk:std_logic;arg:t)
+    return t is
+      variable n : integer;
     begin
       if rising_edge(clk) then
-        if arg'length <= 63 then
+        if arg'length <= 32 then  
+          n := to_integer(unsigned(arg));
           work.Util.echo(integer'image(to_integer(signed(arg))));
         else
-          work.Util.echo("<resize>");
-          work.Util.echo(integer'image(to_integer(resize(unsigned(arg),63))));
+          print_bigint(arg);
         end if;
       end if;
-      return res;
+      return "0";
     end;
 
   function resize(arg:t; k:integer) return t is
@@ -567,7 +606,7 @@ package body uint is
       end if;
       return "0";
     end function;
-  -- signed int
+  -- unsigned int
   function of_int (arg: t) return t is
     begin
       return arg;
