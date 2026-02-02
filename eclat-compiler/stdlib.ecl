@@ -57,7 +57,6 @@ operator Int.land :   (int<?n> * int<?n>) => int<?n> ;;
 operator Int.lor :    (int<?n> * int<?n>) => int<?n> ;;
 operator Int.lnot :   int<?n> => int<?n> ;;
 operator Int.lxor :   (int<?n> * int<?n>) => int<?n> ;;
-operator Int.land :   (int<?n> * int<?n>) => int<?n> ;;
 operator Int.lsl :    (int<?n> * int<?ofs>) => int<?n> ;;
 operator Int.lsr :    (int<?n> * int<?ofs>) => int<?n> ;;
 operator Int.asr :    (int<?n> * int<?ofs>) => int<?n> ;;

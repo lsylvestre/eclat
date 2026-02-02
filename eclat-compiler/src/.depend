@@ -118,6 +118,7 @@ src/Eclat/compile/middle_end/middle_end.cmo : \
     src/Eclat/compile/middle_end/normalize/move_down_gfun_under_exec_and_par.cmo \
     src/Eclat/compile/middle_end/monomorphize.cmo \
     src/Eclat/compile/middle_end/transform/matching.cmo \
+    src/Eclat/compile/middle_end/normalize/let_floating.cmo \
     src/Eclat/compile/middle_end/transform/lambda_lifting.cmo \
     src/Eclat/compile/middle_end/normalize/instantiate.cmo \
     src/Eclat/compile/middle_end/transform/insert_bound_checking.cmo \
@@ -141,6 +142,7 @@ src/Eclat/compile/middle_end/middle_end.cmx : \
     src/Eclat/compile/middle_end/normalize/move_down_gfun_under_exec_and_par.cmx \
     src/Eclat/compile/middle_end/monomorphize.cmx \
     src/Eclat/compile/middle_end/transform/matching.cmx \
+    src/Eclat/compile/middle_end/normalize/let_floating.cmx \
     src/Eclat/compile/middle_end/transform/lambda_lifting.cmx \
     src/Eclat/compile/middle_end/normalize/instantiate.cmx \
     src/Eclat/compile/middle_end/transform/insert_bound_checking.cmx \

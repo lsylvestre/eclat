@@ -1,8 +1,4 @@
-let rec f x = f(x + 1) ;;
-
-let main () =
-  f(f(42)) ;;
-
+(* ./eclat tests/good/compose.ecl -relax *)
 
 
 let rec f x = x;;

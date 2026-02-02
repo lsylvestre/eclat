@@ -59,13 +59,17 @@ module Errors = struct
 
   (** emit a warning *)
 
+  let no_warning = ref false
+
   let warning ?(warning_kw="Warning") ?loc pp : unit =
+    if !no_warning then error ?loc pp;
     let fmt = err_formatter in
     (match loc with
     | None -> ()
     | Some loc -> fprintf fmt "%s%a%s:\n" bold pp_loc loc reset);
     fprintf fmt "%s%s%s%s: " bold purple warning_kw reset;
-    pp fmt
+    pp fmt;
+    Format.pp_print_flush fmt ()
 
 
   (** emit syntax-error and raise [Caml_error] *)

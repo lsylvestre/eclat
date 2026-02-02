@@ -9,9 +9,9 @@ let full_add(a,b,ci) =
   let co = c1 or c2 in
   (s, co) ;;
 
-let add_n((x, y, ci) : int<'N> * int<'N> * bool) : int<'N> =
+let add_n((x, y, ci) : int<?n> * int<?n> * bool) : int<?n> =
   let (result,co) = 
-    iterate<1 to 'N> (fun (i,(res,ci)) ->
+    iterate<1 to ?n> (fun (i,(res,ci)) ->
       let z = size_val res in
       let a = get_bit(x,z-i) in
       let b = get_bit(y,z-i) in 

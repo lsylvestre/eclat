@@ -1,8 +1,7 @@
 type `a vect<?s> ;;
 
-operator M.f : `a => `a vect <?a> ;;
+operator M.f : `a => `a vect <?n> ;;
 let g <<?s>> y : `a vect<?s> = M.f y;;
-
 
 let main () =
    let a = g<<4>> (0) in

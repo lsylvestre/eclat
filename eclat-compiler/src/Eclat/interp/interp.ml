@@ -68,7 +68,7 @@ let error_cannot_be_reduced e =
   subse e
 
 
-let instance ty v e =
+let instance ~genv ty v e =
   let size_match_val sz1 sz2 = match Types.canon_size sz1,Types.canon_size sz2 with 
     Types.Sz_var {contents=Unknown id},Types.Sz_lit n -> (* Printf.printf "===>%d|%d\n" id n; *) [(id,n)]
     | Sz_lit _ , _ -> [] 
@@ -84,13 +84,13 @@ let instance ty v e =
     | Ty_fun(ty1,d,tyB2),Ty_fun(ty1',_,tyB2') ->
           match_ty ty1 ty1' @ match_ty (Ty_base tyB2) (Ty_base tyB2')
     | _ -> [] in
-  let rec type_of v = 
+  let rec type_of ~genv v = 
     match v with
     | E_const(Inj _ | C_appInj _) -> 
         Prelude.Errors.raise_error 
            ~msg:"sum type not supported in evaluation mode" ()
     | E_const(c) -> Types.Ty_base (Typing.typ_const ~loc:Prelude.dloc SMap.empty c)
-    | E_tuple(es) -> (Ty_tuple (List.map type_of es))
+    | E_tuple(es) -> (Ty_tuple (List.map (type_of ~genv) es))
     | E_fun(_,(ty,tyr),_) -> Types.Ty_fun(ty,Types.new_dur_unknown(), tyr)
     | E_fix(_,(_,(ty,tyr),_)) -> Types.Ty_fun(ty,Types.new_dur_unknown(), tyr)
   (* let rec match_val ty v =
@@ -101,7 +101,7 @@ let instance ty v e =
     | Ty_fun(ty1,d,tyB2),E_fun(_,ty1',tyB2'),_) ->
     | _ -> []*)
   in
-  subst_sz_var (match_ty ty (type_of v)) e
+  subst_sz_var (match_ty ty (type_of ~genv v)) e
 
 let set_buffer x e1 e2 r =
   match e1 with
@@ -234,7 +234,7 @@ let rec find_case c hs =
 open Format
 let fmt = Format.std_formatter
 
-let rec red (e,r) =
+let rec red ~genv (e,r) =
    (* fprintf fmt "%a\n" Ast_pprint.pp_exp  e ;
    (fprintf fmt "i: ";
              SMap.iter (fun x e -> fprintf fmt "    (%s %a)\n" x Ast_pprint.pp_exp e) r.mu;
@@ -243,7 +243,7 @@ let rec red (e,r) =
     let rec aux acc es r =
       match es with
       | [] -> List.rev acc,r
-      | e1::es' -> let e1',r1 = red (e1,r) in
+      | e1::es' -> let e1',r1 = red ~genv (e1,r) in
                    aux (e1' :: acc) es' r1
     in aux [] es r
   in
@@ -254,50 +254,50 @@ let rec red (e,r) =
   ) 
   else
   match e with
-  | E_deco(e1,_) -> red (e1,r)
+  | E_deco(e1,_) -> red ~genv (e1,r)
   | E_const _ | E_fun (_,_, _) | E_fix (_, _) ->
       assert false (* see [REDUCE-VAL] *)
   | E_var x -> 
       (* we reduce only close expressions *)
       Prelude.Errors.raise_error ~msg:("unbound variable "^x) ()
   | E_if(e,e1,e2) ->
-     (match red (e,r) with
+     (match red ~genv (e,r) with
      | E_const (Bool true),r' ->
          (* [REDUCE-IF-TRUE] *)
-        red (e1,r')
+        red ~genv (e1,r')
      | E_const (Bool false),r' ->
         (* [REDUCE-IF-FALSE] *)
-        red (e2,r')
+        red ~genv (e2,r')
      | (e',r') ->
         (* [REDUCE-IF-PAUSE] *)
         E_if(e',e1,e2),r')
   | E_case(e,hs,e_els) ->
-     (match red (e,r) with
+     (match red ~genv (e,r) with
       | (E_const c,r') ->
          (* [REDUCE-CASE-SELECT] *)
          (match find_case c hs with
-          | None -> red (e_els,r')
-          | Some ei -> red (ei,r'))
+          | None -> red ~genv (e_els,r')
+          | Some ei -> red ~genv (ei,r'))
       | (e',r') ->
          (* [REDUCE-CASE-PAUSE] *)
          E_case(e',hs,e_els),r')
   | E_match(e,hs,eo) ->
-     (match red (e,r) with
+     (match red ~genv (e,r) with
       | (E_app(E_const (Inj ctor),(E_const _ as v)),r') ->
          (* [REDUCE-MATCH-SELECT] *)
          (match List.assoc_opt ctor hs with
           | None -> (match eo with
                      | None -> Prelude.Errors.raise_error ~msg:"match failure" ()
                      | Some e' -> (e',r))
-          | Some (p,ei) -> red ((subst_p_e p v ei),r'))
+          | Some (p,ei) -> red ~genv ((subst_p_e p v ei),r'))
       | (e',r') ->
          (* [REDUCE-CASE-PAUSE] *)
          E_match(e',hs,eo),r')
   | E_letIn(p,ty,e1,e2) ->
-    let e1',r' = red (e1,r) in
+    let e1',r' = red ~genv (e1,r) in
     if evaluated e1'
     then (* [REDUCE-LET-VAL] *)
-      red (subst_p_e p e1' e2,  r')
+      red ~genv (subst_p_e p e1' e2,  r')
     else (* [REDUCE-LET-PAUSE] *)
       (E_letIn(p,ty,e1',e2),r')
   | E_tuple es ->
@@ -308,7 +308,7 @@ let rec red (e,r) =
               let es' = List.rev acc in 
               (E_tuple es',r)
       | e1::es' ->
-        let e1',r' = red (e1,r) in
+        let e1',r' = red ~genv (e1,r) in
         if evaluated e1' then
           loop (e1'::acc) es' r' 
         else
@@ -319,34 +319,34 @@ let rec red (e,r) =
       loop [] es r
   | E_app(E_const (Op (TyConstr ty)),e2) ->
       (* let e2 = instance t e2 in *)
-      let e',mu' = red (e2(*id_tau e2 t*),r) in
+      let e',mu' = red ~genv (e2(*id_tau e2 t*),r) in
       if evaluated e' then (e',mu') else (E_app(E_const (Op (TyConstr ty)),e'),mu')
   | E_app(e1,e2) ->
-      let e2',r' = red (e2,r) in
+      let e2',r' = red ~genv (e2,r) in
       if not (evaluated e2')
       then (* [REDUCE-APP-PAUSE] *)
         (E_app(e1,e2'), r')
       else
         let v = e2' in
-        let e1',r'' = red (e1,r') in
+        let e1',r'' = red ~genv (e1,r') in
         (match e1' with
          | E_const c -> app_const e1' v r''
          | E_fun(p,(ty,_),e) ->
-             let e1 = instance ty v e in
+             let e1 = instance ~genv ty v e in
              let e' = subst_p_e p v e1 in
-             red (e',r'')
+             red ~genv (e',r'')
          | (E_fix(g,(p,(ty,_),e))) as w ->
-             let e = instance ty v e in
+             let e = instance ~genv ty v e in
              (E_letIn(p,ty,v,subst_e g w e)),r''  
             (** we do not substituate [p] by [v] in [e] directly as the redex must not be a value *)
          | _ -> assert false)
   | E_reg((p,tyB,e1),e0,l) ->
       (* [Reg] *)
-      let v0,r = red (e0,r) in
+      let v0,r = red ~genv (e0,r) in
       let v = match SMap.find_opt l r.mu with
               | None -> v0
               | Some v -> v in
-      let v',r = red (E_letIn(p,Ty_base tyB,v,e1),r) in
+      let v',r = red ~genv (E_letIn(p,Ty_base tyB,v,e1),r) in
       v', add_r l v' r
   (* | E_set(e1,e2) ->
      (* [Set] *)
@@ -357,7 +357,7 @@ let rec red (e,r) =
       let r = match eo3 with
               | None -> r
               | Some(e3) ->
-                 let v3,r = red (e3,r) in
+                 let v3,r = red ~genv (e3,r) in
                  assert (evaluated v3);
                  (match v3 with
                   | E_const (Bool false) ->
@@ -368,17 +368,17 @@ let rec red (e,r) =
       if not (SMap.mem k r.mu) then
         (* [REDUCE-EXEC-INIT] *)
         let r' = add_r k e1 r in
-        red (E_exec (e1,e2,eo3,k),r')
+        red ~genv (E_exec (e1,e2,eo3,k),r')
       else
         let e = SMap.find k r.mu in
-        let e',r' = red (e,r) in
+        let e',r' = red ~genv (e,r) in
         if evaluated e' then
           (* [REDUCE-EXEC-VAL] *)
           (* let e1',r' = red (e1,r') in*)
           E_tuple[e';E_const(Bool true)], (remove_r k r')
         else
           (* [REDUCE-EXEC-DEFAULT] *)
-          let v2,r'' = red (e2,r') in
+          let v2,r'' = red ~genv (e2,r') in
           assert (evaluated v2);
           E_tuple[v2;E_const(Bool false)], (add_r k e' r'')
   | E_par(es) ->
@@ -397,14 +397,14 @@ let rec red (e,r) =
       let any_constant = Unit in
       E_const (V_loc l), {r with statics = SMap.add l (Array.make n any_constant) r.statics}
   | E_array_get ((x,loc),e1) ->
-      let e1',r1 = red (e1,r) in
+      let e1',r1 = red ~genv (e1,r) in
       if evaluated e1' then E_const (buffer_get x e1' r),r else
       E_array_get ((x,loc),e1'),r1
   | E_array_length(x,_) ->
       E_const(buffer_length x r),r
   | E_array_set ((x,loc),e1,e2) ->
-      let e1',r1 = red (e1,r) in
-      let e2',r2 = red (e2,r1) in
+      let e1',r1 = red ~genv (e1,r) in
+      let e2',r2 = red ~genv (e2,r1) in
       if evaluated e1' && evaluated e2' then E_const(Unit), set_buffer x e1' e2' r else
       E_array_set ((x,loc),e1',e2'),r2
   | E_generate _ 
@@ -412,12 +412,12 @@ let rec red (e,r) =
   | E_pause (_,e) -> E_letIn(P_unit,Ty_base(TyB_unit),E_const(Unit),e),r
 
 
-let eval_prog mu main v =
+let eval_prog ~genv mu main v =
   (* fprintf fmt "%a\n" Ast_pprint.pp_exp  main ;*)
-  let e',mu' = red ((E_app(main,v)), mu) in
+  let e',mu' = red ~genv ((E_app(main,v)), mu) in
   (e',mu') ;;
 
-let eval n mu main vs ty =
+let eval ~genv n mu main vs ty =
   if vs = [] then (
     Prelude.Errors.error (fun fmt ->
        Format.fprintf fmt "@[<v>Arguments needed to evaluate the program (see option -arg)@]")
@@ -437,7 +437,7 @@ let eval n mu main vs ty =
        fprintf std_formatter "@[<v 0>%a : " 
                   (emph_pp blue (fun fmt () -> fprintf fmt "cycle %d" i)) ();
        fprintf std_formatter "%a --> " Ast_pprint.pp_exp v ;
-       (let e',mu' = eval_prog mu ef v in
+       (let e',mu' = eval_prog ~genv mu ef v in
         if evaluated e' then (
            let v' = e' in
            fprintf std_formatter "%a@,"
@@ -461,6 +461,6 @@ let interp_pi ~nb_iterations (pi : pi) (value_list : e list) ty : (e * r) =
   let r = { r_init with statics = prepare_statics pi.genv.statics } in
   let targ = Types.new_ty_unknown () in
   Typing.unify_ty ~loc:Prelude.dloc ty (Ty_fun(targ,Types.new_dur_unknown(), Types.new_tyB_unknown ()));
-  eval nb_iterations r (* (ty_annot ~ty*) pi.main value_list targ;
+  eval ~genv:pi.genv nb_iterations r (* (ty_annot ~ty*) pi.main value_list targ;
   (E_const Unit, r_init) ;;
 

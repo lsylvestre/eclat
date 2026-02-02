@@ -4,7 +4,7 @@ let size_ty_opt = function
 | None -> 1
 | Some t -> Gen_vhdl_aux.size_ty t
 
-let gen_testbench fmt ?(vhdl_comment="") ~operators ~externals typing_env name ty ((argument,ta),(result,tr)) (args_for_simul: _ list) =
+let gen_testbench fmt ?(vhdl_comment="") ~genv typing_env name ty ((argument,ta),(result,tr)) (args_for_simul: _ list) =
   let argument_size = size_ty_opt ta in
   let result_size = size_ty_opt tr in
 
@@ -14,7 +14,7 @@ let gen_testbench fmt ?(vhdl_comment="") ~operators ~externals typing_env name t
       let s_arg = Flat_let_atom.flat_s (MiniHDL_syntax.set_ tmp arg_for_simul) in
       MiniHDL_typing.typing_error_handler @@ (fun () ->
         Option.iter (fun t -> MiniHDL_typing.add_typing_env typing_env_tb tmp t) ta;
-        MiniHDL_typing.typing_s ~operators ~externals ~result:tmp typing_env_tb s_arg;
+        MiniHDL_typing.typing_s ~genv ~result:tmp typing_env_tb s_arg;
         s_arg)) args_for_simul in
 
   fprintf fmt "@[<v>%s@]" vhdl_comment;
@@ -93,7 +93,7 @@ architecture tb of tb_%s is
     wait for 5 ns;@,";
 
   List.iter (fun s_arg ->
-    fprintf fmt "      @[<v>%a@]@," (Gen_vhdl.pp_s operators externals ~st:"fake") s_arg;
+    fprintf fmt "      @[<v>%a@]@," (Gen_vhdl.pp_s ~genv ~st:"fake") s_arg;
     fprintf fmt "      tb_argument <= %a;@," Gen_vhdl_aux.pp_ident tmp; (* (Gen_vhdl.default_zero_value argument_size);*)
     fprintf fmt "wait for 10 ns;@,"
   ) ss_args;

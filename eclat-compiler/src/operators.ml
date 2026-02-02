@@ -15,7 +15,7 @@ type op =
 let combinational ~externals p =
   match p with
   | External_fun (x,_) -> (match SMap.find_opt x externals with
-                           | Some (_,(_,_,pure)) -> not(pure)
+                           | Some (_,(_,_,pure,_)) -> not(pure)
                            | None -> true)
   | _ -> true
 
@@ -65,7 +65,7 @@ let gen_op ~operators fmt (op:op) pp a : unit =
   | Unroll _ -> assert false (* should be eliminated before *)
   | External_fun (x,_) ->
       (match SMap.find_opt x operators with
-       | Some (t,(_,_,is_imp)) ->
+       | Some (t,(_,_,is_imp,_)) ->
           if is_imp 
           then procall fmt (Printf.sprintf "work.%s" x)
           else funcall fmt (Printf.sprintf "work.%s" x)

@@ -9,11 +9,11 @@ let map_worker (f,r,src,dst) =
     else ()
   in loop();;
 
-let map_farm ((( p, f, src), k) : (('A * 'B * array<'N>) * 'D)) : 'E = 
-  let dst = create<'N> () in
+let map_farm<<?n>><<?p>> ((f, src), k) : 'E = 
+  let dst = create<?n> () in
   let r = create<1> () in
   set(r,0,0);
-  parfor i = 0 to p - 1 do
+  parfor i = 1 to ?p do
     map_worker(f,r,src,dst)
   done;
   k(dst) ;;
@@ -50,10 +50,11 @@ let main () =
 
       init_array(a); (* note: initialization takes time *)
     
-      let p = 2 (* degree of parallelism *)
-      in 
-      (map_farm(p,collatz,a) @@ fun t -> ()) 
-  default () in
-if rdy then (print_string " cy="; 
-             print_int (cy); 
-             print_newline()) ;;
+      (* 2 : degree of parallelism *)
+      let k = fun t -> () in
+      map_farm (<<100>>,<<2>>,((collatz,a),k))
+    default () 
+  in
+  if rdy then (print_string " cy="; 
+               print_int (cy); 
+               print_newline()) ;;

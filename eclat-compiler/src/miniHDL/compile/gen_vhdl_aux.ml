@@ -140,7 +140,7 @@ let rec pp_c fmt c =
       fprintf fmt "%a & %s" pp_c c (const_zero (n - size_const c))
 
 (** code generator for tuples deconstruction *)
-let rec pp_tuple_access operators fmt (i:int) ty (a:a) : unit =
+let rec pp_tuple_access ~genv fmt (i:int) ty (a:a) : unit =
 
   let rec tuple_access i ty_a a =
       (* compute bounds of the value to be accessed at index [i_to_find]
@@ -180,22 +180,22 @@ let rec pp_tuple_access operators fmt (i:int) ty (a:a) : unit =
         (* this case is use to avoid a strange failure (a GHDL bug ?)
            during simulation (overflow detected)
            when using slice x(j to k) of size 1 (i.e., j = k) *)
-        fprintf fmt "\"\"&%a(%d)" (pp_a operators) a j
+        fprintf fmt "\"\"&%a(%d)" (pp_a ~genv) a j
       else
       let pp_slice fmt (j,k) =
         fprintf fmt "%d to %d" j k
       in
-      fprintf fmt "%a(%a)" (pp_a operators) a pp_slice (j,k)
-  | `Atom(a) -> pp_a operators fmt a
+      fprintf fmt "%a(%a)" (pp_a ~genv) a pp_slice (j,k)
+  | `Atom(a) -> pp_a ~genv fmt a
 
 
 (** code generator for operator call *)
-and pp_call operators fmt (op,a) =
+and pp_call ~genv fmt (op,a) =
   match op with
-  | GetTuple(i,_,ty) -> pp_tuple_access operators fmt i ty a
+  | GetTuple(i,_,ty) -> pp_tuple_access ~genv fmt i ty a
   | Runtime(External_fun (x,ty)) ->
-      let annot_with_sizes,arity = match Ast.SMap.find_opt x operators with
-                                   | Some (_,(b,n,_)) -> (b,n)
+      let annot_with_sizes,arity = match Ast.SMap.find_opt x Ast.(genv.operators) with
+                                   | Some (_,(b,n,_,_)) -> (b,n)
                                    | None -> false,1 in
       (* let rec extract_tyB tyB =
         match Types.canon_tyB tyB with
@@ -205,8 +205,8 @@ and pp_call operators fmt (op,a) =
         | _ -> []
       in*)
       fprintf fmt "@[work.%s(" x;
-      (match Ast.SMap.find_opt x operators with
-       | Some (t,(_,_,is_imp)) -> if is_imp then  fprintf fmt "clk," else ()
+      (match Ast.SMap.find_opt x Ast.(genv.operators) with
+       | Some (t,(_,_,is_imp,_)) -> if is_imp then  fprintf fmt "clk," else ()
        | None -> Prelude.Errors.raise_error ~msg:("unbound operator "^x) ()
       );
       if annot_with_sizes then (
@@ -220,11 +220,11 @@ and pp_call operators fmt (op,a) =
       (match a with
       | A_tuple aa when arity > 1 -> 
          fprintf fmt "@[%a)@]"
-            (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt ", ") (pp_a operators)) aa
-      | _ -> fprintf fmt "@[%a)@]" (pp_a operators) a);
+            (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt ", ") (pp_a ~genv)) aa
+      | _ -> fprintf fmt "@[%a)@]" (pp_a ~genv) a);
       fprintf fmt "@]"
-  | Runtime p -> Operators.gen_op ~operators fmt p (pp_a operators) a
-  | _ -> fprintf fmt "@[%a(%a)@]" pp_op op (pp_a operators) a
+  | Runtime p -> Operators.gen_op ~operators:Ast.(genv.operators) fmt p (pp_a ~genv) a
+  | _ -> fprintf fmt "@[%a(%a)@]" pp_op op (pp_a ~genv) a
 
 (** code generator for operator *)
 and pp_op fmt = function
@@ -235,16 +235,16 @@ and pp_op fmt = function
 
 (** code generator for atoms (i.e. combinatorial expression) *)
 (* assumes that the let-bindings of atoms are not nested *)
-and pp_a operators fmt = function
+and pp_a ~genv fmt = function
 | A_const c -> pp_c fmt c
 | A_var x
 | A_sig_get x -> fprintf fmt "%a" pp_ident x
 | A_call(op,a) ->
-   pp_call operators fmt (op,a)
+   pp_call ~genv fmt (op,a)
 | A_letIn(x,a1,a2) ->
    assert false (* flattening needed before *) (* fprintf fmt "@[%a := %a;@,%a@]" pp_ident x pp_a operators a1 pp_a operators a2*)
-| A_tuple aas -> pp_tuple fmt (pp_a operators) aas
-| A_vector aas -> pp_vector fmt (pp_a operators) aas
+| A_tuple aas -> pp_tuple fmt (pp_a ~genv) aas
+| A_vector aas -> pp_vector fmt (pp_a ~genv) aas
 | A_string_get(s,i) ->
     let i_norm = norm_ident i in
     fprintf fmt "@[%a(to_integer(unsigned(%s&\"000\")) to to_integer(unsigned(%s&\"000\"))+7)@]"
@@ -264,7 +264,7 @@ and pp_a operators fmt = function
    fprintf fmt "%a(0 to %d)" pp_ident y (size_ty ty - 1)
 
 
-let print_external fmt (n,(ty,shared)) =
+let print_external fmt (n,(ty,shared,_)) =
   let arg,d,ret = match ty with
   | Types.Ty_fun(arg,d,ret) -> 
       size_ty MiniHDL_typing.(translate_ty arg),d, size_ty MiniHDL_typing.(translate_tyB ret)
@@ -285,7 +285,7 @@ let print_external fmt (n,(ty,shared)) =
   fprintf fmt "@]);@,end component;@,@,@]"
 
 
-let instantiate_external fmt (n,(_,shared)) =    
+let instantiate_external fmt (n,(_,shared,_)) =    
   let instances = match Hashtbl.find_opt Count_externals.external_count n with
                   | None -> Count_externals.SMap.empty
                   | Some v -> v in
@@ -300,7 +300,7 @@ let instantiate_external fmt (n,(_,shared)) =
 
 
 
-let variable_decl_go_external fmt (n,(ty,_)) =    
+let variable_decl_go_external fmt (n,(ty,_,_)) =    
   let ty_arg = match ty with
   | Types.Ty_fun(arg,_,_) -> 
       MiniHDL_typing.(translate_ty arg)

@@ -83,16 +83,17 @@ let static data_rom = ((0,false))^2048 ;;
   (code.(19) <- GROUP4(APPLY(true,1,0)));
   (code.(20) <- ADD(false,0));
   (code.(21) <- GROUP4(RETURN(1)));
-  (code.(22) <- GROUP4(CLOSUREREC(1,0,31,5)));
+  (code.(22) <- GROUP4(CLOSUREREC(1,0,32,5)));
   (code.(23) <- CONST(42));
   (code.(24) <- GROUP4(CALL(18,false,false,false,false)));
   (code.(25) <- CONST(7));
   (code.(26) <- PUSH());
   (code.(27) <- ACC(2));
   (code.(28) <- GROUP4(APPLY(true,1,0)));
-  (code.(29) <- POP(1));
-  (code.(30) <- GROUP3(STOP()));
-  (code.(31) <- LABEL(5));
+  (code.(29) <- GROUP4(CALL(18,false,false,false,false)));
+  (code.(30) <- POP(1));
+  (code.(31) <- GROUP3(STOP()));
+  (code.(32) <- LABEL(5));
   ()
  ;;
 

@@ -136,17 +136,21 @@ type pi = {
    main : e    (** body *)
 }
 and genv = {
-  statics : 
+  statics :
     (** ordered sequence of static global arrays *)
     (x * static) list ; 
   
+  abstract_types : (string * Types.size list * Types.tyB list * int list) SMap.t ; 
+    (* each type in the map is the shape 
+       of the corresponding abstract type *)
+
   operators : 
     (* external,combinational operators (e.g., VHDL functions) *)
-    (ty * (bool * int * bool)) SMap.t ;
+    (ty * (bool * int * bool * Prelude.loc)) SMap.t ;
   
   externals :
      (* external functions (e.g., VHDL modules) *)
-     (x * (ty * bool)) list ;
+     (x * (ty * bool * Prelude.loc)) list ;
   
   sums : 
      (** sum types, non recursive *)
@@ -267,8 +271,10 @@ let rec e2c e =
 
 
 
-
-let typ_decl_abstract : (string, string * Types.size list * int list) Hashtbl.t 
+(* todo: avoid this global variable (and associated side effects) *)
+let typ_decl_abstract : (string, string * Types.size list * Types.tyB list * int list) Hashtbl.t 
   = Hashtbl.create 10
 
+let create_abstract_type_smap () =
+  SMap.of_seq @@ Hashtbl.to_seq typ_decl_abstract
 

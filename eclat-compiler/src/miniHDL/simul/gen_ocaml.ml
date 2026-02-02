@@ -133,7 +133,7 @@ let rec pp_call operators typing_env res fmt (op,a) =
           qualified identifier in OCaml
           e.g. VHDL function Int.lor becomes OCaml value Int.lor_ *)
       let annot_with_sizes,arity = match SMap.find_opt x operators with
-                                   | Some (_,(b,n,_)) -> (b,n)
+                                   | Some (_,(b,n,_,_)) -> (b,n)
                                    | None -> false,1 in
       fprintf fmt "%s_ " x;
       if annot_with_sizes then (let extra = match Types.canon_ty ty with
@@ -163,13 +163,19 @@ and pp_op fmt = function
 | GetTuple (i,_,_) -> assert false (* special case, defined below (see tuple_access) *)
 
 (** code generator for atoms (i.e. combinatorial expression) *)
-(* assumes that the let-bindings of atoms are not nested *)
+(** This supports atoms having let-bindings, 
+    which occurs sometimes in the translation 
+    of argument list (e.g., -arg="A(5)") 
+  *)
 and pp_a typing_env operators fmt = function
 | A_const c -> pp_c fmt c
 | A_var x -> fprintf fmt "!%a" pp_ident x
 | A_call(op,a) ->
    pp_call operators typing_env None fmt (op,a)
-| A_letIn _ -> assert false (* flattening needed before *)
+| A_letIn(x,a1,a2) ->
+   fprintf fmt "let %a = %a in %a" pp_ident x 
+     (pp_a typing_env operators) a1
+     (pp_a typing_env operators) a2
 | A_tuple aas -> pp_tuple (pp_a typing_env operators) fmt aas
 | A_vector aas -> pp_vector fmt (pp_a typing_env operators) aas
 | A_string_get(s,i) ->

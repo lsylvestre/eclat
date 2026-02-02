@@ -53,7 +53,8 @@ let rec simple_atom e =
 
 let propagation ~genv e =
   let _propagable e =
-    if !flag_propagate_combinational_linear then Instantaneous.combinational ~with_sig_get:false ~externals:genv.operators e 
+    if !flag_propagate_combinational_linear 
+    then Instantaneous.combinational ~with_sig_get:false ~externals:genv.operators e 
                                   && (SMap.cardinal (linear_bindings e) <= 1) else
     simple_atom e
   in

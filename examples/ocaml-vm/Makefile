@@ -32,7 +32,6 @@ CLK=clk
 
 externals:
 	(cd $(ECLAT_COMPILER); ./eclat -main=comparator $(ECLAT_FLAGS) \
-	   stdlib.ecl \
 	   $(VM_FROM_ECLAT_COMPILER)/vm/int.ecl \
 	   $(VM_FROM_ECLAT_COMPILER)/vm/opcode.ecl \
 	   $(VM_FROM_ECLAT_COMPILER)/vm/externals/comparator.ecl)
@@ -40,7 +39,6 @@ externals:
 vm: $(ECLAT_COMPILER)/eclat
 	(cd $(ECLAT_COMPILER); ./eclat $(ECLAT_FLAGS) \
 		    $(FLAGS) -arg=$(ARG) \
-		    stdlib.ecl \
 	        $(VM_FROM_ECLAT_COMPILER)/vm/int.ecl \
 	        $(VM_FROM_ECLAT_COMPILER)/vm/static.ecl \
 	        $(VM_FROM_ECLAT_COMPILER)/vm/mlvalue.ecl \

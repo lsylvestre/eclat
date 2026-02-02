@@ -5,7 +5,9 @@ let has_changed = ref false
 
 let eval_size ~loc sz =
   match Types.canon_size sz with
-  | Types.Sz_lit n -> Printf.printf "=======================> %d\n\n" n; (n,Types.new_size_unknown())
+  | Types.Sz_lit n -> 
+      (* Printf.printf "=======================> %d\n\n" n; *)
+      (n,Types.new_size_unknown())
   | _ -> let open Prelude.Errors in
          error ~loc (fun fmt ->
          Format.fprintf fmt

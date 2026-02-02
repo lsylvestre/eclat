@@ -114,13 +114,14 @@ let rec unify_dur ~loc d1 d2 =
 
   let warning_loss_of_precision d d' var =
     Prelude.Errors.warning ~loc (fun fmt ->
-        Format.fprintf fmt "don't know how to unify durations %a and %a.\nVariable %a is arbitrarily set to 1 (this is safe but result in a loss of precision)"
+        Format.fprintf fmt "don't know how to unify durations %a and %a.\nVariable %a is set to 1 (this is safe, with loss of precision)\n"
           pp_dur d pp_dur d' pp_dur (Dur_var var))
   in
 
   let d1,d2 = canon_dur d1,canon_dur d2 in
-  (* Format.fprintf Format.std_formatter "-- ====> %a / %a\n"  pp_dur  d1  pp_dur  d2;  *)
+  (* Format.fprintf Format.std_formatter "-- ====> %a / %a\n"  pp_dur  d1  pp_dur  d2; *)
   match d1,d2 with
+  | Dur_zero,Dur_one -> () (* 0 <= 1 *)
   | Dur_zero,Dur_zero
   | Dur_one,Dur_one -> ()
   | d1,Dur_var {contents=Is d2}
@@ -147,7 +148,7 @@ let rec unify_dur ~loc d1 d2 =
   | Dur_max(d1,d2),Dur_zero
   | Dur_zero,Dur_max(d1,d2) ->
       unify_dur ~loc d1 Dur_zero;
-      unify_dur ~loc d1 Dur_zero;
+      unify_dur ~loc d1 Dur_zero
   | Dur_max(Dur_var ({contents=(Unknown{id=n;_})} as r1),Dur_var ({contents=(Unknown{id=m;_})} as r2)),d2 ->
     if n = m then let d = Dur_var r1 in r2 := Is d; unify_dur ~loc d d2 else
       (warning_loss_of_precision d1 d2 r1;
@@ -163,7 +164,7 @@ let rec unify_dur ~loc d1 d2 =
 
 (* let () =  (* test *)
    Printf.printf "===>\n";
-   unify_dur ~loc:Prelude.dloc (Dur_max(new_dur_unknown(),new_dur_unknown()))
+   unify_dur ~loc (Dur_max(new_dur_unknown(),new_dur_unknown()))
                               (Dur_max(new_dur_unknown(),new_dur_unknown())) *)
 
 let rec unify_tyB ~loc tyB1 tyB2 =
@@ -275,35 +276,35 @@ let unify_ty ~loc ty1 ty2 =
     | Ty_tuple ty_list1, Ty_tuple ty_list2 ->
       if List.compare_lengths ty_list1 ty_list2 <> 0 then
         raise @@ CannotUnify(loc,(Imcompatible_length(ty1, ty2))::[]);
-      List.iter2 (unify ~loc:Prelude.dloc) ty_list1 ty_list2
+      List.iter2 (unify ~loc) ty_list1 ty_list2
     | Ty_fun(ty1,d1,tyB1),Ty_fun(ty2,d2,tyB2) ->
-        unify ~loc:Prelude.dloc ty1 ty2;
-        unify_dur ~loc:Prelude.dloc d1 d2;
-        unify_tyB ~loc:Prelude.dloc tyB1 tyB2
+        unify ~loc ty1 ty2;
+        unify_dur ~loc d1 d2;
+        unify_tyB ~loc tyB1 tyB2
     | Ty_ref(tyB1),Ty_ref(tyB2) ->
-        unify_tyB ~loc:Prelude.dloc tyB1 tyB2 
+        unify_tyB ~loc tyB1 tyB2 
     | Ty_array(sz1,tyB1),Ty_array(sz2,tyB2) ->
-        unify_size ~loc:Prelude.dloc sz1 sz2;
-        unify_tyB ~loc:Prelude.dloc tyB1 tyB2
+        unify_size ~loc sz1 sz2;
+        unify_tyB ~loc tyB1 tyB2
     | Ty_signal(tyB1),Ty_signal(tyB2) ->
-        unify_tyB ~loc:Prelude.dloc tyB1 tyB2
+        unify_tyB ~loc tyB1 tyB2
     | Ty_trap(tyB1),Ty_trap(tyB2) ->
-        unify_tyB ~loc:Prelude.dloc tyB1 tyB2
+        unify_tyB ~loc tyB1 tyB2
     | Ty_base (TyB_tuple tyB_list), Ty_tuple ty_list ->
         if List.compare_lengths tyB_list ty_list <> 0 then
           raise @@ CannotUnify(loc,(Imcompatible_length(ty1, ty2))::[]);
-        List.iter2 (fun tyB ty -> unify ~loc:Prelude.dloc (Ty_base tyB) ty) tyB_list ty_list
+        List.iter2 (fun tyB ty -> unify ~loc (Ty_base tyB) ty) tyB_list ty_list
     | Ty_tuple ty_list, Ty_base (TyB_tuple tyB_list) ->
         if List.compare_lengths tyB_list ty_list <> 0 then
           raise @@ CannotUnify(loc,(Imcompatible_length(ty1, ty2))::[]);
-        List.iter2 (fun ty tyB -> unify ~loc:Prelude.dloc ty (Ty_base tyB)) ty_list tyB_list
+        List.iter2 (fun ty tyB -> unify ~loc ty (Ty_base tyB)) ty_list tyB_list
 
     | Ty_base tyB, Ty_tuple ty_list ->
         let tyB_list = List.map (fun _ -> new_tyB_unknown()) ty_list in
         unify ~loc ty1 (Ty_base (TyB_tuple tyB_list));
         unify ~loc ty1 ty2;
     | Ty_tuple ty_list, Ty_base tyB ->
-        List.iter (fun ty -> unify ~loc:Prelude.dloc ty (Ty_base (new_tyB_unknown()))) ty_list;
+        List.iter (fun ty -> unify ~loc ty (Ty_base (new_tyB_unknown()))) ty_list;
         unify ~loc ty1 ty2
 
     | Ty_base tyB1,_ ->
@@ -356,14 +357,14 @@ let ty_bindings ~loc p ty =
         let _ts_found = List.map (fun _ -> new_ty_unknown ()) ps in
         raise @@ CannotUnify(loc,Imcompatible_length(Ty_tuple _ts_found, ty)::[])
       else
-        List.fold_left2 (fun m p t -> ty_bindings_aux ~loc:Prelude.dloc p t ++ m) SMap.empty ps ts
+        List.fold_left2 (fun m p t -> ty_bindings_aux ~loc p t ++ m) SMap.empty ps ts
     | P_unit,ty ->
       unify_ty ~loc ty (Ty_base TyB_unit);
       SMap.empty
     | P_tuple ps,ty ->
       let ty_list = List.map (fun _ -> new_ty_unknown ()) ps in
       unify_ty ~loc ty (Ty_tuple ty_list);
-      List.fold_left2 (fun m p t -> ty_bindings_aux ~loc:Prelude.dloc p t ++ m) SMap.empty ps ty_list
+      List.fold_left2 (fun m p t -> ty_bindings_aux ~loc p t ++ m) SMap.empty ps ty_list
   in 
   try ty_bindings_aux ~loc p ty with
   | CannotUnify(loc0,l) ->
@@ -783,7 +784,7 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
     let ty1,d1 = typ_exp ~collect_sig ~statics ~genv ~ctors
                        ~toplevel ~loc:(loc_of e1) g e1 in (* TODO: force ty2 to be a base type *)
     (match List.assoc_opt i genv.externals with
-    | Some (ty,shared) ->
+    | Some (ty,shared,_) ->
         let d2 = (if shared then Dur_one else Dur_zero) in
         let tyB = new_tyB_unknown () in
         let d3 = new_dur_unknown() in
@@ -983,10 +984,8 @@ let env_extend_operators env operators =
     SMap.add x (generalize (SMap.bindings env) ty) env) operators env ;;
 
 let env_extend_externals env externals =
-  List.fold_left (fun env (x,(ty,_)) ->
-    SMap.add x (generalize (SMap.bindings env) ty) env) env externals ;;
-
-
+  List.fold_left (fun env (x,(ty,_,_)) ->
+    SMap.add x (Forall(Vs.empty, ty)) env) env externals ;;
 
 let typing ?collect_sig ?(env=SMap.empty) ?(msg="") ~statics ~genv e =
   let loc = loc_of e in
@@ -1083,13 +1082,29 @@ let typing_with_argument ?(get_vector_size=true) ?collect_sig ({genv;main} : pi)
          let t = canon_ty ty in
          match t with
          | Ty_fun(_,dur,_) ->
-           if (canon_dur dur) <> Dur_zero then
+            (try unify_dur ~loc:(loc_of e) dur Dur_zero
+             with CannotUnify _ -> 
+               let open Prelude.Errors in
+               error (fun fmt ->
+                   Format.fprintf fmt
+                     "@[<v>This program has type %a. It is not reactive. @]" (* Hint: use eta-expansion. *)
+                     (emph_pp green pp_ty) t))
+         | _ -> assert false);
+
+      let () =
+         let t = canon_ty ty in
+         match t with
+         | Ty_fun(ty_arg,_,_) ->
+           (try
+              unify_ty ~loc:(loc_of e) 
+                 ty_arg (Ty_base (new_tyB_unknown()));
+            with CannotUnify _ ->
              let open Prelude.Errors in
              error (fun fmt ->
                  Format.fprintf fmt
-                   "@[<v>This program has type %a. It is not reactive. @]" (* Hint: use eta-expansion. *)
-                   (emph_pp green pp_ty) t)
-         | _ -> assert false);
+                   "@[<v>The type of the program input should be a basic type. @]"))
+         | _ -> assert false
+      in
       List.iter (fun a -> typing ~env ~msg:"checking inputs given by option -arg, "
                     ~statics:statics_env ~genv
                     (ty_annot ~ty:t_arg a)

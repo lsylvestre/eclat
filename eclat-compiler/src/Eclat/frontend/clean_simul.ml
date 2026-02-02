@@ -17,7 +17,7 @@ let clean_exp ~no_print ~no_assert ~genv e =
                   | E_const(Op(Runtime(External_fun(x,_)))) ->
                       if no_print then
                           (match SMap.find_opt x genv.operators with
-                           | Some (t,(_,_,is_imp)) ->
+                           | Some (t,(_,_,is_imp,_)) ->
                               if is_imp 
                               then (Some (E_letIn(P_var x,Types.new_ty_unknown(),e2,E_const(Unit))))
                               else None
@@ -35,4 +35,6 @@ let clean_exp ~no_print ~no_assert ~genv e =
   in clean e
 
 let clean_pi ~no_print ~no_assert pi =
-  Map_pi.map (clean_exp ~no_print ~no_assert ~genv:pi.genv) pi
+  if no_print || no_assert then
+    Map_pi.map (clean_exp ~no_print ~no_assert ~genv:pi.genv) pi
+  else pi

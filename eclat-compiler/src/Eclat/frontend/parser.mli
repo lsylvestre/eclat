@@ -143,8 +143,8 @@ exception Error
 
 (* The monolithic API. *)
 
-val pi: (Lexing.lexbuf -> token) -> Lexing.lexbuf -> (((Ast.x * (Types.ty * bool)) list *
-   (Ast.x * (Types.ty * (bool * int * bool))) list) *
+val pi: (Lexing.lexbuf -> token) -> Lexing.lexbuf -> (((Ast.x * (Types.ty * bool * Prelude.loc)) list *
+   (Ast.x * (Types.ty * (bool * int * bool * Prelude.loc))) list) *
   (Ast.x * Ast.static) list * (Ast.x * (Ast.x * Types.tyB) list) list *
   ((Ast.p * Ast.e) * Prelude.loc) list)
 

@@ -223,7 +223,7 @@ let pp_tyB fmt (tyB:tyB) : unit =
          fprintf fmt ") ") else ();
          (fprintf fmt "%s" x;
           match szs with
-          | [Sz_lit 1] -> ()
+          | [] -> ()
           | _ -> fprintf fmt "<";
                  pp_print_list
                    ~pp_sep:(fun fmt () -> fprintf fmt ", ") pp_size fmt szs;
@@ -245,7 +245,7 @@ let pp_ty fmt (ty:ty) : unit =
       fprintf fmt "(%a -{%a}-> %a)" pp ty1 pp_dur d pp_tyB tyB2
   | Ty_ref tyB -> fprintf fmt "ref<%a>" pp_tyB tyB
   | Ty_array(sz,tyB) ->
-      fprintf fmt "array<%a,%a>" pp_size sz pp_tyB tyB
+      fprintf fmt "%a array<%a>" pp_tyB tyB pp_size sz
   | Ty_signal(tyB) ->
       fprintf fmt "signal<%a>" pp_tyB tyB
   | Ty_trap(tyB) ->
@@ -418,7 +418,18 @@ let free_vars_of_type (bv,t) =
   Vs.diff (vars_of_ty t) bv
 
 
-let instance (Forall(vs,ty)) =
+let print_scheme(Forall(vs,ty)) =
+let open Format in 
+let fmt = std_formatter in
+fprintf fmt "#forall ";
+Vs.iter (fun u -> let name = u.name in
+        fprintf fmt "%d " u.id) vs;
+fprintf fmt " . %a #" pp_ty ty
+
+let rec instance s = 
+  (* print_scheme(s);*)
+  instance_aux s and
+instance_aux (Forall(vs,ty)) =
   let unknowns = Hashtbl.create (Vs.cardinal vs) in
   Vs.iter (fun u -> let name = u.name in
         Hashtbl.add unknowns u.id (new_unknown_generic ?name ())) vs;
@@ -448,7 +459,7 @@ let instance (Forall(vs,ty)) =
            with Not_found -> tyB)
   | TyB_var {contents=Is tyB} ->
       inst_tyB tyB
-  | TyB_bool | TyB_unit as tyB -> tyB
+  | (TyB_bool | TyB_unit) as tyB -> tyB
   | TyB_int sz -> TyB_int (inst_size sz)
   | TyB_tuple tyB_list ->
       TyB_tuple (List.map inst_tyB tyB_list)
@@ -483,76 +494,6 @@ let instance (Forall(vs,ty)) =
       Ty_size(inst_size sz) 
   in
   inst_ty ty
-
-  let free_vars_of_type_env l =
-    List.fold_left (fun vs (x,(Forall (v,t))) ->
-                  Vs.union vs (free_vars_of_type (v,t)) )
-     Vs.empty l
-
-let generalize r ty =
-  let ty = canon_ty ty in
-  match ty with
-  | Ty_var{contents=Is (Ty_fun _)} | Ty_fun _ ->
-      let fvg = free_vars_of_type_env r in
-      let vs = free_vars_of_type (fvg,ty) in
-      (* Format.fprintf Format.std_formatter
-                   "@[<v>gives: %a @]"
-                   Prelude.Errors.(emph_pp green pp_ty) ty; *)
-      (* Vs.iter (fun n -> Printf.printf "           ??===> %d\n" n) vs; *)
-      Forall(vs,ty)
-  | ty -> Forall(Vs.empty,ty)
-
-let copy_ty ty =
-  instance (generalize [] ty)
-
-let rec as_tyB ~loc ty = 
-  match ty with
-  | Ty_base tyB -> tyB
-  | Ty_tuple(tys) -> TyB_tuple(List.map (as_tyB ~loc) tys)
-  | Ty_var({contents=Unknown n} as r) -> TyB_var(Obj.magic r)
-  | _ -> Prelude.Errors.raise_error ~loc ()
-                 ~msg:"basic type expected"
-
-let rec is_tyB ty = 
-  match canon_ty ty with
-  | Ty_base _ -> true
-  | Ty_tuple(tys) -> List.for_all is_tyB tys
-  | Ty_var({contents=Is ty}) -> is_tyB ty
-  | Ty_var _ -> true
-  | _ -> false
-
-
-let extract_arg_res_fun ty =
-  match canon_ty ty with
-  | Ty_fun(ty1,d,tyB) -> (ty1,tyB)
-  | _ -> assert false
-  
-let extract_ty_fun ty =
-  match canon_ty ty with
-  | Ty_fun(ty1,d,tyB) -> (ty1,d,tyB)
-  | _ -> assert false
-
-let contains_fun ty =
-  let exception Find in
-  let rec aux = function
-  | Ty_var {contents=Is ty1} -> aux ty1
-  | Ty_var _ -> ()
-  | Ty_base _ -> () 
-  | Ty_tuple ty_list -> List.iter aux ty_list
-  | Ty_fun _ -> raise Find
-  | Ty_ref _
-  | Ty_array _
-  | Ty_signal _
-  | Ty_trap _
-  | Ty_size _ -> () 
-  in
-  try aux ty; false 
-  with Find -> true ;;
-
-
-let rec no_unknown_in_ty t =
-  assert false (* todo *)
-
 
 
 
@@ -620,6 +561,86 @@ let rec rename_ty unknowns = function
     Ty_trap(rename_tyB unknowns tyB)
 | Ty_size sz ->
     Ty_size(rename_size unknowns sz)
+
+  let free_vars_of_type_env l =
+    List.fold_left (fun vs (x,(Forall (v,t))) ->
+                  Vs.union vs (free_vars_of_type (v,t)) )
+     Vs.empty l
+
+let rename_scheme (Forall(vs,ty)) =
+  let h = Hashtbl.create 10 in
+  Vs.iter (fun {id;name} -> 
+    Hashtbl.add h id (new_unknown_generic ?name ())
+  ) vs;
+  let ty' = rename_ty h ty in
+  let vs' = Vs.map (fun u -> 
+    match (Hashtbl.find h u.id) with 
+    | {contents=Unknown i } -> i
+    | _ -> assert false (* should not happend *)
+  ) vs
+  in
+  Forall(vs',ty')
+
+let generalize r ty =
+  let ty = canon_ty ty in
+  match ty with
+  | Ty_var{contents=Is (Ty_fun _)} | Ty_fun _ ->
+      let fvg = free_vars_of_type_env r in
+      let vs = free_vars_of_type (fvg,ty) in
+      (* rename_scheme *)(Forall(vs,ty))
+  | ty -> Forall(Vs.empty,ty)
+
+let copy_ty ty =
+  instance (generalize [] ty)
+
+let rec as_tyB ~loc ty = 
+  match ty with
+  | Ty_base tyB -> tyB
+  | Ty_tuple(tys) -> TyB_tuple(List.map (as_tyB ~loc) tys)
+  | Ty_var({contents=Unknown n} as r) -> TyB_var(Obj.magic r)
+  | _ -> Prelude.Errors.raise_error ~loc ()
+                 ~msg:"basic type expected"
+
+let rec is_tyB ty = 
+  match canon_ty ty with
+  | Ty_base _ -> true
+  | Ty_tuple(tys) -> List.for_all is_tyB tys
+  | Ty_var({contents=Is ty}) -> is_tyB ty
+  | Ty_var _ -> true
+  | _ -> false
+
+
+let extract_arg_res_fun ty =
+  match canon_ty ty with
+  | Ty_fun(ty1,d,tyB) -> (ty1,tyB)
+  | _ -> assert false
+  
+let extract_ty_fun ty =
+  match canon_ty ty with
+  | Ty_fun(ty1,d,tyB) -> (ty1,d,tyB)
+  | _ -> assert false
+
+let contains_fun ty =
+  let exception Find in
+  let rec aux = function
+  | Ty_var {contents=Is ty1} -> aux ty1
+  | Ty_var _ -> ()
+  | Ty_base _ -> () 
+  | Ty_tuple ty_list -> List.iter aux ty_list
+  | Ty_fun _ -> raise Find
+  | Ty_ref _
+  | Ty_array _
+  | Ty_signal _
+  | Ty_trap _
+  | Ty_size _ -> () 
+  in
+  try aux ty; false 
+  with Find -> true ;;
+
+
+let rec no_unknown_in_ty t =
+  assert false (* todo *)
+
 
 let size_sz sz =
     let sz' = canon_size sz in

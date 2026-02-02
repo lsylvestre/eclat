@@ -606,11 +606,11 @@ let rec to_s ~endloop ~traps ~is_zero ~genv gs e x k =
       let args = to_a ~genv e in
       let externals =
         let e1, e2 = genv.externals, genv.operators in
-        List.fold_left (fun env (x,(ty,shared)) -> Types.SMap.add x (ty, shared) env) Types.SMap.empty e1,
+        List.fold_left (fun env (x,(ty,shared,loc)) -> Types.SMap.add x (ty, shared,loc) env) Types.SMap.empty e1,
         genv.operators in
       begin
         match SMap.find_opt f (fst externals) with
-        | Some(ty,shared) ->
+        | Some(ty,shared,_) ->
             (* let is_instantaneous = match Types.canon_ty ty with
                                     | Ty_fun(_,Dur_zero,_) -> true
                                     | _ -> false in*)

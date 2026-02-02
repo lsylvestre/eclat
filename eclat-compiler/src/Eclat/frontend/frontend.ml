@@ -34,6 +34,32 @@ let syntax_error_handler f lexbuf =
     with Parser.Error -> 
            Prelude.Errors.syntax_error (Lexer.get_loc lexbuf)
 
+let smap_operators_of_list rev_l =
+  List.fold_right (fun (x,((_,(_,_,_,loc)) as v)) m -> 
+     (match SMap.find_opt x m with
+     | Some (_,(_,_,_,last_loc)) -> 
+         let open Prelude.Errors in 
+         warning ~loc:last_loc (fun fmt -> 
+            Format.fprintf fmt "Redefinition of operator %s\nPrevious declaration at location: %a\n" 
+              x
+              (emph_pp blue pp_loc) loc)
+     | None -> ());
+     SMap.add x v m) rev_l SMap.empty
+
+
+let check_externals_nodup rev_l =
+  ( List.fold_right (fun (x,((_,_,loc) as v)) m -> 
+     (match SMap.find_opt x m with
+     | Some (_,_,last_loc) -> 
+         let open Prelude.Errors in 
+         warning ~loc:last_loc (fun fmt -> 
+            Format.fprintf fmt "Redefinition of external function %s\nPrevious declaration at location: %a\n" 
+              (String.lowercase_ascii x)
+              (emph_pp blue pp_loc) loc)
+     | None -> ());
+     SMap.add x v m) rev_l SMap.empty ) |> ignore
+
+
 let frontend ~(inputs : string list) repl ?(when_repl=(fun _ ~genv:_ _ _ -> ())) 
              ?(relax=false) main_name str_arg : pi * e list =
   let (ess_from_files, 
@@ -71,10 +97,11 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ ~genv:_ _ _ -> ()))
   let (exts, gs, ts, ds) = 
          (if repl || List.length inputs < (if !no_stdlib_flag then 1 else 2) then
             (* let () = List.iter (when_repl ([],[]) [] []) ds_from_files in *)
-            (Current_filename.current_file_name := "%stdin";
+            (
              Printf.printf "=== eclat toploop ===.\nEnter phrases (separated by ';;') then compile (or run) with ``#q.''\n";
              flush stdout;
-             let rec loop (exts1,exts2) gs ts ds =
+             let rec loop i (exts1,exts2) gs ts ds =
+               Current_filename.current_file_name := ("%stdin>"^string_of_int i);
                Printf.printf "\n> ";
                let l = read_phrase () in
                if String.contains l '#' then 
@@ -84,15 +111,19 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ ~genv:_ _ _ -> ()))
                                           Format.fprintf fmt " Please continue, or quit with ^C.") 
                                     Format.std_formatter ();
                      Format.print_flush ();
-                     loop (exts1,exts2) gs ts ds))
+                     loop (i+1) (exts1,exts2) gs ts ds))
                else
                try
                  (let lexbuf = (Lexing.from_string l) in
                   caml_error_handler ~on_error:(fun _ ->
                       Format.print_flush ();
-                      let genv = {statics=gs;operators=smap_of_list exts2;externals=exts1;sums=ts} in
+                      let genv = {abstract_types=create_abstract_type_smap ();
+                                  statics=gs;
+                                  operators=smap_operators_of_list exts2;
+                                  externals=exts1;
+                                  sums=ts} in
                       let () = List.iter (when_repl gs ~genv false) ds in
-                      loop (exts1,exts2) gs ts ds)
+                      loop (i+1) (exts1,exts2) gs ts ds)
                   (fun () -> 
                        let (exts1',exts2'),gs',ts',ds' = syntax_error_handler (fun lexbuf ->
                                                            Parser.pi Lexer.token lexbuf) lexbuf in
@@ -101,15 +132,21 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ ~genv:_ _ _ -> ()))
                        let gs'' = gs@gs' in
                        let ts'' = ts@ts' in
                        let ds'' = ds@ds' in
-                       let genv = {statics=gs'';operators=smap_of_list exts2''; externals=exts1'';sums=ts''} in
+                       check_externals_nodup exts1'';
+                       let genv = {abstract_types=create_abstract_type_smap ();
+                                   statics=gs'';
+                                   operators=smap_operators_of_list exts2'';
+                                   externals=exts1'';
+                                   sums=ts''} in
                        let w = (when_repl gs'' ~genv) in
                        List.iter (w false) ds;
                        List.iter (w true) ds';
-                       loop (exts1'', exts2'') gs'' ts'' ds'')
+                       loop (i+1) (exts1'', exts2'') gs'' ts'' ds'')
                   ())
                 with End_of_file -> (exts1,exts2),gs,ts,ds
              in
-             loop ((fun (ext1,ext2) -> List.rev ext1, List.rev ext2) exts_from_files)
+             loop 1
+                  ((fun (ext1,ext2) -> List.rev ext1, List.rev ext2) exts_from_files)
                   (List.rev @@ gs_from_files) 
                   (List.rev @@ ts_from_files) 
                   (ds_from_files))
@@ -145,6 +182,12 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ ~genv:_ _ _ -> ()))
   let main = List.fold_right (fun (x,v) e -> E_letIn(P_var x,Types.new_ty_unknown(),v,e)) ds (let y = gensym () in 
       E_fun (P_var y,(Types.new_ty_unknown(),Types.new_tyB_unknown()), E_app(entry_point,E_var y))) in
 
+  check_externals_nodup (fst exts);
+
   (* return both parsed program and its inputs *)
-  ({genv={statics=gs;operators=smap_of_list (snd exts); externals=(fst exts);sums=ts};main}, values_list)
+  ({genv={abstract_types=create_abstract_type_smap ();
+          statics=gs;
+          operators=smap_operators_of_list (snd exts);
+          externals=(fst exts);sums=ts};
+         main}, values_list)
 

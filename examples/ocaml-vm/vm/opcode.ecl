@@ -10,7 +10,6 @@ type unop = NOT of unit
           | NEG of unit
           | ISINT of unit ;;
 
-type group1 = op ;;
 
 type group3 =
              BRANCH         of short

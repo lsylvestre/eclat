@@ -53,7 +53,7 @@ let compile ?globalize
   let pi = Anf.anf_pi pi in
   display_pi Anf pi;
   let _ = Typing.typing_with_argument pi arg_list in
-
+    display_pi Specialize pi;
   let pi = Specialize.specialize_pi pi in
   display_pi Specialize pi;
   (** make explicit all lexical environments *)

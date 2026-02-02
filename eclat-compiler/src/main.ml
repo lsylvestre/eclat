@@ -53,8 +53,10 @@ let () =
                  "entry point (a function name)");
 
     ("-toploop", Arg.Set top_flag,
-                 "Interaction loop");
-
+                 "Interactive read-type-print loop before compilation");
+    ("-Werror",   Arg.Set Prelude.Errors.no_warning,
+                 "Turn all warnings into errors.");
+    
     ("-int",     Arg.Int Fix_int_lit_size.set_size,
                  "force litteral integers to be of the given size");
     ("-mono",    Arg.Set Typing.monomorphic,
@@ -203,12 +205,13 @@ let main () : unit =
   if !tailrec_check_flag then
     Check_tail_call.check_pi pi;
 
+
   let pi = if Operators.(!Operators.flag_no_assert || !Operators.flag_no_print)
            then Clean_simul.clean_pi
                   ~no_assert:!Operators.flag_no_assert
                   ~no_print:!Operators.flag_no_print pi
            else pi in
-
+ 
   (** remove all decorations (locations) in the source program *)
   let (pi, arg_list) =
     let open Ast_undecorated in
@@ -238,7 +241,7 @@ let main () : unit =
   let (argument,result,typing_env) = Compile.compile ~vhdl_comment ~prop_fsm:!prop_fsm_flag arg_list name ty fmt_vhdl pi in
   let args = List.map (Gen_miniHDL.to_a ~genv:pi.genv) arg_list in
 
-  Gen_testbench.gen_testbench fmt_tb ~vhdl_comment ~operators:pi.genv.operators ~externals:pi.genv.externals typing_env name ty (argument,result) args;
+  Gen_testbench.gen_testbench fmt_tb ~vhdl_comment ~genv:pi.genv typing_env name ty (argument,result) args;
 
   Format.fprintf Format.std_formatter
       "\nvhdl code generated in %s/%s.vhdl\

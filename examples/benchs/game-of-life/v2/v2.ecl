@@ -40,7 +40,7 @@ let counter () =
   reg (fun c -> c + 1) last 0 ;;
 
 (**
-   $ ./eclat ../benchs/game-of-life/v2/v2.ecl  -main=chrono_main
+   $ ./eclat ../examples/benchs/game-of-life/v2/v2.ecl  -main=chrono_main
    $ make simul NAME=chrono_main
      ~> execution time = 1 cycles
 *)
@@ -71,44 +71,38 @@ let print_world (world,nbc,nbl) : unit =
 
 
 (** 
-    $ ./eclat -relax ../benchs/game-of-life/v2/v2.ecl  -main=test_main
+    $ ./eclat -relax ../examples/benchs/game-of-life/v2/v2.ecl  -main=test_main
+    $ make simul NS=4000000 NAME=test_main 
  *)
 let test_main () =
-  let a = vect_create<10>(false) in
-  let w0 = vect_create<10>(a) in
-  let w0 = cell_copy_with(w0,0,0,true) in
-  let w0 = cell_copy_with(w0,0,2,true) in
-  let w0 = cell_copy_with(w0,1,1,true) in
-  let w0 = cell_copy_with(w0,1,2,true) in
-  let w0 = cell_copy_with(w0,2,1,true) in
-  let w1 = reg (fun w -> vect_life(w,10,10)) init w0 in
-  print_world(w1,10,10);
-
-  (*let f = (fun (i,_) ->
-    i = 0 or 
-    i = 2 or 
-    i = (n+1) or
-    i = (n+2) or 
-    i = (n+n+1))  *)
-
-  if vect_nth(vect_nth(w1,0),0) then 0 else 1 ;;
+  (let a = vect_create<10>(false) in
+     let w0 = vect_create<10>(a) in
+     let w0 = cell_copy_with(w0,0,0,true) in
+     let w0 = cell_copy_with(w0,0,2,true) in
+     let w0 = cell_copy_with(w0,1,1,true) in
+     let w0 = cell_copy_with(w0,1,2,true) in
+     let w0 = cell_copy_with(w0,2,1,true) in
+     let w1 = reg (fun w -> vect_life(w,10,10)) init w0 in
+     print_world(w1,10,10);
+   
+     if vect_nth(vect_nth(w1,0),0) then 0 else 1) ;;
 
 
 (** ==== synthesis ==== *)
 
-(** ./eclat -relax ../benchs/game-of-life/v2/v2.ecl  -intel-max10  -main=main_intel *)
+(** ./eclat -relax ../examples/benchs/game-of-life/v2/v2.ecl  -intel-max10  -main=main_intel *)
 
 let main_intel (_:int<12>) : int<58> =
   let v = test_main() in
   resize_int<58>(v) ;;
 
-(** ./eclat -relax ../benchs/game-of-life/v2/v2.ecl  -xilinx-zybo  -main=main_xilinx *)
+(** ./eclat -relax ../examples/benchs/game-of-life/v2/v2.ecl  -xilinx-zybo  -main=main_xilinx *)
 
 let main_xilinx (i:int<8>) : int<4> =
   let v = test_main() in
   resize_int<4>(v) ;;
 
-(** ./eclat -relax ../benchs/game-of-life/v2/v2.ecl  -yosys-ecp5  -main=main_yosys *)
+(** ./eclat -relax ../examples/benchs/game-of-life/v2/v2.ecl  -yosys-ecp5  -main=main_yosys *)
 
 let main_yosys (i:int<1>) : int<1> =
   let v = test_main() in
