@@ -123,6 +123,7 @@ type token =
   | COMMA
   | COL_EQ
   | COL
+  | CHAR_LIT of (char)
   | BOOL_LIT of (bool)
   | BANG
   | AT_AT

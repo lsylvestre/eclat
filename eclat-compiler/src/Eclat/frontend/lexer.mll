@@ -183,6 +183,13 @@ rule token = parse
 | '.'                 { DOT }
 | ";;"                { SEMI_SEMI }
 | "$"                 { DOLLARD }
+| [''']([^'''] as c) [''']    { CHAR_LIT(c) }
+| [''']['\\'] ((['0'-'9']['0'-'9']['0'-'9']) as c) [''']  { 
+                        let n = int_of_string c in 
+                        if n > 255 then
+                          Prelude.Errors.raise_error ~loc:(get_loc lexbuf)
+                              ~msg:(Printf.sprintf "%d is outside the range of legal characters (0-255))" n) ()
+                        else CHAR_LIT(Char.chr n) }
 | eof | "%eof"        { EOF }
 | "(*"                { incr nested_comment_depth; comment lexbuf }
 | _  as lxm           { Prelude.Errors.raise_error ~loc:(get_loc lexbuf)

@@ -19,6 +19,7 @@ let new_tvar = let c = ref 0 in fun () -> incr c; TVar (ref (V ("'a"^string_of_i
 type c = Unit
        | Int of {value:int;tsize:ty}
        | Bool of bool
+       | Char of char
        | Enum of x
        | CTuple of c list
        | CVector of c list
@@ -124,6 +125,7 @@ let pp_vector = Ast_pprint.pp_vector
     | Unit -> fprintf fmt "()"
     | Int{value=n;tsize=t} -> fprintf fmt "%d'%ab" n pp_ty t
     | Bool b -> fprintf fmt "\"%d\"" (if b then 1 else 0)
+    | Char c -> fprintf fmt "%c" c
     | Enum x -> fprintf fmt "%s" x
     | CTuple(cs) ->
         pp_tuple fmt pp_c cs

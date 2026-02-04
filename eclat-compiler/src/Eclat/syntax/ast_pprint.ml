@@ -69,6 +69,7 @@ let rec pp_const (fmt:fmt) (c:c) : unit =
       if !hexa_int_pp_flag then fprintf fmt "0x%x" n else fprintf fmt "%d" n;
       fprintf fmt " : int<%a>)" pp_size tz
   | Bool b -> fprintf fmt "%b" b
+  | Char c -> fprintf fmt "%c" c
   | Unit -> fprintf fmt "()"
   | String s -> fprintf fmt "\"%s\"" s
   | Op op ->

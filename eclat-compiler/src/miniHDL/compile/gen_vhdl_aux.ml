@@ -20,6 +20,7 @@ let rec size_const c =
       1
   | Int {value=_;tsize} ->
       size_ty tsize
+  | Char _ -> 8
   | Enum _ ->
       assert false (* cannot infer enum size *)
   | CTuple cs | CVector cs ->
@@ -117,7 +118,7 @@ let rec pp_c fmt c =
       let n = abs n in
       let sz = size_ty tsize in
       if is_neg then fprintf fmt "work.Int.neg(";
-      if true (* sz < 16 *) then
+      if true (* sz < 16 *) (* todo: check condition *) then
         fprintf fmt "\"%s\"" (int2bin ~int_size:sz n)
       else
         (let v = Printf.sprintf "%x" n in (* dislay in hexa directly *)
@@ -129,6 +130,8 @@ let rec pp_c fmt c =
   | Bool b ->
       (* notice: in VHDL, eclat_true(0) is valid, but "1"(0) is invalid. *)
       fprintf fmt "%s" (if b then "work.Values.val_true" else "work.values.val_false")
+  | Char c -> let n = Char.code c in 
+              fprintf fmt "\"%s\"" (int2bin ~int_size:8 n)
   | Enum x -> pp_ident fmt x
   | CTuple(cs) ->
        pp_tuple fmt pp_c cs

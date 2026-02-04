@@ -76,7 +76,7 @@ let fv_type_in ?(s=Types.Vs.empty) e =
         ss e2
     | E_const c ->
         let rec ss_const = function
-        | Unit | Bool _ | String _ | V_loc _ | Inj _ -> ()
+        | Unit | Bool _ | Char _ | String _ | V_loc _ | Inj _ -> ()
         | Int (_,sz) -> r := !r ++ free_vars_of_type (Vs.empty,Ty_size sz)
         | C_tuple cs | C_vector cs -> List.iter ss_const cs
         | C_appInj(x,c,tyB) -> 
@@ -124,7 +124,7 @@ let subst_ty e = (* todo: rename this function and remove the unused parameter *
     | E_array_make(sz,c,deco) -> E_array_make(rename_size unknowns sz,c,deco)
     | E_const c ->
         let rec ss_const = function
-        | Unit | Bool _ | String _ | V_loc _ | Inj _ as c -> c
+        | Unit | Bool _ | Char _ | String _ | V_loc _ | Inj _ as c -> c
         | Int (n,sz) -> Int (n,rename_size unknowns sz)
         | C_tuple cs -> C_tuple (List.map ss_const cs)
         | C_vector cs -> C_vector (List.map ss_const cs)

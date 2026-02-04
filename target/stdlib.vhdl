@@ -349,7 +349,7 @@ package body int is -- signed int
     end if;
     while (num_unsigned /= 0) loop
       w := num_unsigned mod k;
-      a(a'length-1-i) := unsigned(w);
+      a(a'length-1-i) := w;
       i := i + 1;
       num_unsigned := num_unsigned / k;
     end loop;
@@ -360,7 +360,7 @@ package body int is -- signed int
         end if;
       else
         b := TRUE;
-        work.Util.echo(integer'image(to_integer(unsigned(a(j)))));
+        work.Util.echo(integer'image(to_integer(a(j))));
       end if;
     end loop;
   end;

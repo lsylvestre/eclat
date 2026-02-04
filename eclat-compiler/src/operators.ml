@@ -23,6 +23,9 @@ let combinational ~externals p =
 let vect_ sz v =
   Types.TyB_abstract("vect",[sz],[v]) ;;
 
+let char_ =
+  Types.TyB_abstract("char",[],[]) ;;
+
 (* improved typing with level of types *)
 let ty_op ~externals op =
   let open Types in

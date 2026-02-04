@@ -105,6 +105,7 @@ let check_abstract_type ~loc x szs tyB_list =
 %token <string> IDENT UP_IDENT TVAR_IDENT TYB_VAR_IDENT 
 %token <bool> BOOL_LIT
 %token <int> INT_LIT
+%token <char> CHAR_LIT
 %token PLUS MINUS TIMES LT LE GT GE NEQ NOT MOD DIV AMP_AMP OR WHEN FBY MERGE 
 %token DOLLARD
 %token XOR LAND LOR LXOR LSL LSR ASR RESIZE_INT VECT_CREATE TUPLE_OF_INT INT_OF_TUPLE
@@ -499,10 +500,11 @@ size:
 | n=INT_LIT { Sz_lit n }
 | sz=size_unknown { sz }
 | sz=size PLUS n=INT_LIT { Sz_add(sz,n) }
-| n=INT_LIT TIMES sz=size { 
+| n=INT_LIT TIMES sz=size
+| sz=size TIMES n=INT_LIT { 
      if n = 2 then Sz_twice(sz) 
      else Prelude.Errors.raise_error ~loc:(with_file $loc)
-            ~msg:"unsupported size operation" () }
+            ~msg:"unsupported size multiplication: only multiplication by two is currently supported." () }
 
 size_unknown:
 | x=TVAR_IDENT {
@@ -632,7 +634,7 @@ equations:
 
 if_end:
 | e2=lexp { e2,E_const Unit }
-| e2=lexp ELSE e3=exp { e2, e3 }
+| e2=lexp ELSE e3=lexp { e2, e3 }
 
 ret_ty_annot_eq:
 | EQ { None }
@@ -985,6 +987,7 @@ const:
 const_without_vect:
 | LPAREN RPAREN { Unit }
 | b=BOOL_LIT    { Bool b }
+| c=CHAR_LIT    { Char c }
 | n=INT_LIT {
     Int (n,new_size_unknown()) }
 | n=INT_LIT QUOTE k=INT_LIT

@@ -242,7 +242,10 @@ let pp_ty fmt (ty:ty) : unit =
   | Ty_base tyB -> pp_tyB fmt tyB
   | Ty_tuple ty_list -> pp_tuple fmt pp ty_list
   | Ty_fun(ty1,d,tyB2) ->
-      fprintf fmt "(%a -{%a}-> %a)" pp ty1 pp_dur d pp_tyB tyB2
+      (match d with
+      | Dur_zero -> fprintf fmt "(%a => %a)" pp ty1 pp_tyB tyB2
+      | Dur_one -> fprintf fmt "(%a -> %a)" pp ty1 pp_tyB tyB2
+      | _ -> fprintf fmt "(%a -{%a}-> %a)" pp ty1 pp_dur d pp_tyB tyB2)
   | Ty_ref tyB -> fprintf fmt "ref<%a>" pp_tyB tyB
   | Ty_array(sz,tyB) ->
       fprintf fmt "%a array<%a>" pp_tyB tyB pp_size sz
@@ -422,8 +425,10 @@ let print_scheme(Forall(vs,ty)) =
 let open Format in 
 let fmt = std_formatter in
 fprintf fmt "#forall ";
-Vs.iter (fun u -> let name = u.name in
-        fprintf fmt "%d " u.id) vs;
+Vs.iter (fun u ->
+           match u.name with
+           | None -> fprintf fmt "%d " u.id
+           | Some s -> fprintf fmt "%s%d " s u.id) vs;
 fprintf fmt " . %a #" pp_ty ty
 
 let rec instance s = 
@@ -659,7 +664,7 @@ let compute_tag_size cs =
   in
   max 1 n
   
-
+(*
 let size_tyB tyB =
   let rec loop tyB = 
     match canon_tyB tyB with
@@ -670,4 +675,4 @@ let size_tyB tyB =
     | TyB_sum sum -> compute_tag_size sum + List.fold_left (max) 0 (List.map (fun (_,tyB) -> loop tyB) sum)
     | TyB_string sz -> size_sz sz * 8
     | _ -> Format.(fprintf std_formatter "[%a]" pp_tyB tyB); assert false (* todo *)
-  in loop tyB  
+  in loop tyB *)

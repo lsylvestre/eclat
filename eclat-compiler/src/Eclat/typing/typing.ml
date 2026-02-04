@@ -435,6 +435,7 @@ let rec typ_const ~loc g = function
   Ty_base(TyB_int (sz))*)
   | Bool _ -> TyB_bool
   | Unit -> TyB_unit
+  | Char _ -> Operators.char_
   | String s -> TyB_string (Sz_lit (String.length s))
   (* | Op op -> ty_op op*)
   (*| (V_loc _) ->
@@ -464,7 +465,7 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
   | E_app(E_const (Op(GetTuple{pos;arity})),e1) ->
       let ty_list = List.init arity (fun _ -> new_ty_unknown ()) in
       assert (0 <= pos && pos <= arity);
-      let t1,d1 = typ_exp ~collect_sig ~statics ~genv ~ctors ~toplevel:false ~loc g e1 in
+      let t1,d1 = typ_exp ~collect_sig ~statics ~genv ~ctors ~toplevel ~loc g e1 in
       unify_ty ~loc:(loc_of e1) t1 (Ty_tuple ty_list);
       List.nth ty_list pos,d1
   | E_const (Op op) -> 
@@ -482,7 +483,7 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
     let tx = typ_ident ~loc g x in
     (tx,Dur_zero)
   | E_deco(e1,loc) ->
-    typ_exp ~collect_sig ~statics ~genv ~ctors ~toplevel:false ~loc g e1
+    typ_exp ~collect_sig ~statics ~genv ~ctors ~toplevel ~loc g e1
   | E_if(e1,e2,e3) ->
     let t1,d1 = typ_exp ~collect_sig ~statics ~genv ~ctors ~toplevel:false ~loc:(loc_of e1) g e1 in
     let t2,d2 = typ_exp ~collect_sig ~statics ~genv ~ctors ~toplevel:false ~loc:(loc_of e2) g e2 in
@@ -505,11 +506,8 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
     (* Format.fprintf Format.std_formatter "--->(%a : %a)\n" Ast_pprint.pp_exp (Pattern.pat2exp p) Types.pp_ty  typ;*)
     let ty1,d1 = typ_exp ~collect_sig ~statics ~genv ~ctors ~toplevel:false ~loc:(loc_of e1) g e1 in
     unify_ty ~loc:(loc_of e1) typ ty1;
-    (* Format.fprintf Format.std_formatter "--->%a\n" pp_ty  ty1;*)
     let gen = evaluated e1 (* && match un_deco e1 with E_fix _ -> false | _ -> true *) in
-    (* Format.fprintf Format.std_formatter "----->|||%b (%a)\n" gen Ast_pprint.pp_pat p;*)
     let g' = env_extend ~loc:(loc_of e1) ~gen g p ty1 in (* todo: loc of pattern *)
-
     (if toplevel && !print_signature_flag then
        begin
          let open Prelude.Errors in
@@ -532,9 +530,9 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
                if Vs.cardinal xs > 0 then (
                  fprintf std_formatter "forall ";
                  Vs.iter (fun x -> match x.name with
-                                   | None -> fprintf std_formatter "'%d " x.id
+                                   | None -> fprintf std_formatter "%d " x.id
                                    | Some y -> fprintf std_formatter "%s%d " y x.id) xs;
-                 fprintf std_formatter " . "))
+                 fprintf std_formatter ". "))
            | _ -> ());
            fprintf std_formatter "%a | %a\n"
              pp_ty (canon_ty ty1) pp_dur (canon_dur d1)
@@ -568,7 +566,7 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
   | E_app(e1,e2) ->
     (match un_deco e1 with
      | E_const (Op (TyConstr ty)) ->
-       let ty2,d2 = typ_exp ~collect_sig ~statics ~genv ~ctors ~toplevel:false g ~loc:(loc_of e2) e2 in
+       let ty2,d2 = typ_exp ~collect_sig ~statics ~genv ~ctors ~toplevel g ~loc:(loc_of e2) e2 in
        unify_ty ~loc:(loc_of e2) ty2 ty;
        ty2,d2
      | _ ->
@@ -1039,7 +1037,7 @@ let when_repl statics ~genv : bool -> ((p * e) * Prelude.loc) -> unit =
                  Vs.iter (fun x -> match x.name with
                                    | None -> fprintf std_formatter "'%d " x.id
                                    | Some y -> fprintf std_formatter "%s%d " y x.id) xs;
-                 fprintf std_formatter " . "))
+                 fprintf std_formatter ". "))
            | _ -> ());
            fprintf std_formatter "%a | %a@."
              pp_ty (canon_ty ty) pp_dur (canon_dur d)

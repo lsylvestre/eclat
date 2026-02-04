@@ -201,10 +201,11 @@ let main () : unit =
     Format.fprintf Format.std_formatter "@,%a\n" Types.pp_ty ty;
     exit 0;
   end;
+  
+  Typing.print_signature_flag := false;
 
   if !tailrec_check_flag then
     Check_tail_call.check_pi pi;
-
 
   let pi = if Operators.(!Operators.flag_no_assert || !Operators.flag_no_print)
            then Clean_simul.clean_pi

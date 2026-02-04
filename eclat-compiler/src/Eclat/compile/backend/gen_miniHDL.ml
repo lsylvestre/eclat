@@ -139,6 +139,7 @@ let rec to_c ~genv = function
 | Ast.Unit -> Unit
 | Ast.Int (n,tz) -> Int {value=n;tsize=MiniHDL_typing.translate_size tz}
 | Ast.Bool b -> Bool b
+| Ast.Char c -> Char c
 | Ast.String s -> String s
 | Ast.C_tuple cs -> CTuple (List.map (to_c ~genv) cs)
 | Ast.C_vector cs -> CVector (List.map (to_c ~genv) cs)

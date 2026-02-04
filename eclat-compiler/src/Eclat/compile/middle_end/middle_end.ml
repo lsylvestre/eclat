@@ -35,8 +35,7 @@ let compile ?globalize
             arg_list
             ty0
             (pi:pi) : pi =
-  Typing.print_signature_flag := false;
-            
+
   (**let pi = Lustre_scheduling.schedule_pi pi in**)
     
   let pi = Ast_rename.rename_pi pi in

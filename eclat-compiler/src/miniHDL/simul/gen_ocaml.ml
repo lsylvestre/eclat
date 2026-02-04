@@ -78,6 +78,8 @@ let rec pp_c fmt c =
       fprintf fmt "%dL" n
   | Bool b ->
       fprintf fmt "%s" (if b then "true" else "false")
+  | Char c ->
+      fprintf fmt "%c" c
   | Enum x -> pp_state fmt x
   | CTuple(cs) ->
        pp_tuple pp_c fmt cs
