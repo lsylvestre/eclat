@@ -42,6 +42,7 @@ let rec rename_pat ~statics p =
    | P_unit -> P_unit
    | P_var x -> P_var (rename_ident ~statics x)
    | P_tuple ps -> P_tuple (List.map (rename_pat ~statics) ps)
+   | P_tyConstr(p,ty) -> P_tyConstr(rename_pat ~statics p, ty) 
 
 let rename_e ~statics e =
   let rec ren_e = function
@@ -86,9 +87,6 @@ let rename_e ~statics e =
 let rename_pi pi =
   let main = rename_e ~statics:pi.genv.statics pi.main in
   { pi with main }
-
-
-
 
 let rename_trap_and_signals ~statics e =
   let rec ren_e = function

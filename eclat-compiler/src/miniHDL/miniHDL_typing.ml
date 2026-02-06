@@ -21,6 +21,8 @@ let rec canon = function
   | TVector{elem;size} -> TVector{elem=canon elem;size=canon size}
   | TVect _ as t -> t
   | TSize _ as t -> t
+  | TSize_add(size,n) -> TSize_add(canon size,n)
+  | TSize_twice(size) -> TSize_twice(canon size)
   | TAbstract(x,ns,ts) -> TAbstract(x,List.map canon ns,List.map canon ts)
   | TSig t -> TSig (canon t)
 (** [size_ty t] returns the size (in number of bytes) of type [t]
@@ -28,22 +30,29 @@ let rec canon = function
   (customizable via argument [?when_tvar]) *)
 let rec size_ty =
   let when_tvar = 32 in
+  let seen_size_vars = Hashtbl.create 1 in
   fun t ->
-    match canon t with
+    match t with
     | TInt n -> size_ty n
     | TBool -> 1
     | TUnit -> 1
     | TTuple ts -> List.fold_left (+) 0 (List.map size_ty ts)
-    | TVar _ ->
+    | TVar{contents=T t} -> size_ty t
+    | TVar{contents=V n} ->
           let open Prelude.Errors in
-          if !emit_warning_flag then warning (fun fmt -> 
-            Format.fprintf fmt "Unknown value size in the generated code replaced by a %d bits range size.\n" when_tvar);
-
+          if !emit_warning_flag then 
+            (if Hashtbl.mem seen_size_vars n then () else
+              (Hashtbl.add seen_size_vars n ();
+               warning (fun fmt -> 
+                 Format.fprintf fmt "Unknown value size in the generated code replaced by %d-bit default size.\n" when_tvar)
+            ));
           when_tvar
     | TString tz -> (size_ty tz * 8)
     | TStatic{elem;size} | TVector{elem;size} -> size_ty elem * size_ty size
     | TVect n -> n
     | TSize n -> n
+    | TSize_add(sz,n) -> size_ty sz + n
+    | TSize_twice(sz) -> 2 * size_ty sz
     | TAbstract(x,ns,tys) ->
         let prod_ns = List.fold_left ( * ) 1 (List.map size_ty ns) in
         let sum_ts = if tys = [] then 1 else List.fold_left (+) 0 (List.map size_ty tys) in
@@ -74,6 +83,8 @@ let rec string_of_ty = function
   | TVar{contents=V s} -> s
   | TVect n -> "vect<"^string_of_int n^">"
   | TSize n -> "size<"^string_of_int n^">"
+  | TSize_add(sz,n) -> "("^string_of_ty sz^"+"^string_of_int n^")"
+  | TSize_twice(sz) -> "(2*"^string_of_ty sz^")"
   | TVector {elem ; size} -> string_of_ty elem ^ " vector<" ^ string_of_ty size ^ ">"
   | TStatic {elem ; size} -> string_of_ty elem ^ " static<" ^ string_of_ty size ^ ">"
   | TAbstract(x,ns,ts) ->  "("^(String.concat "," @@ List.map string_of_ty ts)^") " 
@@ -95,6 +106,29 @@ let rec unify t1 t2 =
       unify tz1 tz2
   | TVect n, TVect m
   | TSize n, TSize m -> if n <> m then cannot_unify t1 t2
+  | TSize_add(sz,n), TSize_add(sz',m) ->
+      if n <> m then cannot_unify t1 t2;
+      unify sz sz'
+  | TSize_twice sz, TSize_twice sz' ->
+      unify sz sz'
+  | TSize n, TSize_add(sz,m)
+  | TSize_add(sz,m), TSize n -> 
+      let k = n-m in
+      if k < 0 then cannot_unify t1 t2 else
+      unify (TSize k) sz
+  | TSize n, TSize_twice(sz) ->
+      if n mod 2 = 0 then
+        unify (TSize (n/2)) sz
+      else cannot_unify t1 t2
+  | TSize_twice(sz), TSize_add(sz',n)
+  | TSize_add(sz',n), TSize_twice(sz) ->
+      let sz2 = new_tvar() in
+      if n mod 2 = 0 then (
+        unify sz' (TSize_twice(sz2));
+        unify sz (TSize_add(sz2,n/2))
+      ) else (
+        unify sz' (TSize_add(TSize_twice(sz2),1));
+        unify sz (TSize_add(sz2,(n+1)/2)))
   | TBool,TBool -> ()
   | TUnit,TUnit -> ()
   | TTuple ts,TTuple ts' ->
@@ -166,7 +200,9 @@ let rec translate_tyB =
                     | Is sz -> T (translate_size sz)) in
         Hashtbl.add hvar r t;
         t)
-    | _ -> assert false (* TSize 32 ? *)
+    | Sz_add(sz,n) -> TSize_add(translate_size sz,n) 
+    | Sz_twice(sz) -> TSize_twice(translate_size sz) 
+    (* | _ -> assert false (* TSize 32 ? *)*)
 
 let rec translate_ty =
   let hvar = Hashtbl.create 10 in

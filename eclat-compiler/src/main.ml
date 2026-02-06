@@ -56,7 +56,8 @@ let () =
                  "Interactive read-type-print loop before compilation");
     ("-Werror",   Arg.Set Prelude.Errors.no_warning,
                  "Turn all warnings into errors.");
-    
+    ("-Wsize",   Arg.Set MiniHDL_typing.emit_warning_flag,
+                 "emit warning if unspecified sizes remain in the generated VHDL code");    
     ("-int",     Arg.Int Fix_int_lit_size.set_size,
                  "force litteral integers to be of the given size");
     ("-mono",    Arg.Set Typing.monomorphic,

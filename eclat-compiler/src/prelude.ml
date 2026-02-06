@@ -62,7 +62,7 @@ module Errors = struct
   let no_warning = ref false
 
   let warning ?(warning_kw="Warning") ?loc pp : unit =
-    if !no_warning then error ?loc pp;
+    if !no_warning then error ~error_kw:warning_kw ?loc pp;
     let fmt = err_formatter in
     (match loc with
     | None -> ()

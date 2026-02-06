@@ -8,6 +8,7 @@ let pat_mem (x:x) (p:p) : bool =
     | P_unit -> ()
     | P_var(y) -> if x = y then raise Found
     | P_tuple(ps) -> List.iter aux ps
+    | P_tyConstr(p,_) -> aux p
   in
   try aux p; false with Found -> true
 
@@ -18,6 +19,7 @@ let rec vars_of_p (p:p) : unit smap =
   | P_var x -> SMap.singleton x ()
   | P_tuple ps ->
     List.fold_left (fun m p -> vars_of_p p ++ m) SMap.empty ps
+  | P_tyConstr(p,_) -> vars_of_p p
 
 (* static expressions, i.e., a constant, a variable,
    or the static projection of a tuple expression *)
@@ -52,6 +54,7 @@ let rec bindings (p:p) (e:e) : e smap =
                 ) ps
       in
       List.fold_right (++) rs  SMap.empty
+  | P_tyConstr(p,_ty),e -> bindings p e (* ignore _ty: ok ? *)
   | _ ->
      raise (CannotMatch (p,e))
 
@@ -64,6 +67,7 @@ let rec pat2exp (p:p) : e =
       E_var x
   | P_tuple ps ->
       E_tuple (List.map pat2exp ps)
+  | P_tyConstr(p,ty) -> E_app(E_const (Op (TyConstr ty)), pat2exp p)
 
 exception Not_a_pattern
 
@@ -78,4 +82,5 @@ let rec exp2pat (e:e) : p =
       P_var x
   | E_tuple ps ->
       P_tuple (List.map exp2pat ps)
+  (* | also [(e:ty) ?] *)
   | _ -> raise Not_a_pattern

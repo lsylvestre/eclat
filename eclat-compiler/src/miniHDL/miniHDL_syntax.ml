@@ -10,6 +10,8 @@ and ty = TInt of ty | TBool | TUnit
        | TVect of int
        | TAbstract of x * size list * ty list
        | TSize of int
+       | TSize_add of ty * int
+       | TSize_twice of ty
        | TSig of ty
 and size = ty
 
@@ -115,6 +117,8 @@ module Debug = struct
       pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt ", ") pp_ty fmt ts;
       fprintf fmt "]@]"
   | TSize n -> fprintf fmt "size<%d>" n
+  | TSize_add(size,n) -> fprintf fmt "(%a + %d)" pp_ty size n
+  | TSize_twice(size) -> fprintf fmt "(2 * %a)" pp_ty size
   | TStatic {elem ; size} -> fprintf fmt "%a static<%a>" pp_ty elem pp_ty size
   | TSig t -> fprintf fmt "tsig<%a>" pp_ty t
 

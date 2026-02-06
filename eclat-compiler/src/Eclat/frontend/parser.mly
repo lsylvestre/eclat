@@ -499,6 +499,7 @@ size:
 | LPAREN sz=size RPAREN { sz }
 | n=INT_LIT { Sz_lit n }
 | sz=size_unknown { sz }
+| n=INT_LIT PLUS sz=size 
 | sz=size PLUS n=INT_LIT { Sz_add(sz,n) }
 | n=INT_LIT TIMES sz=size
 | sz=size TIMES n=INT_LIT { 
@@ -972,7 +973,7 @@ apat:
 | LPAREN RPAREN { P_unit }
 | LPAREN p=pat RPAREN { p }
 | x=IDENT { P_var x }
-
+| LPAREN p=apat COL ty=ty RPAREN { P_tyConstr(p,ty) }
 
 (* const_with_neg_int:
 | c=const | LPAREN c=const_with_neg_int RPAREN  { c }

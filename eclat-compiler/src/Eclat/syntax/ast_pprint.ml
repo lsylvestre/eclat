@@ -95,7 +95,8 @@ let rec pp_pat (fmt:fmt) (p:p) : unit =
       pp_ident fmt x
   | P_tuple ps ->
       pp_tuple fmt pp_pat ps
-
+  | P_tyConstr(p,ty) ->
+      fprintf fmt "(%a : %a)" pp_pat p pp_ty ty
 (** pretty printer for expressions *)
 let pp_exp (fmt:fmt) (e:e) : unit =
   let rec pp_e ~paren fmt e =

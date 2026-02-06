@@ -45,7 +45,9 @@ let rec matching e =
                     E_letIn(P_var x,Types.new_ty_unknown(), e1,
                     let rec loop i = function
                     | [] -> e2
-                    | p::ps' -> E_letIn(p,Types.new_ty_unknown(),get_tuple i arity var_x, (loop (i+1) ps')) in loop 0 ps)))
+                    | p::ps' -> E_letIn(p,Types.new_ty_unknown(),get_tuple i arity var_x, (loop (i+1) ps')) in loop 0 ps))
+        | P_tyConstr _ -> assert false
+      )
   | E_fun(P_var x,tysig,e) ->
       E_fun(P_var x,tysig,matching e)
   | E_fun(p,(ty,tyB),e) ->

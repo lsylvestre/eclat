@@ -13,6 +13,7 @@ let rec subst_p x ex = function
 | P_unit -> P_unit
 | P_var y -> P_var (subst_ident x ex y)
 | P_tuple(ps) -> P_tuple (List.map (subst_p x ex) ps)
+| P_tyConstr(p,ty) -> P_tyConstr(subst_p x ex p, ty)
 
 let as_ident ex =
   match ex with

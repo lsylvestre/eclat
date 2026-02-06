@@ -363,9 +363,12 @@ let ty_bindings ~loc p ty =
       SMap.empty
     | P_tuple ps,ty ->
       let ty_list = List.map (fun _ -> new_ty_unknown ()) ps in
-      unify_ty ~loc ty (Ty_tuple ty_list);
+      unify_ty ~loc ty (Ty_tuple ty_list); (* todo: fix loc *)
       List.fold_left2 (fun m p t -> ty_bindings_aux ~loc p t ++ m) SMap.empty ps ty_list
-  in 
+    | P_tyConstr(p,ty'),ty ->
+        unify_ty ~loc ty' ty; (* todo: fix loc *)
+        ty_bindings_aux ~loc p ty
+  in
   try ty_bindings_aux ~loc p ty with
   | CannotUnify(loc0,l) ->
       raise @@ CannotUnify(loc,(Pat_ty (p,ty))::l)

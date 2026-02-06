@@ -350,7 +350,9 @@ let rec default_zero t =
       (** assume the user provides a function [default_x : unit -> x] 
           for the given abstract type [x] *)
       Printf.sprintf "(default_%s ())" x
-  | TSize _ -> assert false (* already removed *)
+  | TSize _ 
+  | TSize_add _ 
+  | TSize_twice _ -> assert false (* already removed *)
   | TVar _ -> 
        (** replace unknown by a dummy constant 
            of the given type unknown (no polymorphism). *)

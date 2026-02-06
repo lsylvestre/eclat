@@ -29,12 +29,16 @@ and op = (** primitives *)
             arity : int   (* size (i.e. number of projections) of the tuple *)
          }
        | Wait of int
-       | TyConstr of ty
+       | TyConstr of ty   (** NB: type annotations are removed from expressions 
+                                  after typing, before compiling *)
 
 type p =                     (** pattern [p] *)
     P_unit                   (** constant unit [()] *)
   | P_var of x               (** variable [x] *)
   | P_tuple of p list        (** tuple [(p1, ... pn)] *)
+  | P_tyConstr of p * ty     (** type annotation [(p:ty)] *)
+                             (** NB: type annotations are removed from patterns
+                                 after typing, before compiling *)
 
 type e =                      (** expression     [e]                       *)
     E_deco of e * deco        (** annot an expression with its location in the source code *)
@@ -121,6 +125,7 @@ let rec vars_of_p (p:p) : unit smap =
   | P_var x -> SMap.singleton x ()
   | P_tuple ps ->
     List.fold_left (fun m p -> vars_of_p p ++ m) SMap.empty ps
+  | P_tyConstr(p,_) -> vars_of_p p
 
 (** [un_deco e] removes decoration (i.e., position in the source file)
    around expression [e] *)
