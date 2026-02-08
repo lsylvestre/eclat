@@ -295,44 +295,48 @@ type_decl:
 | kw=TYPE t_with_params=type_decl_tyB_param_then_ident
            szs=type_decl_sizes2 a=type_decl_end {
     let tyargs,x = t_with_params in
-      if Hashtbl.mem Types.global_type_declarations x then (
-            let open Errors in
-            note ~loc:(with_file $loc)
-              (fun fmt ->
-                 Format.fprintf fmt "type %s overides a previous declaration of %s\n"
-                    x x)); 
-      let x' = rename_new_type_ident x in
-      match a with
-      | `Ty ty ->   
-         let vs = Types.vars_of_ty ty in
-         (Vs.iter (fun u _ -> 
-                    match u.name with
-                    | None -> ()
-                    | Some name -> 
-                       if (List.mem name tyargs || List.mem name szs)
-                       then () else 
-                         Prelude.Errors.syntax_error
-                                 ~msg:("The type variable "^name^" is unbound in this type declaration ("^
-                                  x'^").")
-                                 (with_file $loc(kw));
-                       ) vs);
-         let tyB = Types.as_tyB ~loc:(with_file $loc) ty in
-         note_no_recursive_type ~loc:(with_file $loc) x tyB; (* x is the previous name *)
-         add_alias x' (tyB,szs,tyargs) (with_file $loc);
-         None
-      | `R r ->
-          let tyargs = List.map (fun x -> new_tyB_unknown ~name:x ()) tyargs in
-          let szs = List.map (fun x -> new_size_unknown ~name:x ()) szs in
-          let (op,intl) = r in
-          Hashtbl.add Types.global_type_declarations x' (Abstract ((op,szs,tyargs,intl),with_file $loc));
-          clear_tyvar_constraints ();
-          None
-      | `Sum tyBs ->
-          let tyB = TyB_sum tyBs in
-          note_no_recursive_type ~loc:(with_file $loc) x tyB; (* x is the previous name *)
-          add_alias x' (tyB,szs,tyargs) (with_file $loc);
-          clear_tyvar_constraints();
-           Some (x',tyBs) }
+    (match Hashtbl.find_opt Types.global_type_declarations x with
+    | None -> ()
+    | Some (Alias(_,loc') | Abstract(_,loc')) -> 
+        let open Errors in
+        note ~loc:(with_file $loc)
+          (fun fmt ->
+            Format.fprintf fmt "type %s overides a previous declaration of %s (%a)\n"
+              x x (fun fmt -> emph_pp bold pp_loc fmt) loc')); 
+    let x' = rename_new_type_ident x in
+    match a with
+    | `Ty ty ->   
+       let vs = Types.vars_of_ty ty in
+       (Vs.iter (fun u _ -> 
+                  match u.name with
+                  | None -> ()
+                  | Some name -> 
+                     if (List.mem name tyargs || List.mem name szs)
+                     then () else 
+                       Prelude.Errors.syntax_error
+                               ~msg:("The type variable "^name^" is unbound in this type declaration ("^
+                                x'^").")
+                               (with_file $loc(kw));
+                     ) vs);
+       let tyB = Types.as_tyB ~loc:(with_file $loc) ty in
+       note_no_recursive_type ~loc:(with_file $loc) x tyB; (* x is the previous name *)
+       add_alias x' (tyB,szs,tyargs) (with_file $loc);
+       None
+    | `R r ->
+        let tyargs = List.map (fun x -> new_tyB_unknown ~name:x ()) tyargs in
+        let szs = List.map (fun x -> new_size_unknown ~name:x ()) szs in
+        let (op,intl) = r in
+        Hashtbl.add Types.global_type_declarations x' (Abstract ((op,szs,tyargs,intl),with_file $loc));
+        clear_tyvar_constraints ();
+        None
+    | `Sum tyBs ->
+        let tyB = TyB_sum tyBs in
+        note_no_recursive_type ~loc:(with_file $loc) x tyB; (* x is the previous name *)
+        add_alias x' (tyB,szs,tyargs) (with_file $loc);
+        clear_tyvar_constraints();
+         Some (x',tyBs) 
+  }
+
 type_decl_end:
 | EQ ty=ty SEMI_SEMI? {`Ty ty }
 | r=rest_abstract { `R r }
