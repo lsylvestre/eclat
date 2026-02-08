@@ -468,6 +468,8 @@ let pp_component fmt ~vhdl_comment ~name ~(operators : _ Ast.SMap.t) ~externals 
 
 let run n =
   let args_list = [|%a|] in
+  if Array.length args_list = 0
+  then (print_string \"no inputs provided in simulation code (to set with ./eclat -arg=\\\"I1;...In\\\")\n\") else
   let k = Array.length args_list - 1 in
   for i = 0 to n - 1 do
     ignore (%a (args_list.(min i k)))

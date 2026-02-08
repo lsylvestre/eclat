@@ -153,9 +153,9 @@ clean-all:	clean
 	# rm -f src/frontend/parser.ml src/frontend/parser.mli
 	make -f ../target/Makefile clean-all
 
-TEST_PATH=tests
+TEST_PATH=tests/good
 TESTS=find $(TEST_PATH) -name *.ecl
 
-test:
+test:       # todo: fix/provide automatic tests
 	@$(foreach t,$(shell $(TESTS)), echo "============================\n== $(t)"; \
               $(shell head -n 2 ${t}  | tail -n 1) ;)

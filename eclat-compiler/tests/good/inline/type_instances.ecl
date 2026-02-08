@@ -1,4 +1,4 @@
-operator M.f : bool vect<'s> => bool vect<'s+1> ;;
+operator M.f : bool vect<?s> => bool vect<?s+1> ;;
 
 let m_f x = M.f x ;;
 

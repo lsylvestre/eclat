@@ -57,7 +57,7 @@ vm: $(ECLAT_COMPILER)/eclat
 			$(VM_FROM_ECLAT_COMPILER)/vm/target-specific/$(BOARD)/main.ecl)
 
 code: 
-	(cd $(ECLAT_COMPILER); ./eclat -nonormalization $(ECLAT_FLAGS) \
+	(cd $(ECLAT_COMPILER); ./eclat  $(ECLAT_FLAGS) \
        $(VM_FROM_ECLAT_COMPILER)/vm/int.ecl \
        $(VM_FROM_ECLAT_COMPILER)/vm/opcode.ecl \
        $(VM_FROM_ECLAT_COMPILER)/vm/mlvalue.ecl \

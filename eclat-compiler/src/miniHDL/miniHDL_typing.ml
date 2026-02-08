@@ -56,7 +56,7 @@ let rec size_ty =
     | TAbstract(x,ns,tys) ->
         let prod_ns = List.fold_left ( * ) 1 (List.map size_ty ns) in
         let sum_ts = if tys = [] then 1 else List.fold_left (+) 0 (List.map size_ty tys) in
-        (match Hashtbl.find_opt Ast.typ_decl_abstract x with
+        (match Hashtbl.find_opt Types.global_type_declarations x with
         | None ->
             let k = prod_ns * sum_ts in
             if List.length tys > 1 then   
@@ -64,13 +64,14 @@ let rec size_ty =
                 Format.fprintf fmt "unknown size for type %s is replaced by %d\n" x k
               );
             k
-        | Some ("only_size_sum",_,_,_) -> List.fold_left (+) 0 (List.map size_ty ns)
-        | Some ("mul",_,_,_) -> prod_ns * sum_ts
-        | Some ("only_size",_,_,_) -> prod_ns
-        | Some (degit,_,_,_) -> 
+        | Some (Types.Abstract(("only_size_sum",_,_,_),_)) -> List.fold_left (+) 0 (List.map size_ty ns)
+        | Some (Types.Abstract(("mul",_,_,_),_)) -> prod_ns * sum_ts
+        | Some (Types.Abstract(("only_size",_,_,_),_)) -> prod_ns
+        | Some (Types.Abstract((degit,_,_,_),_)) -> 
                                 if ns=[] && tys=[] (* todo: better distinguish both *)
                                 then int_of_string degit else
-                                int_of_string degit * (List.fold_left (+) 0 (List.map size_ty ns)))
+                                int_of_string degit * (List.fold_left (+) 0 (List.map size_ty ns))
+        | Some (Types.Alias _) -> assert false (* should not happen *))
    | TSig t -> size_ty t
 
 let rec string_of_ty = function
@@ -185,6 +186,9 @@ let rec translate_tyB =
       let size_tag = compute_tag_size cs in
       let n = List.fold_left (max) 0 @@ List.map (fun (_,t) -> size_ty (translate_tyB t)) cs in
       TTuple[TInt(TSize size_tag);TVect(n)]
+  | TyB_alias(x,sz_list,tyB_list) ->
+      let tyB' = alias_instance x sz_list tyB_list in
+      translate_tyB tyB'
   | TyB_string sz -> TString (translate_size sz)
 
   and translate_size = 

@@ -152,7 +152,7 @@ let caml_fresh_oo_id(_,st) =
 let caml_obj_dup((arg,_),st) =
   let sz = size_val(arg) in
   if sz == 0 then (arg,st) else (
-  let tag = char_of_short(tag_val arg) in
+  let tag = byte_of_short(tag_val arg) in
   
   let (pc,acc,sp, (env, extra_args, trap_sp), others) = st in
   

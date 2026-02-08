@@ -3,7 +3,6 @@ let one_hot_encoding_flag = ref true
 
 type x = string
 
-
 (** associative array having key of type [string] *)
 module SMap = Map.Make(String)
 
@@ -39,7 +38,7 @@ type tyB = TyB_var of tyB var
          | TyB_sum of (tag * tyB) list
          | TyB_string of size
          | TyB_abstract of x * size list * tyB list (* size in number of bits *)
-
+         | TyB_alias of x * size list * tyB list
 and tag = string
 
 type dur = Dur_var of dur var
@@ -90,8 +89,11 @@ let rec canon_tyB = function
     TyB_sum(List.map (fun (tag,tyB) -> (tag,canon_tyB tyB)) ctors)
 | TyB_string sz ->
     TyB_string (canon_size sz)
-| TyB_abstract (x,szs,tyB_list) ->
-    TyB_abstract (x,List.map canon_size szs, List.map canon_tyB tyB_list)
+| TyB_abstract (x,sz_list,tyB_list) ->
+    TyB_abstract (x,List.map canon_size sz_list, List.map canon_tyB tyB_list)
+| TyB_alias (x,sz_list,tyB_list) ->
+    TyB_alias (x,List.map canon_size sz_list, List.map canon_tyB tyB_list)
+
 
 let rec canon_dur = function
 | Dur_var ({contents=Is d} as v) ->
@@ -157,14 +159,20 @@ let rec canon_ty = function
 | Ty_size(sz) ->
     Ty_size(canon_size sz)
 
+type alias_entry = 
+| Alias of (tyB * x list * x list) * Prelude.loc
+| Abstract of (string * size list * tyB list * int list) * Prelude.loc
+
+let global_type_declarations : (x,alias_entry) Hashtbl.t = Hashtbl.create 10
+
 let pp_dur fmt (d:dur) : unit =
   let open Format in
   let rec pp fmt d =
   match canon_dur d with
   | Dur_var{contents=Unknown{id=n;name}} ->
       (match name with
-      | None -> fprintf fmt "'dur%d" n
-      | Some x -> fprintf fmt "%s%d" x n)
+      | None -> fprintf fmt "$%d" n
+      | Some x -> fprintf fmt "$%s%d" x n)
   | Dur_var{contents=Is d} -> pp fmt d
   | Dur_zero -> fprintf fmt "0"
   | Dur_one -> fprintf fmt "1"
@@ -179,7 +187,7 @@ let pp_size fmt (sz:size) : unit =
   | Sz_var{contents=Unknown{id=n;name}} ->
        (match name with
         | None -> fprintf fmt "?%d" n
-        | Some x -> fprintf fmt "%s%d" x n)
+        | Some x -> fprintf fmt "?%s%d" x n)
   | Sz_var{contents=Is sz} -> pp fmt sz
   | Sz_lit k -> fprintf fmt "%d" k
   | Sz_add(sz,n) -> fprintf fmt "(%a + %d)" pp sz n
@@ -194,6 +202,22 @@ pp_print_list
       pp fmt vs;
 fprintf fmt ")"
 
+let pp_tyB_ident fmt pp_tyB x sz_list tyB_list =
+  let open Format in
+  if tyB_list <> [] then
+    (fprintf fmt "(";
+     pp_print_list
+       ~pp_sep:(fun fmt () -> fprintf fmt ", ") pp_tyB fmt tyB_list;
+     fprintf fmt ") ") 
+  else ();
+  (fprintf fmt "%s" x;
+  match sz_list with
+  | [] -> ()
+  | _ -> fprintf fmt "<";
+         pp_print_list
+           ~pp_sep:(fun fmt () -> fprintf fmt ", ") pp_size fmt sz_list;
+       fprintf fmt ">")
+
 let pp_tyB fmt (tyB:tyB) : unit =
   let open Format in
   let rec pp fmt tyB =
@@ -201,7 +225,7 @@ let pp_tyB fmt (tyB:tyB) : unit =
   | TyB_var{contents=Unknown{id=n;name}} ->
        (match name with
         | None -> fprintf fmt "~%d" n
-        | Some x -> fprintf fmt "%s%d" x n)
+        | Some x -> fprintf fmt "~%s%d" x n)
   | TyB_var{contents=Is tyB} -> pp fmt tyB
   | TyB_bool -> fprintf fmt "bool"
   | TyB_unit -> fprintf fmt "unit"
@@ -215,19 +239,11 @@ let pp_tyB fmt (tyB:tyB) : unit =
            fprintf fmt "%s of %a" x pp t) fmt ctors;
         fprintf fmt ")"
   | TyB_string sz -> fprintf fmt "string<%a>" pp_size sz
-  | TyB_abstract (x,szs,tyB_list) ->
-      if tyB_list <> [] then
-        (fprintf fmt "(";
-         pp_print_list
-           ~pp_sep:(fun fmt () -> fprintf fmt ", ") pp fmt tyB_list;
-         fprintf fmt ") ") else ();
-         (fprintf fmt "%s" x;
-          match szs with
-          | [] -> ()
-          | _ -> fprintf fmt "<";
-                 pp_print_list
-                   ~pp_sep:(fun fmt () -> fprintf fmt ", ") pp_size fmt szs;
-                 fprintf fmt ">")
+  | TyB_abstract (x,sz_list,tyB_list) ->
+      (* fprintf fmt "abstract:"; *)
+      pp_tyB_ident fmt pp x sz_list tyB_list
+ | TyB_alias (x,sz_list,tyB_list) ->
+      pp_tyB_ident fmt pp x sz_list tyB_list
  in pp fmt tyB
 
 let pp_ty fmt (ty:ty) : unit =
@@ -237,7 +253,7 @@ let pp_ty fmt (ty:ty) : unit =
   | Ty_var{contents=Unknown{id=n;name}} ->
        (match name with
         | None -> fprintf fmt "'%d" n
-        | Some x -> fprintf fmt "%s%d" x n)
+        | Some x -> fprintf fmt "'%s%d" x n)
   | Ty_var{contents=Is ty} -> pp fmt ty
   | Ty_base tyB -> pp_tyB fmt tyB
   | Ty_tuple ty_list -> pp_tuple fmt pp ty_list
@@ -284,12 +300,13 @@ TyB_var (ref (Unknown {id=new_unknown ();name}))
 let new_ty_unknown ?name () =
 Ty_var (ref (Unknown {id=new_unknown ();name}))
 
+type kind = T | B | S | D
 
-module Vs = Set.Make(struct
+module Vs = Map.Make(struct
                        type t = unknown 
                        let compare {id=n;_} {id=m;_} = compare n m
                      end)
-type scheme = Forall of (Vs.t * ty)
+type scheme = Forall of (kind Vs.t * ty)
 
 exception Found
 
@@ -324,8 +341,9 @@ let rec occ = function
 | TyB_sum ctors ->
     List.iter (fun (_,tyB) -> occ tyB) ctors
 | TyB_string sz -> occur_size v sz
-| TyB_abstract(_,szs,tyB_list) ->
-    List.iter (occur_size v) szs; List.iter occ tyB_list
+| TyB_abstract (_, sz_list, tyB_list)
+| TyB_alias    (_, sz_list, tyB_list) ->
+    List.iter (occur_size v) sz_list; List.iter occ tyB_list
 in occ tyB
 
 let rec occur_ty v ty =
@@ -355,88 +373,98 @@ let rec occur_ty v ty =
   in occ ty
 
 let test_occur occ o =
-try occ o; false with Found -> true
+  try occ o; false with Found -> true
 
 let vars_of_size ?(s=Vs.empty) sz =
-let rec vars s = function
-  | Sz_var {contents=Unknown u} -> Vs.add u s
-  | Sz_var {contents=Is sz} -> vars s sz
-  | Sz_lit _ -> s
-  | Sz_add(sz,_) -> vars s sz
-  | Sz_twice(sz) -> vars s sz
-in vars s sz
+  let rec vars s = function
+    | Sz_var {contents=Unknown u} -> Vs.add u S s
+    | Sz_var {contents=Is sz} -> vars s sz
+    | Sz_lit _ -> s
+    | Sz_add(sz,_) -> vars s sz
+    | Sz_twice(sz) -> vars s sz
+  in vars s sz
 
 let vars_of_dur ?(s=Vs.empty) d =
-let rec vars s = function
-  | Dur_var {contents=Unknown u} ->
-      Vs.add u s
-  | Dur_var {contents=Is sz} -> vars s sz
-  | Dur_zero | Dur_one -> s
-  | Dur_max(d1,d2) -> vars (vars s d1) d2
-in vars s d
+  let rec vars s = function
+    | Dur_var {contents=Unknown u} ->
+        Vs.add u D s
+    | Dur_var {contents=Is sz} -> vars s sz
+    | Dur_zero | Dur_one -> s
+    | Dur_max(d1,d2) -> vars (vars s d1) d2
+  in vars s d
 
 let vars_of_tyB ?(s=Vs.empty) tyB =
-let rec vars s = function
-  | TyB_var {contents=Unknown u} ->
-      Vs.add u s
-  | TyB_var {contents=Is tyB} -> vars s tyB
-  | TyB_bool | TyB_unit -> s
-  | TyB_int sz -> vars_of_size ~s:s sz
-  | TyB_tuple tyB_list ->
-      List.fold_left vars s tyB_list
-  | TyB_sum ctors ->
-      List.fold_left (fun s (_,tyB) -> vars s tyB) s ctors
-  | TyB_string sz -> vars_of_size ~s:s sz
-  | TyB_abstract(_,szs,tyB_list) -> 
-      let s = List.fold_left (fun s -> vars_of_size ~s) s szs in
-      List.fold_left vars s tyB_list
-in
-vars s tyB
+  let rec vars s = function
+    | TyB_var {contents=Unknown u} ->
+        Vs.add u B s
+    | TyB_var {contents=Is tyB} -> vars s tyB
+    | TyB_bool | TyB_unit -> s
+    | TyB_int sz -> vars_of_size ~s:s sz
+    | TyB_tuple tyB_list ->
+        List.fold_left vars s tyB_list
+    | TyB_sum ctors ->
+        List.fold_left (fun s (_,tyB) -> vars s tyB) s ctors
+    | TyB_string sz -> vars_of_size ~s:s sz
+    | TyB_abstract(_, sz_list, tyB_list)
+    | TyB_alias   (_, sz_list, tyB_list) -> 
+        let s = List.fold_left (fun s -> vars_of_size ~s) s sz_list in
+        List.fold_left vars s tyB_list
+  in
+  vars s tyB
 
 let vars_of_ty ?(s=Vs.empty) ty =
-let rec vars s = function
-| Ty_var {contents=Unknown u} ->
-    Vs.add u s
-| Ty_var {contents=Is ty} -> vars s ty
-| Ty_base t -> vars_of_tyB ~s t
-| Ty_tuple ty_list ->
-    List.fold_left vars s ty_list
-| Ty_fun(ty1,d,tyB2) ->
-    let s1 = vars s ty1 in
-    let s2 = vars_of_tyB ~s:s1 tyB2 in
-    vars_of_dur ~s:s2 d
-| Ty_ref tyB -> vars_of_tyB ~s tyB
-| Ty_array (sz,tyB) ->
-    let s1 = vars_of_size ~s sz in
-    vars_of_tyB ~s:s1 tyB
-| Ty_signal (tyB) ->
-    vars_of_tyB ~s:s tyB
-| Ty_trap (tyB) ->
-    vars_of_tyB ~s:s tyB
-| Ty_size sz ->
-    vars_of_size ~s sz
-in vars s ty
+  let rec vars s = function
+  | Ty_var {contents=Unknown u} ->
+      Vs.add u T s
+  | Ty_var {contents=Is ty} -> vars s ty
+  | Ty_base t -> vars_of_tyB ~s t
+  | Ty_tuple ty_list ->
+      List.fold_left vars s ty_list
+  | Ty_fun(ty1,d,tyB2) ->
+      let s1 = vars s ty1 in
+      let s2 = vars_of_tyB ~s:s1 tyB2 in
+      vars_of_dur ~s:s2 d
+  | Ty_ref tyB -> vars_of_tyB ~s tyB
+  | Ty_array (sz,tyB) ->
+      let s1 = vars_of_size ~s sz in
+      vars_of_tyB ~s:s1 tyB
+  | Ty_signal (tyB) ->
+      vars_of_tyB ~s:s tyB
+  | Ty_trap (tyB) ->
+      vars_of_tyB ~s:s tyB
+  | Ty_size sz ->
+      vars_of_size ~s sz
+  in vars s ty
+
+let vs_diff vs1 vs2 =
+  Vs.filter (fun v k -> not (Vs.mem v vs2)) vs1
 
 let free_vars_of_type (bv,t) =
-  Vs.diff (vars_of_ty t) bv
+  vs_diff (vars_of_ty t) bv
 
 
-let print_scheme(Forall(vs,ty)) =
-let open Format in 
-let fmt = std_formatter in
-fprintf fmt "#forall ";
-Vs.iter (fun u ->
-           match u.name with
-           | None -> fprintf fmt "%d " u.id
-           | Some s -> fprintf fmt "%s%d " s u.id) vs;
-fprintf fmt " . %a #" pp_ty ty
+let pp_scheme fmt (Forall(vs,ty)) =
+  let open Format in 
+  if Vs.cardinal vs > 0 then (
+  fprintf fmt "forall ";
+  Vs.iter (fun u k ->
+             (match k with
+             | T -> fprintf fmt "'"
+             | B -> fprintf fmt "~"
+             | S -> fprintf fmt "?"
+             | D -> fprintf fmt "$");
+             match u.name with
+             | None -> fprintf fmt "%d " u.id
+             | Some s -> fprintf fmt "%s%d " s u.id) vs;
+  fprintf fmt " . ");
+  pp_ty fmt ty
 
 let rec instance s = 
   (* print_scheme(s);*)
   instance_aux s and
 instance_aux (Forall(vs,ty)) =
   let unknowns = Hashtbl.create (Vs.cardinal vs) in
-  Vs.iter (fun u -> let name = u.name in
+  Vs.iter (fun u _ -> let name = u.name in
         Hashtbl.add unknowns u.id (new_unknown_generic ?name ())) vs;
   let rec inst_size = function
   | Sz_var {contents=Unknown u} as sz ->
@@ -471,8 +499,10 @@ instance_aux (Forall(vs,ty)) =
   | TyB_sum ctors ->
       TyB_sum (List.map (fun (tag,tyB) -> tag,inst_tyB tyB) ctors)
   | TyB_string sz -> TyB_string (inst_size sz)
-  | TyB_abstract(x,szs,tyB_list) ->
-      TyB_abstract (x,List.map inst_size szs,List.map inst_tyB tyB_list)
+  | TyB_abstract (x,sz_list,tyB_list) ->
+      TyB_abstract (x,List.map inst_size sz_list,List.map inst_tyB tyB_list)
+  | TyB_alias (x,sz_list,tyB_list) ->
+      TyB_alias (x,List.map inst_size sz_list,List.map inst_tyB tyB_list)
   in
 
   let rec inst_ty = function
@@ -499,12 +529,6 @@ instance_aux (Forall(vs,ty)) =
       Ty_size(inst_size sz) 
   in
   inst_ty ty
-
-
-
-
-
-
 
 let rec rename_size unknowns = function
 | Sz_var {contents=Unknown u} as sz ->
@@ -540,9 +564,10 @@ let rec rename_tyB unknowns = function
 | TyB_sum ctors ->
     TyB_sum (List.map (fun (tag,tyB) -> tag,rename_tyB unknowns tyB) ctors)
 | TyB_string sz -> TyB_string (rename_size unknowns sz)
-| TyB_abstract(x,szs,tyB_list) ->
-    TyB_abstract (x,List.map (rename_size unknowns) szs,List.map (rename_tyB unknowns) tyB_list)
-
+| TyB_abstract(x,sz_list,tyB_list) ->
+    TyB_abstract (x,List.map (rename_size unknowns) sz_list,List.map (rename_tyB unknowns) tyB_list)
+| TyB_alias(x,sz_list,tyB_list) ->
+    TyB_alias (x,List.map (rename_size unknowns) sz_list,List.map (rename_tyB unknowns) tyB_list)
 
 let rec rename_ty unknowns = function
 | Ty_var {contents=Unknown u} as ty ->
@@ -567,46 +592,91 @@ let rec rename_ty unknowns = function
 | Ty_size sz ->
     Ty_size(rename_size unknowns sz)
 
-  let free_vars_of_type_env l =
-    List.fold_left (fun vs (x,(Forall (v,t))) ->
-                  Vs.union vs (free_vars_of_type (v,t)) )
-     Vs.empty l
+let free_vars_of_type_env l =
+  List.fold_left (fun vs (x,(Forall (v,t))) ->
+                Vs.union (fun v k1 k2 -> assert (k1=k2); Some k1) 
+                  vs (free_vars_of_type (v,t)) )
+   Vs.empty l
 
-let rename_scheme (Forall(vs,ty)) =
-  let h = Hashtbl.create 10 in
-  Vs.iter (fun {id;name} -> 
-    Hashtbl.add h id (new_unknown_generic ?name ())
-  ) vs;
-  let ty' = rename_ty h ty in
-  let vs' = Vs.map (fun u -> 
-    match (Hashtbl.find h u.id) with 
-    | {contents=Unknown i } -> i
-    | _ -> assert false (* should not happend *)
-  ) vs
-  in
-  Forall(vs',ty')
+let rec subst_size vsize = function
+| Sz_var {contents=Unknown u} as sz ->
+    (match u.name with
+    | None -> sz
+    | Some x ->
+       (match SMap.find_opt x vsize with
+        | None -> sz
+        | Some sz' -> sz'))
+| Sz_var ({contents=Is sz} as _v) ->
+    subst_size vsize sz
+| Sz_lit _ as k -> k
+| Sz_add(sz,n) -> Sz_add (subst_size vsize sz, n)
+| Sz_twice(sz) -> Sz_twice(subst_size vsize sz)
 
-let generalize r ty =
+
+let rec subst_tyB vsize va = function
+| TyB_var {contents=Unknown u} as tyB ->
+    (match u.name with
+    | None -> tyB
+    | Some x ->
+       (match SMap.find_opt x va with
+        | None -> tyB
+        | Some tyB' -> tyB'))
+| TyB_var {contents=Is tyB} ->
+    subst_tyB vsize va tyB
+| TyB_bool | TyB_unit as tyB -> tyB
+| TyB_int sz -> TyB_int (subst_size vsize sz)
+| TyB_tuple tyB_list ->
+    TyB_tuple (List.map (subst_tyB vsize va) tyB_list)
+| TyB_sum ctors ->
+    TyB_sum (List.map (fun (tag,tyB) -> tag,subst_tyB vsize va tyB) ctors)
+| TyB_string sz -> TyB_string (subst_size vsize sz)
+| TyB_abstract(x,sz_list,tyB_list) ->
+    TyB_abstract (x,List.map (subst_size vsize) sz_list,List.map (subst_tyB vsize va) tyB_list)
+| TyB_alias(x,sz_list,tyB_list) ->
+    TyB_alias (x,List.map (subst_size vsize) sz_list,List.map (subst_tyB vsize va) tyB_list)
+
+let alias_instance x sz_list tyB_list =
+  match Hashtbl.find global_type_declarations x with
+  | Alias ((tyB',sz_argvs,tyB_argsvs),_) ->
+      if List.compare_lengths sz_argvs sz_list <> 0 then assert false;
+      if List.compare_lengths tyB_argsvs tyB_list <> 0 then assert false;
+      let sz_argvs' = List.fold_left2 (fun m vx sz -> 
+                        SMap.add vx sz m) SMap.empty sz_argvs sz_list in
+      let tyB_argsvs' = List.fold_left2 (fun m vx tyB -> 
+                        SMap.add vx tyB m) SMap.empty tyB_argsvs tyB_list in
+      let tyB'' = subst_tyB sz_argvs' tyB_argsvs' tyB' in
+      tyB''
+  | _ -> assert false (* not an alias *)
+
+let generalize ?(only_functions=true) r ty =
   let ty = canon_ty ty in
-  match ty with
-  | Ty_var{contents=Is (Ty_fun _)} | Ty_fun _ ->
+  let gen_aux () = 
       let fvg = free_vars_of_type_env r in
       let vs = free_vars_of_type (fvg,ty) in
       (* rename_scheme *)(Forall(vs,ty))
-  | ty -> Forall(Vs.empty,ty)
+  in
+  if only_functions then
+    match ty with
+    | Ty_var{contents=Is (Ty_fun _)} | Ty_fun _ ->
+        gen_aux ()
+    | ty -> Forall(Vs.empty,ty)
+  else gen_aux ()
 
 let copy_ty ty =
-  instance (generalize [] ty)
+  instance (generalize ~only_functions:false [] ty)
 
 let rec as_tyB ~loc ty = 
   match ty with
   | Ty_base tyB -> tyB
   | Ty_tuple(tys) -> TyB_tuple(List.map (as_tyB ~loc) tys)
-  | Ty_var({contents=Unknown n} as r) -> TyB_var(Obj.magic r)
+  | Ty_var({contents=Unknown v} as r) -> 
+      TyB_var(Obj.magic r)
   | _ -> Prelude.Errors.raise_error ~loc ()
                  ~msg:"basic type expected"
 
-let rec is_tyB ty = 
+let rec is_tyB ty =
+  (* alias for basic type should be put 
+     in the form [Ty_base(TyB_alias _)] before *)
   match canon_ty ty with
   | Ty_base _ -> true
   | Ty_tuple(tys) -> List.for_all is_tyB tys
@@ -614,13 +684,14 @@ let rec is_tyB ty =
   | Ty_var _ -> true
   | _ -> false
 
-
-let extract_arg_res_fun ty =
+let rec extract_arg_res_fun ty =
+  (* what to do with alias ? *)
   match canon_ty ty with
   | Ty_fun(ty1,d,tyB) -> (ty1,tyB)
   | _ -> assert false
   
-let extract_ty_fun ty =
+let rec extract_ty_fun ty =
+  (* what to do with alias ? *)
   match canon_ty ty with
   | Ty_fun(ty1,d,tyB) -> (ty1,d,tyB)
   | _ -> assert false
@@ -637,7 +708,7 @@ let contains_fun ty =
   | Ty_array _
   | Ty_signal _
   | Ty_trap _
-  | Ty_size _ -> () 
+  | Ty_size _ -> ()
   in
   try aux ty; false 
   with Find -> true ;;
@@ -676,3 +747,24 @@ let size_tyB tyB =
     | TyB_string sz -> size_sz sz * 8
     | _ -> Format.(fprintf std_formatter "[%a]" pp_tyB tyB); assert false (* todo *)
   in loop tyB *)
+
+let alias_find_tyB x tyB =
+  let exception Find in
+  let rec alias tyB = 
+    match tyB with
+    | TyB_var {contents=Unknown _} ->
+        ()
+    | TyB_var {contents=Is tyB} -> alias tyB
+    | TyB_bool | TyB_unit 
+    | TyB_int _ -> ()
+    | TyB_tuple tyB_list ->
+        List.iter alias tyB_list
+    | TyB_sum ctors ->
+        List.iter (fun (_,tyB) -> alias tyB) ctors
+    | TyB_string _ -> ()
+    | TyB_abstract(y,_,tyB_list)
+    | TyB_alias (y, _, tyB_list) -> 
+        if x = y then raise Find
+        else List.iter alias tyB_list
+  in
+  try alias tyB; false with Find -> true

@@ -89,7 +89,7 @@ let instance ~genv ty v e =
     | E_const(Inj _ | C_appInj _) -> 
         Prelude.Errors.raise_error 
            ~msg:"sum type not supported in evaluation mode" ()
-    | E_const(c) -> Types.Ty_base (Typing.typ_const ~loc:Prelude.dloc SMap.empty c)
+    | E_const(c) -> Types.Ty_base (Typing.typ_const ~loc:Prelude.dloc ~ctors:SMap.empty c)
     | E_tuple(es) -> (Ty_tuple (List.map (type_of ~genv) es))
     | E_fun(_,(ty,tyr),_) -> Types.Ty_fun(ty,Types.new_dur_unknown(), tyr)
     | E_fix(_,(_,(ty,tyr),_)) -> Types.Ty_fun(ty,Types.new_dur_unknown(), tyr)

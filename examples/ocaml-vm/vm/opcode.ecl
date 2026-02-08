@@ -31,12 +31,12 @@ type group4 =
   | RESTART of unit
   | RETURN of short
   | APPTERM of short * short
-  | PUSHTRAP of char 
+  | PUSHTRAP of byte 
   | PUSHRETADDR of short
-  | APPLY of bool * char * short 
-  | MAKEBLOCK     of bool * bool * short * char * short(* is_atom * size * tag *) 
-  | GRAB of char 
-  | CLOSUREREC of char * short * short * short ;; 
+  | APPLY of bool * byte * short 
+  | MAKEBLOCK     of bool * bool * short * byte * short(* is_atom * size * tag *) 
+  | GRAB of byte 
+  | CLOSUREREC of byte * short * short * short ;; 
 
 
 type get_seg = ENVACC of unit | GETFIELD of unit | GETGLOBAL of unit

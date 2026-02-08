@@ -10,18 +10,29 @@
   let with_file loc =
     (!Current_filename.current_file_name, loc)
 
-  let alias_types = Hashtbl.create 10
+  let already_defined_types = Hashtbl.create 100 ;;
+  
+  let rename_new_type_ident x =
+    match Hashtbl.find_all already_defined_types x with
+    | [] -> Hashtbl.add already_defined_types x x; x
+    | l -> let y = x ^"/"^string_of_int (List.length l+1) in
+           Hashtbl.add already_defined_types x y;
+           y
 
-  let add_alias x ty loc =
-    match Hashtbl.find_opt alias_types x with
-    | Some (_,loc') ->
-        let open Errors in
-        error ~loc
-              (fun fmt -> 
-                 Format.fprintf fmt "type %s cannot be redefined. Previous definition at %a"
-                    x (fun fmt -> emph_pp bold pp_loc fmt) loc')
-    | _ ->
-      Hashtbl.add alias_types x (ty,loc)
+  let rename_from_defined_type x =
+    match Hashtbl.find_opt already_defined_types x with
+    | None -> x
+    | Some y -> y
+
+  let note_no_recursive_type ~loc x tyB =
+    (* if identifier x occurs in tyB, emit a note 
+     saying that, in Eclat, types are not recursive *)
+    if Types.alias_find_tyB x tyB then
+      Prelude.Errors.note ~loc (fun fmt -> 
+        Format.fprintf fmt "Types are not recursive@,")
+
+  let add_alias x (tyB,szs,args) loc =
+    Hashtbl.add Types.global_type_declarations x (Alias ((tyB,szs,args),loc))
 
   let rec as_const loc e =
     match un_annot e with
@@ -30,6 +41,13 @@
     | _ -> Format.fprintf Format.std_formatter "--->%a\n" Ast_pprint.pp_exp e;
     Prelude.Errors.raise_error ~loc:(with_file loc)
               ~msg:"this expression should be a constant" ()
+
+  let hash_dur_tvar = Hashtbl.create 10 ;;
+  let decl_dur_var x =
+    if Hashtbl.mem hash_dur_tvar x then
+    Hashtbl.find hash_dur_tvar x else
+    (let v = (new_dur_unknown ~name:x ()) in
+     Hashtbl.add hash_dur_tvar x v; v)
 
   let hash_size_tvar = Hashtbl.create 10 ;;
   let decl_size_var x =
@@ -64,45 +82,46 @@
     match Types.canon_ty ty with
     | Ty_fun(Ty_base(TyB_tuple ts),_,_) -> List.length ts
     | Ty_fun(Ty_base _,_,_) -> 1
-    | _ -> assert false (* todo *)
+    | _ -> 0 (* todo *)
 
 
 let check_abstract_type ~loc x szs tyB_list =
-  match Hashtbl.find_opt typ_decl_abstract x with
-  | None -> Prelude.Errors.error ~loc (fun fmt -> Format.fprintf fmt "Unbound type constructor %s" x)
-  | Some(_,szs',tyB_list',_) ->
-    begin
-      if List.compare_lengths szs szs' = 0 then ()
-      else let szs_length = List.length szs' in
+  let check_when_present szs' tyB_list' =
+    (if List.compare_lengths szs szs' = 0 then ()
+    else let szs_length = List.length szs' in
            Prelude.Errors.error ~loc 
              (fun fmt -> Format.fprintf fmt 
                             "type %s expects %d size parameter%s" 
                             x szs_length 
-                            (if szs_length <= 1 then "" else "s"))
-    end;
-    begin
-      if List.compare_lengths tyB_list tyB_list' = 0 then ()
-      else let tyB_list_length = List.length tyB_list' in
-           Prelude.Errors.error ~loc 
+                            (if szs_length <= 1 then "" else "s")));
+    if List.compare_lengths tyB_list tyB_list' = 0 then ()
+    else let tyB_list_length = List.length tyB_list' in
+         Prelude.Errors.error ~loc 
              (fun fmt -> Format.fprintf fmt 
                             "type %s expects %d type parameter%s" 
                             x tyB_list_length 
                             (if tyB_list_length <= 1 then "" else "s"))
-
-    end
-
+  in
+  match Hashtbl.find_opt Types.global_type_declarations x with
+  | None ->
+     if Hashtbl.mem Types.global_type_declarations x then () 
+     else Prelude.Errors.error ~loc (fun fmt -> Format.fprintf fmt "Unbound type constructor %s" x)
+  | Some(Alias((_,szs',tyB_list'),_)) ->
+      check_when_present szs' tyB_list'
+  | Some(Abstract((_,szs',tyB_list',_),_)) ->
+      check_when_present szs' tyB_list'
 
 %}
 
 %token LPAREN RPAREN LCUR RCUR LBRACKET RBRACKET COMMA PIPE_PIPE PIPE_COMMA_PIPE EQ EQ_EQ COL SEMI HAT STATIC DOT_LENGTH ARRAY_LENGTH
 %token LBRACKET_PIPE PIPE_RBRACKET
 %token FUN AMP DOT REGISTER EXEC INIT DEFAULT RESET WHERE RETURNS PERCENT
-%token NODE IMPLY
+%token NODE IMPLY MINUS_LCUR RCUR_MINUS_GT
 %token MATCH WITH PIPE END
 %token OF
 %token LET REC AND IN IF THEN ELSE FIX
 %token ARRAY IMPURE
-%token <string> IDENT UP_IDENT TVAR_IDENT TYB_VAR_IDENT 
+%token <string> IDENT UP_IDENT TVAR_IDENT TYB_VAR_IDENT DUR_VAR_IDENT SIZE_VAR_IDENT
 %token <bool> BOOL_LIT
 %token <int> INT_LIT
 %token <char> CHAR_LIT
@@ -179,30 +198,26 @@ pi:
     let v = mk @@ E_fun(P_var arg,(Types.new_ty_unknown(),Types.new_tyB_unknown()), 
          mk @@ E_run(f,(mk @@ E_var arg),gensym())) in
     (((f,(t,shared,loc_x))::ecs,efs), gs,    ts,    (((P_var x,v),with_file $loc)::ds))}
-| ef=ext_fun pi=pi    { let (ecs,efs),gs,ts,ds = pi in ((ecs,ef::efs), gs,    ts,    ds   ) }
-| g=static pi=pi      { let (ecs,efs),gs,ts,ds = pi in ((ecs,    efs), g::gs, ts,    ds   ) }
-| d=typ_sum pi=pi     { let (ecs,efs),gs,ts,ds = pi in ((ecs,    efs), gs,    d::ts, ds   ) }
-| d=decl pi=pi        { let (ecs,efs),gs,ts,ds = pi in ((ecs,    efs), gs,    ts,    d::ds) }
-| type_decl pi=pi     { pi }
-| EOF                 { ([],[]),[],[],[] }
+| ef=ext_operator pi=pi { let (ecs,efs),gs,ts,ds = pi in ((ecs,ef::efs), gs,    ts,    ds   ) }
+| g=static pi=pi        { let (ecs,efs),gs,ts,ds = pi in ((ecs,    efs), g::gs, ts,    ds   ) }
+| d=type_decl pi=pi     { match d with 
+                          | None -> pi 
+                          | Some d ->
+                             let (ecs,efs),gs,ts,ds = pi in
+                             ((ecs,    efs), gs,    d::ts, ds   ) }
+| d=decl pi=pi          { let (ecs,efs),gs,ts,ds = pi in ((ecs,    efs), gs,    ts,    d::ds) }
+| EOF                   { ([],[]),[],[],[] }
 
-ext_fun:
-/*| OPERATOR x=SYM COL t=ty EQ y=STRING_LIT SEMI_SEMI 
-   { Hashtbl.add infix_operators x y; 
-     Hashtbl.clear hash_size_tvar;
-     (y, (t,false)) }*/
-| OPERATOR x=OPERATOR_IDENT COL t=ty imp=is_impure SEMI_SEMI 
+ext_operator:
+| OPERATOR ws=WITH_SIZES? x=OPERATOR_IDENT COL t=ty imp=is_impure SEMI_SEMI 
    { Hashtbl.clear hash_size_tvar;
      let copy_t = Types.copy_ty t in
      (* copying [t] is very important for let-polymorphism *)
      let loc_x = with_file $loc(x) in
-     (x, (copy_t,(false,get_arity t,imp,loc_x))) }
-| OPERATOR WITH_SIZES x=OPERATOR_IDENT COL t=ty imp=is_impure SEMI_SEMI 
-   { Hashtbl.clear hash_size_tvar;
-     let copy_t = Types.copy_ty t in
-     let loc_x = with_file $loc(x) in
-     (x, (copy_t,(true,get_arity t,imp,loc_x))) }
-
+     let n = get_arity t in
+     if n = 0 then Prelude.Errors.raise_error ~loc:(with_file $loc)
+                     ~msg:("operator "^x^" should have a functional type") ();
+     (x, (copy_t,(ws <> None,n,imp,loc_x))) }
 %inline is_impure:
 | AT IMPURE { true }
 | {false}
@@ -233,15 +248,7 @@ static: /* todo: add loc and type annotation [tyopt] */
       x,Static_array_of (ty,loc)
     }
 
-
-
-
-
 static_dim_exp: HAT e=aexp { e }
-
-/*const_init_static:
-| ce=aexp { (ce,None) }
-| LPAREN ce=exp COL ty=ty RPAREN { (ce,Some ty) }*/
 
 exp_eof:
 | e=exp EOF {e}
@@ -267,13 +274,11 @@ decl_all:
         { enforce_node b,(with_file $loc) }
 */
 | e=exp SEMI_SEMI { ((P_var "_", e),(with_file $loc))  }
-/*
-| EOF { E_var (!Ast_mk.main_symbol) }*/
 
 after_missing_semi_semi:
 LET | NODE | EOF | TYPE {}
 
-type_decl_sizes:
+type_decl_sizes2:
 | { [] }
 | LT szs=separated_nonempty_list(COMMA,size_unknown) GT { szs }
 
@@ -285,247 +290,275 @@ type_decl_tyB_param_then_ident:
 | LPAREN uu=separated_nonempty_list(COMMA,tyB_unknown) RPAREN x=IDENT 
     { uu,x }
 
+
 type_decl: 
-  /* todo: avoid side effect, 
-     which depends on the left-to-right
-     evaluation order */
-| TYPE x=IDENT EQ tyB=tyB SEMI_SEMI? 
-    { add_alias x tyB (with_file $loc) }
-| kw=TYPE tyB_list_then_ident=type_decl_tyB_param_then_ident 
-       szs=type_decl_sizes 
-       r=rest_abstract
-    { let tyargs,x = tyB_list_then_ident in
-      let (op,intl) = r in
-      if Hashtbl.mem Ast.typ_decl_abstract x then (
-        Prelude.Errors.syntax_error
-                             ~msg:("already defined type "^x)
-                             (with_file $loc(kw)));
-      Hashtbl.add Ast.typ_decl_abstract x (op,szs,tyargs,intl);
-      clear_tyvar_constraints () 
-    }
+| kw=TYPE t_with_params=type_decl_tyB_param_then_ident
+           szs=type_decl_sizes2 a=type_decl_end {
+    let tyargs,x = t_with_params in
+      if Hashtbl.mem Types.global_type_declarations x then (
+            let open Errors in
+            note ~loc:(with_file $loc)
+              (fun fmt ->
+                 Format.fprintf fmt "type %s overides a previous declaration of %s\n"
+                    x x)); 
+      let x' = rename_new_type_ident x in
+      match a with
+      | `Ty ty ->   
+         let vs = Types.vars_of_ty ty in
+         (Vs.iter (fun u _ -> 
+                    match u.name with
+                    | None -> ()
+                    | Some name -> 
+                       if (List.mem name tyargs || List.mem name szs)
+                       then () else 
+                         Prelude.Errors.syntax_error
+                                 ~msg:("The type variable "^name^" is unbound in this type declaration ("^
+                                  x'^").")
+                                 (with_file $loc(kw));
+                       ) vs);
+         let tyB = Types.as_tyB ~loc:(with_file $loc) ty in
+         note_no_recursive_type ~loc:(with_file $loc) x tyB; (* x is the previous name *)
+         add_alias x' (tyB,szs,tyargs) (with_file $loc);
+         None
+      | `R r ->
+          let tyargs = List.map (fun x -> new_tyB_unknown ~name:x ()) tyargs in
+          let szs = List.map (fun x -> new_size_unknown ~name:x ()) szs in
+          let (op,intl) = r in
+          Hashtbl.add Types.global_type_declarations x' (Abstract ((op,szs,tyargs,intl),with_file $loc));
+          clear_tyvar_constraints ();
+          None
+      | `Sum tyBs ->
+          let tyB = TyB_sum tyBs in
+          note_no_recursive_type ~loc:(with_file $loc) x tyB; (* x is the previous name *)
+          add_alias x' (tyB,szs,tyargs) (with_file $loc);
+          clear_tyvar_constraints();
+           Some (x',tyBs) }
+type_decl_end:
+| EQ ty=ty SEMI_SEMI? {`Ty ty }
+| r=rest_abstract { `R r }
+| EQ tyBs=separated_nonempty_list(PIPE,ty_case) SEMI_SEMI?  {`Sum tyBs }
 
 %inline rest_abstract:
-| SEMI_SEMI? { ("mul",[]) }
+| SEMI_SEMI ?  { ("mul",[]) }
 | AT op=IDENT SEMI_SEMI? { (op,[]) }
-| AT op=INT_LIT SEMI_SEMI? { (string_of_int op,[]) }
+| AT op=INT_LIT SEMI_SEMI?  { (string_of_int op,[]) }
 | op=IDENT LBRACKET intl=separated_nonempty_list(COMMA,INT_LIT) RBRACKET SEMI_SEMI?
-   { (op,intl) } 
-
-
-typ_sum:
-| TYPE x=IDENT EQ ts=separated_nonempty_list(PIPE,ty_case) SEMI_SEMI? 
-   { add_alias x (TyB_sum ts) (with_file $loc);
-     clear_tyvar_constraints();
-     x,ts }
+   { (op,intl) }
 
 ty_case:
-| x=UP_IDENT OF tyB=tyB { x,tyB }
+| x=UP_IDENT OF ty=ty { x,Types.as_tyB ~loc:(with_file $loc) ty }
+| x=UP_IDENT          { x,TyB_unit }
 
 fun_decl(In_kw):
-| f=IDENT /* szs=size_param_fun_decl*  */
-         p_ty_opt_list=arg_ty_atomic+
-                  ty_opt_ret=ret_ty_annot_eq
-    e1=exp In_kw
-        { let ps, ts = List.split @@
-                            List.map (fun (p,ty_opt) -> 
-                            match ty_opt with
-                            | None -> p, new_ty_unknown()
-                            | Some ty -> p,ty) p_ty_opt_list in
-          let p_ty_opt = group_ps ps, Some (group_ts ts) in
-        (*  let p_ty_opt = 
-            match szs,p_ty_opt with
-            | [],p_ty_opt -> p_ty_opt
-            | szs,(p,ty_opt) ->
-                let ps = List.map (fun _ -> P_var(Ast.gensym ())) szs in
-                (P_tuple(ps@[p]), 
-                  Some (Ty_tuple(List.map (fun sz -> Ty_size sz) szs @ 
-                                [match ty_opt with
-                                 | None -> new_ty_unknown ()
-                                 | Some ty -> ty]))) in *)
-           let ef = mk_let_fun ~loc:(with_file ($startpos(f),$endpos(e1)))
-                               ~p_ty_opt
-                               ~ty_opt_ret
-                        e1
-            in
-            (P_var f, ef)
-        }
+| f=IDENT p_ty_opt_list=arg_ty_atomic+ 
+      ty_opt_ret=ret_ty_annot_eq
+      e1=exp In_kw { 
+    let ps, ts = List.split @@ 
+                    List.map (fun (p,ty_opt) -> 
+                                match ty_opt with
+                                | None -> p, new_ty_unknown()
+                                | Some ty -> p,ty
+                      ) p_ty_opt_list in
+    let p_ty_opt = group_ps ps, Some (group_ts ts) in
+(*  let p_ty_opt = 
+    match szs,p_ty_opt with
+    | [],p_ty_opt -> p_ty_opt
+    | szs,(p,ty_opt) ->
+        let ps = List.map (fun _ -> P_var(Ast.gensym ())) szs in
+        (P_tuple(ps@[p]), 
+          Some (Ty_tuple(List.map (fun sz -> Ty_size sz) szs @ 
+                        [match ty_opt with
+                         | None -> new_ty_unknown ()
+                         | Some ty -> ty]))) in *)
+    let ef = mk_let_fun ~loc:(with_file ($startpos(f),$endpos(e1)))
+                               ~p_ty_opt ~ty_opt_ret e1 in
+    (P_var f, ef)
+  }
 
 size_param_fun_decl:
 | LT_LT sz=size GT_GT { sz }
 
 after_let(In_kw):
 | b=bindings(apat,exp) In_kw { b }
-| b=fun_decl(In_kw)
-        { b }
-| e=fun_rec_decl(In_kw)
-        { e }
-| REC f_ty_opt=ty_annot(IDENT) EQ e1=exp In_kw
-        {
-            let f,ty_opt = f_ty_opt in
-            let loc_fun = with_file ($startpos(f_ty_opt),$endpos(e1)) in
-            let v = mk_fix f (ty_annot_opt ~ty:ty_opt e1) loc_fun in
-            P_var f, v
-        }
+| b=fun_decl(In_kw)          { b }
+| e=fun_rec_decl(In_kw)      { e }
+| REC f_ty_opt=ty_annot(IDENT) EQ e1=exp In_kw {
+    let f,ty_opt = f_ty_opt in
+    let loc_fun = with_file ($startpos(f_ty_opt),$endpos(e1)) in
+    let v = mk_fix f (ty_annot_opt ~ty:ty_opt e1) loc_fun in
+    P_var f, v
+  }
 fun_rec_decl(In_kw):
-| REC f=IDENT p_ty_opt=arg_ty_atomic ty_opt=ret_ty_annot_eq e1=exp In_kw
-        {
-            let p_ty_opt_f =
-              let open Types in
-              match p_ty_opt with
-              | p,None -> p,None
-              | p,Some t -> p,Some (Ty_fun(t,new_dur_unknown(),new_tyB_unknown()))
-            in
-            let loc_fun = with_file ($startpos(f),$endpos(e1)) in
-            let (p,ty_f_opt) = p_ty_opt_f in
-            let ef = mk_fun_ty_annot p ty_f_opt (ty_annot_opt ~ty:ty_opt e1)
-                   |> mk_loc loc_fun in
-            let v = mk_fix f ef loc_fun in
-            P_var f, v
-        }
-
+| REC f=IDENT p_ty_opt=arg_ty_atomic 
+      ty_opt=ret_ty_annot_eq e1=exp In_kw {
+    let p_ty_opt_f =
+      let open Types in
+      match p_ty_opt with
+      | p,None -> p,None
+      | p,Some t -> p,Some (Ty_fun(t,new_dur_unknown(),new_tyB_unknown()))
+    in
+    let loc_fun = with_file ($startpos(f),$endpos(e1)) in
+    let (p,ty_f_opt) = p_ty_opt_f in
+    let ef = mk_fun_ty_annot p ty_f_opt (ty_annot_opt ~ty:ty_opt e1)
+           |> mk_loc loc_fun in
+    let v = mk_fix f ef loc_fun in
+    P_var f, v
+  }
 
 ty_annot(X) :
-| x=X
-        { x,None }
-| x=X COL ty=ty
-        { x,Some ty }
-| LPAREN x_ty_opt=ty_annot(X) RPAREN
-        { x_ty_opt }
-
-tyB_ident:
-| x=IDENT { match x with
-            | "unit" -> TyB_unit
-            | "bool" -> TyB_bool
-            | "int" -> TyB_int(Sz_lit 32)
-            | "string" -> TyB_string (new_size_unknown()) 
-            | s -> 
-                (match Hashtbl.find_opt alias_types s with
-                    | Some (t,_) -> t
-                    | None -> 
-                        let szs = [(* Sz_lit 1*) ] in
-                        let tyBs = [] in
-                        check_abstract_type ~loc:(with_file $loc(x)) x szs tyBs;
-                        TyB_abstract(x,szs,tyBs)) (* Prelude.Errors.raise_error ~loc:(with_file $loc)
-                              ~msg:("unbound type constructor "^s) ()) *) }
-
-
-ty_ident:
-| tyB=tyB_ident { Ty_base tyB }
-
-tyB:
-| tyB=tyB_next TIMES tyBs=separated_nonempty_list(TIMES,tyB_next) 
-    { TyB_tuple (tyB::tyBs) }
-| tyB=tyB_next {tyB}
-
-tyB_next:
-| x=TVAR_IDENT
-| x=TYB_VAR_IDENT { decl_tyB_var x }
-| tyB=tyB_ident { tyB }
-| LPAREN tyB=tyB RPAREN { tyB }
-| x=IDENT szs=size_list
-     { if szs = [] then (
-        let szs = [Sz_lit 1] in
-        let tyBs = [] in
-        check_abstract_type ~loc:(with_file $loc(x)) x szs tyBs;
-        TyB_abstract(x,szs,tyBs) 
-       ) else (
-       match x with
-       | "_" -> (new_tyB_unknown ())
-       | "int" -> (match szs with 
-                   | sz::[] -> 
-                      TyB_int(sz)
-                   | _ -> assert false) 
-       | ("array" (* | "vect"*)) -> 
-            Prelude.Errors.raise_error ~loc:(with_file $loc)
-                 ~msg:("type parameter expected for type constructor "^x) ()
-       | _ ->
-          check_abstract_type ~loc:(with_file $loc(x)) x szs [];
-          TyB_abstract(x,szs,[])) }
-| tyBs=tyB_list x=IDENT szs=size_list
-     { match x with
-       | "array" -> Prelude.Errors.raise_error ~loc:(with_file $loc) ()
-                 ~msg:(x^" is not a basic type constructor")
-       (* | "vect" -> (match szs,tyBs with 
-                   | sz::[],tyB::[] -> 
-                      TyB_vector(sz,tyB)
-                   | _ -> assert false)*)
-       | x -> 
-         check_abstract_type ~loc:(with_file $loc(x)) x szs tyBs;
-         TyB_abstract(x,szs,tyBs)
-       (* Prelude.Errors.raise_error ~loc:(with_file $loc) ()
-                 ~msg:("unknown type constructor "^x) *) }
-
+| x=X                                { x,None }
+| x=X COL ty=ty                      { x,Some ty }
+| LPAREN x_ty_opt=ty_annot(X) RPAREN { x_ty_opt }
 
 size_list:
 | {[]}
-| sz=size { [sz] }
+| LT sz=size GT { [sz] }
 | LT szs=separated_nonempty_list(COMMA,size) GT { szs }
 
-%inline tyB_list:
-| tyB=tyB_next { [tyB] }
-| LPAREN tyBs=separated_nonempty_list(COMMA,tyB) RPAREN { tyBs }
-
-
 ty:
-ts= separated_nonempty_list(TIMES,ty_next) 
-{ match ts with
-  | [] -> assert false
-  | [ty] -> ty 
-  | _ -> Ty_tuple ts }
-
-
-ty_next:
-| ty=ty_tuple_next RIGHT_ARROW tyB=tyB { Ty_fun(ty,Dur_one,tyB) } 
-| ty=ty_tuple_next QUESTION_MARK RIGHT_ARROW tyB=tyB { Ty_fun(ty,new_dur_unknown(),tyB) } 
-| ty=ty_tuple_next IMPLY tyB=tyB { Ty_fun(ty,Dur_zero,tyB) } 
+| ty=ty_tuple_next RIGHT_ARROW ty2=ty_tuple_next {
+    Ty_fun(ty,Dur_one,Types.as_tyB ~loc:(with_file $loc) ty2) 
+  } 
+| ty=ty_tuple_next MINUS_LCUR dur RCUR_MINUS_GT ty2=ty_tuple_next {
+    Ty_fun(ty,new_dur_unknown(),Types.as_tyB ~loc:(with_file $loc) ty2)
+  } 
+| ty=ty_tuple_next IMPLY ty2=ty_tuple_next {
+    Ty_fun(ty,Dur_zero,Types.as_tyB ~loc:(with_file $loc) ty2) 
+  } 
 | ty=ty_tuple_next { ty }
 
-ty_tuple_next:
-| t1=ty_next2 TIMES ts=separated_nonempty_list(TIMES,ty_next2) 
-    { Ty_tuple(t1::ts)}
-| ty=ty_next2 { ty }
+dur:
+| n=INT_LIT {
+    match n with
+    | 0 -> Dur_zero
+    | 1 -> Dur_one
+    | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
+             ~msg:("duration literal should be 0 or 1") ()
+  }
+| x=IDENT LPAREN d1=dur COMMA d2=dur RPAREN {
+    match x with
+    | "max" -> Dur_max(d1,d2)
+    | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc(x))
+              ~msg:("unexpected duration operator "^x) ()
+  }
+| x=DUR_VAR_IDENT { decl_dur_var x } 
 
-ty_next2:
-| x=TVAR_IDENT { decl_ty_var x }
-| ty=ty_next2 ARRAY LT sz=size GT 
+ty_tuple_next:
+| t1=apty0 TIMES ts=separated_nonempty_list(TIMES,apty0) {
+    Ty_tuple(t1::ts)
+  }
+| ty=apty0 { ty }
+
+apty0:
+| tys=ty_list {
+    match tys with
+    | [t] -> t
+    | _ -> assert false (* todo: err *) 
+  }
+| tys=ty_list x=IDENT szs=size_list {
+    let x = rename_from_defined_type x in
+    match x with
+    | "int" ->
+        let open Prelude.Errors in 
+        error ~loc:(with_file $loc) (fun fmt ->
+          let open Format in
+          let b = List.compare_length_with tys 1 = 0 in
+          fprintf fmt "type int<_> does not expect type parameter%s "
+              (if b then "" else "s");
+          emph_pp blue (fun fmt () -> 
+              if b then () else fprintf fmt "(";
+              pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt ", ") Types.pp_ty fmt tys;
+              if b then () else fprintf fmt ")") fmt ()
+        )
+    | _ ->
+        let tyBs = List.map (Types.as_tyB ~loc:(with_file $loc)) tys in
+        (match Hashtbl.find_opt Types.global_type_declarations x with
+         | Some (Alias ((_,args,szs0),_)) -> 
+            Ty_base (TyB_alias(x,szs,tyBs))
+         | _ -> 
+            check_abstract_type ~loc:(with_file $loc(x)) x szs tyBs;
+            Ty_base (TyB_abstract(x,szs,tyBs))) }
+| ty=apty ARRAY LT sz=size GT 
     { Ty_array(sz,Types.as_tyB ~loc:(with_file $loc) ty) }
-| ty=ty_ident { ty }
-| tyB=tyB_next { Ty_base tyB }
+
+apty:
+| x=IDENT szs=size_list {
+    let x = rename_from_defined_type x in
+    match x with
+    | "_" -> (new_ty_unknown ())
+    | "unit" ->
+        assert (szs = []); Ty_base TyB_unit
+    | "bool" ->
+        assert (szs = []); Ty_base TyB_bool
+    | "int" -> 
+        if (szs = []) then Ty_base (TyB_int(Sz_lit 32)) else
+        (match szs with
+        | [sz] -> Ty_base (TyB_int sz)
+        | _ -> assert false)
+     | "string" ->
+        Ty_base (TyB_string (new_size_unknown()))
+     | "array" -> 
+          Prelude.Errors.raise_error ~loc:(with_file $loc)
+               ~msg:("type parameter expected for type constructor "^x) ()
+     | s ->
+       (match Hashtbl.find_opt Types.global_type_declarations s with
+        | Some (Alias ((_,args,szs0),_)) ->
+            Ty_base (TyB_alias(s,szs,[]))
+        | _ ->
+            let tyBs = [] in
+            check_abstract_type ~loc:(with_file $loc(x)) x szs tyBs;
+            Ty_base (TyB_abstract(x,szs,tyBs))) }
+| t=aty {t}
+
+aty:
+| tyB=ty_or_TyB_unknown_decl { tyB }
 | LT_LT sz=size GT_GT { Ty_size sz }
 | LPAREN ty=ty RPAREN { ty }
+
+ty_list:
+| LPAREN ts=ty_list RPAREN {ts}
+| t=apty {[t]}
+| LPAREN t1=ty COMMA ts=separated_nonempty_list(COMMA,ty) RPAREN
+   { t1::ts }
 
 
 size:
 | LPAREN sz=size RPAREN { sz }
 | n=INT_LIT { Sz_lit n }
-| sz=size_unknown { sz }
+| x=size_unknown { decl_size_var x }
 | n=INT_LIT PLUS sz=size 
 | sz=size PLUS n=INT_LIT { Sz_add(sz,n) }
 | n=INT_LIT TIMES sz=size
 | sz=size TIMES n=INT_LIT { 
      if n = 2 then Sz_twice(sz) 
      else Prelude.Errors.raise_error ~loc:(with_file $loc)
-            ~msg:"unsupported size multiplication: only multiplication by two is currently supported." () }
+            ~msg:"unsupported size multiplication: only multiplication by two is currently supported.@," ()
+  }
 
 size_unknown:
+| x=SIZE_VAR_IDENT { x }
 | x=TVAR_IDENT {
-    (* TODO: avoid confusion between size variables 
-       and type variables in source programs 
-       by systematically using a question mark *)
-    decl_size_var ("?"^x)
-}
-| QUESTION_MARK x=IDENT {
-    decl_size_var ("?"^x)
+    Prelude.Errors.warning ~loc:(with_file $loc(x)) (fun fmt -> 
+          Format.fprintf fmt "size variable '%s should be prefixed with `?`.@," x);
+    x
+  }
+| TYB_VAR_IDENT x=IDENT {
+    Prelude.Errors.warning ~loc:(with_file $loc(x)) (fun fmt -> 
+          Format.fprintf fmt "size variable ~%s should be prefixed with `?`.@," x);
+    x
   }
 
 tyB_unknown:
-| x=TVAR_IDENT
-| x=TYB_VAR_IDENT { decl_tyB_var x }
+| x=TYB_VAR_IDENT { x }
+| x=TVAR_IDENT { 
+    Prelude.Errors.warning ~loc:(with_file $loc(x)) (fun fmt -> 
+          Format.fprintf fmt "basic type variable '%s should be prefixed with `~`." x);
+  x }
 
+ty_or_TyB_unknown_decl:
+| x=TVAR_IDENT { decl_ty_var ((*"'"^*)x) }
+| x=TYB_VAR_IDENT { Ty_base (decl_tyB_var ((*"~"^*)x)) }
 
-
-aty:
-ty=ty_next2 { ty } 
 
 value:
   v=value_desc { mk_loc (with_file $loc) v }
@@ -658,13 +691,8 @@ bindings_and(P,E):
 
 
 binding(P,E):
-| p_ty_opt=ty_annot(P) EQ e=E
-        {
-            let p,ty_opt = p_ty_opt in
-            p,ty_annot_opt ~ty:ty_opt e
-        }
-| p=P EQ e=E
-    { p,e }
+| p=P COL ty=ty EQ e=E { p,ty_annot ~ty e }
+| p=P EQ e=E           { p,e }
 
 app_exp:
   e=app_exp_desc { mk_loc (with_file $loc) e }
@@ -849,7 +877,7 @@ aexp:
   e=aexp_desc { mk_loc (with_file $loc) e }
 
 aexp_desc:
-| QUESTION_MARK x=IDENT { E_sig_get(x) }
+| /* QUESTION_MARK x=IDENT */ x=SIZE_VAR_IDENT { E_sig_get(x) }
 | BANG ex=aexp { E_get(ex) }
 | LPAREN e=exp RPAREN { e }
 | LPAREN e=exp COL ty=ty RPAREN { ty_annot ~ty e }
@@ -955,6 +983,7 @@ match_cases:
 
 match_case:
 | x=UP_IDENT p=apat RIGHT_ARROW e=exp { (x,(p,e)) }
+| x=UP_IDENT RIGHT_ARROW e=exp { (x,(P_unit,e)) }
 
 wildcard_case:
 | x=IDENT RIGHT_ARROW e=exp
@@ -989,21 +1018,21 @@ const_without_vect:
 | LPAREN RPAREN { Unit }
 | b=BOOL_LIT    { Bool b }
 | c=CHAR_LIT    { Char c }
-| n=INT_LIT {
-    Int (n,new_size_unknown()) }
-| n=INT_LIT QUOTE k=INT_LIT
-    { if Float.log2 (float n) >= float (k-1) then
+| n=INT_LIT     { Int (n,new_size_unknown()) }
+| n=INT_LIT QUOTE k=INT_LIT { 
+    if Float.log2 (float n) >= float (k-1) then
        Prelude.Errors.raise_error ~loc:(with_file $loc)
           ~msg:("Integer literal "^
                 string_of_int n^
                 " exceeds the range of representable integers of type int<"^
                 string_of_int k ^">") ()
-      else Int (n,Sz_lit k) }
+      else Int (n,Sz_lit k) 
+  }
 | s=STRING_LIT           { String s }
 | x=OPERATOR_IDENT       { Op(Runtime(External_fun(x,new_ty_unknown()))) }
 | x=UP_IDENT             { Inj x }
-| LT_LT sz=size GT_GT { C_size sz }
-| LT_LT GT_GT { C_size (new_size_unknown()) }
+| LT_LT sz=size GT_GT    { C_size sz }
+| LT_LT GT_GT            { C_size (new_size_unknown()) }
 | LPAREN op=binop RPAREN { Op(Runtime(op)) }
 
 %inline binop:

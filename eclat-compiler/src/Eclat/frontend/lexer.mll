@@ -109,9 +109,7 @@ let get_loc lexbuf =
 (* let tvar_ident = [''']['a'-'z'] ['a'-'z''A'-'Z''0'-'9''_''A'-'Z'''']* *)
 let ident = ['a'-'z''_'] ['a'-'z''A'-'Z''0'-'9''_']*[''']*
 let up_ident = ['A'-'Z']['a'-'z''A'-'Z''0'-'9''_''A'-'Z']*
-let tvar_ident = ['a'-'z''A'-'Z''0'-'9''_''A'-'Z']*
-let tyB_var_ident = ['a'-'z''A'-'Z''0'-'9''_''A'-'Z']*
-
+let tvar_ident =  ['a'-'z''A'-'Z''0'-'9''_''A'-'Z']*
 
 let op_ident = up_ident '.' ident
 
@@ -119,8 +117,10 @@ rule token = parse
 | ident as id            { try Hashtbl.find keywords id with
                            | Not_found -> IDENT id }
 | up_ident as id                 { UP_IDENT id }
-| ['''](tvar_ident as lxm)       { TVAR_IDENT lxm }
-| ['`''~'](tyB_var_ident as lxm) { TYB_VAR_IDENT lxm }
+| [''']   (tvar_ident as lxm) { TVAR_IDENT lxm }
+| ['`''~'](tvar_ident as lxm) { TYB_VAR_IDENT lxm }
+| ['$']   (tvar_ident as lxm) { DUR_VAR_IDENT lxm }
+| ['?']   (tvar_ident as lxm) { SIZE_VAR_IDENT lxm }
 | op_ident as id{ OPERATOR_IDENT id }
 | '('                 { incr paren_lvl; LPAREN }
 | ')'                 { if !paren_lvl <= 0 then
@@ -137,10 +137,10 @@ rule token = parse
 | "%with_sizes"       { WITH_SIZES }
 | "|]"                { PIPE_RBRACKET }
 | "[|"                { LBRACKET_PIPE }
-| "{"                { LCUR }
-| "}"                { RCUR }
-| "["                { LBRACKET }
-| "]"                { RBRACKET }
+| "{"                 { LCUR }
+| "}"                 { RCUR }
+| "["                 { LBRACKET }
+| "]"                 { RBRACKET }
 | '@'                 { AT }
 | "@@"                { AT_AT }
 | ','                 { COMMA }
@@ -168,11 +168,13 @@ rule token = parse
 | "!"                 { BANG }
 | "?"                 { QUESTION_MARK }
 | "!=" | "<>"         { NEQ }
-| "<<"                 { LT_LT }
-| ">>"                 { GT_GT }
+| "<<"                { LT_LT }
+| ">>"                { GT_GT }
 | "&&"                { AMP_AMP }
 | "&"                 { AMP }
-(* | "%"                 { PERCENT }*)
+| "-{"                { MINUS_LCUR }
+| "}->"               { RCUR_MINUS_GT }
+(* | "%"              { PERCENT }*)
 | "^"                 { HAT }
 | ".length"           { DOT_LENGTH }
 | "loop:"             { LOOP }

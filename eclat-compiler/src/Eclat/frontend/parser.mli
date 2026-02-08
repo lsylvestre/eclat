@@ -25,6 +25,7 @@ type token =
   | SUSPEND
   | STRING_LIT of (string)
   | STATIC
+  | SIZE_VAR_IDENT of (string)
   | SIZE_CREATE
   | SIGNAL
   | SHARED
@@ -40,6 +41,7 @@ type token =
   | REGISTER
   | REF
   | REC
+  | RCUR_MINUS_GT
   | RCUR
   | RBRACKET
   | QUOTE
@@ -59,6 +61,7 @@ type token =
   | NODE
   | NEQ
   | MOD
+  | MINUS_LCUR
   | MINUS
   | MERGE
   | MATCH
@@ -112,6 +115,7 @@ type token =
   | END
   | EMIT
   | ELSE
+  | DUR_VAR_IDENT of (string)
   | DOT_LENGTH
   | DOT
   | DONE

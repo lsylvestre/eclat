@@ -163,25 +163,20 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ ~genv:_ _ _ -> ()))
         Parser.exp_eof Lexer.token lexbuf)
         lexbuf)
   in
-
-  let find_main = ref false in
-  let ds = List.concat @@
-           List.map (function ((p,e),loc) ->
-                       let bs = try Pattern.bindings p e |> SMap.bindings with
-                       | Pattern.CannotMatch _ ->
-                           error ~loc (fun fmt ->
-                                  Format.fprintf fmt
-                                    "@[<v>This global pattern does not match statically the right-hand side.@]") 
-                       in
-                       find_main := !find_main || (List.exists (fun (x,_) -> x = main_name) bs);
-                       bs) ds 
-  in
-  if !find_main then () 
+  
+  (* check if the entry point is defined *)
+  if List.exists (fun ((p,_),loc) -> 
+                   SMap.mem main_name (vars_of_p p)) ds then () 
   else error (fun fmt -> main_function_undefined fmt main_name);
+  
   let entry_point = E_var main_name in
-  let main = List.fold_right (fun (x,v) e -> E_letIn(P_var x,Types.new_ty_unknown(),v,e)) ds (let y = gensym () in 
-      E_fun (P_var y,(Types.new_ty_unknown(),Types.new_tyB_unknown()), E_app(entry_point,E_var y))) in
-
+  let main = List.fold_right (fun ((p,e1),_) e ->
+                              E_letIn(p,Types.new_ty_unknown(),e1,e)
+                        ) ds (let y = gensym () in 
+                              E_fun (P_var y,(Types.new_ty_unknown(),
+                                              Types.new_tyB_unknown()), 
+                                       E_app(entry_point,E_var y))) 
+  in
   check_externals_nodup (fst exts);
 
   (* return both parsed program and its inputs *)

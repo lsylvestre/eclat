@@ -45,8 +45,8 @@ let rec bindings (p:p) (e:e) : e smap =
   | P_var x,e ->
       SMap.singleton x e
   | P_tuple ps,E_tuple es ->
-    if (List.compare_lengths ps es <> 0) then raise (CannotMatch (p,e)) else
-    List.fold_left2 (fun m p v -> bindings p v ++ m) SMap.empty ps es
+      if (List.compare_lengths ps es <> 0) then raise (CannotMatch (p,e)) else
+      List.fold_left2 (fun m p v -> bindings p v ++ m) SMap.empty ps es
   | P_tuple ps,e when static e ->
       let n = List.length ps in
       let rs = List.mapi (fun i p ->
@@ -67,7 +67,8 @@ let rec pat2exp (p:p) : e =
       E_var x
   | P_tuple ps ->
       E_tuple (List.map pat2exp ps)
-  | P_tyConstr(p,ty) -> E_app(E_const (Op (TyConstr ty)), pat2exp p)
+  | P_tyConstr(p,ty) ->
+      E_app(E_const (Op (TyConstr ty)), pat2exp p)
 
 exception Not_a_pattern
 

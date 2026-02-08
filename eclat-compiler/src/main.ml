@@ -164,15 +164,12 @@ let () =
     ("-ram-init", Arg.String (fun s -> 
                      Gen_vhdl_aux.has_init_file_ram := s::!Gen_vhdl_aux.has_init_file_ram),
                  "add initialization file for the given static array");
-    ("-nonormalization", Arg.Set Compile.nonormalization,
-                         "[experimental] inline only, assume the source program is already normalized");
     ("-ocaml", Arg.Set Compile.ocaml_output_flag,
                "Translate the generated circuit into sequential ocaml code for testing");
     ("-nostdlib", Arg.Unit (fun () -> 
                     Frontend.no_stdlib_flag := true;
                     inputs := List.filter (function "stdlib.ecl" -> false | _ -> true) !inputs),
                  "Do not add stdlib.ecl to the list of input files");
-
     ]
       add_input "Usage:\n  ./eclat file"
 ;;

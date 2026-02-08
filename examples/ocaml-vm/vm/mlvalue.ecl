@@ -31,12 +31,12 @@ let val_ptr (n:short) : value = (as_long(n),false) ;;
 
 
 
-let no_scan_tag : char = 251 ;;
-let string_tag : char = 252 ;;
-let closure_tag : char = 247 ;;
-let infix_tag : char = 249 ;;
-let fwd_ptr_tag : char = 248 ;;
+let no_scan_tag : byte = 251 ;;
+let string_tag : byte = 252 ;;
+let closure_tag : byte = 247 ;;
+let infix_tag : byte = 249 ;;
+let fwd_ptr_tag : byte = 248 ;;
 
 
-let make_header ((tag,sz) : (char * short)) : long =
-  (long_of_char(tag) lsl 24) lor (as_long(sz) lsl 2) ;;
+let make_header ((tag,sz) : (byte * short)) : long =
+  (long_of_byte(tag) lsl 24) lor (as_long(sz) lsl 2) ;;

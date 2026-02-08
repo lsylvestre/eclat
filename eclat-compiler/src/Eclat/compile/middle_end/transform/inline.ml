@@ -37,7 +37,7 @@ let eval_static_exp_int ~loc ~statics e =
 let fv_type_in ?(s=Types.Vs.empty) e =
   let open Types in
   let (++) m1 m2 =
-    Vs.union m1 m2 in
+    Vs.union (fun v k1 k2 -> assert (k1 = k2); Some (k1)) m1 m2 in
   let r = ref s in
   let rec ss e =
     match e with
@@ -104,7 +104,7 @@ let subst_ty e = (* todo: rename this function and remove the unused parameter *
   let vs = fv_type_in e in
   let unknowns = Hashtbl.create (Vs.cardinal vs) in
   (* Ast_pprint.pp_exp Format.std_formatter e; *)
-   Vs.iter (fun n -> Hashtbl.add unknowns n.id (new_unknown_generic ())) vs;
+   Vs.iter (fun n _ -> Hashtbl.add unknowns n.id (new_unknown_generic ())) vs;
   
   let rec ss e =
     let open Operators in

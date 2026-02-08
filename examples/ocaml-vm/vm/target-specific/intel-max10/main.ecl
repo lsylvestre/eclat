@@ -4,18 +4,18 @@ let counter (rst) =
   let inc(c) =
     if rst then 0 else c + 1
   in
-  reg inc last 0 ;;
+  reg inc init 0 ;;
 
 let counter_cond (b) =
   let inc(c) =
     if b then c + 1 else c
   in
-  reg inc last 0 ;;
+  reg inc init 0 ;;
 
 (* blinking a led each n clock cycles *)
 let blink (n) =
   let inc c = if c = n + n then 0 else c + 1 in
-  (reg inc last 0) > n
+  (reg inc init 0) > n
 ;;
 
 

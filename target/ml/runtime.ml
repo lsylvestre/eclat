@@ -40,7 +40,7 @@ module Int = struct
   let lsr_ (a,b) = Int64.shift_right_logical a (Int64.to_int b)
   let asr_ (a,b) = Int64.shift_right a (Int64.to_int b)
   let lsl_ (a,b) = Int64.shift_left a (Int64.to_int b)
-  let resize_ (v,n) = Int64.rem v (Int64.shift_left 1L n)
+  let resize_ (_,n) v = Int64.rem v (Int64.shift_left 1L n)
   let get_bit_(v,i) =
    if Int64.compare (Int64.logand (Int64.shift_right v (Int64.to_int i)) 1L) 1L = 0 
    then true 

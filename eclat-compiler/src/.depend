@@ -401,14 +401,12 @@ src/Eclat/frontend/fix_int_lit_size.cmx :
 src/Eclat/frontend/frontend.cmo : \
     src/Eclat/typing/types.cmo \
     src/prelude.cmo \
-    src/Eclat/syntax/pattern.cmo \
     src/Eclat/frontend/parser.cmi \
     src/Eclat/frontend/current_filename.cmo \
     src/Eclat/syntax/ast.cmo
 src/Eclat/frontend/frontend.cmx : \
     src/Eclat/typing/types.cmx \
     src/prelude.cmx \
-    src/Eclat/syntax/pattern.cmx \
     src/Eclat/frontend/parser.cmx \
     src/Eclat/frontend/current_filename.cmx \
     src/Eclat/syntax/ast.cmx

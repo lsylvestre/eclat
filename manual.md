@@ -184,7 +184,7 @@ Eclat is statically and implicitely typed using a variant of the ML type system.
 ```
 type        -- ty ::= tyB 
                     | ty_1 * ... ty_n 
-                    | ty -dur-> tyB 
+                    | ty -{dur}-> tyB 
                     | tyB array<sz> 
                     | << sz >>
                     | 'a
@@ -194,14 +194,15 @@ basic type  -- tyB ::= bool
                     | tyB_1 * ... tyB_n 
                     | (X_1 of tyB_1 | ... X_n of ty_N)
                     | string
-                    | `a
-duration    -- dur := 
+                    | ~a
+duration    -- dur ::= 
 * instantaneous       0
 * multi-cycle       | 1
                     | max(dur,dur)
-                    | `d
-size        -- sz := n | sz + n | 2 * sz | `s
-type scheme -- sigma := ty | forall `a . sigma
+                    | $a
+size        -- sz ::= n | sz + n | 2 * sz | ?a
+type scheme -- sigma ::= ty | forall v1 ... vN . sigma
+            -- vi    ::= 'a | ~a | $a | ?a
 ```
 
 Immediate values, such as booleans, are typed with basic types.
@@ -210,16 +211,16 @@ They are implemented as bitvectors in the RTL code generated.
 Other values are specialized (removed) by the compiler.
 For example, higher-order function are inlined. 
 Note that the return type of a function must be a basic type, 
-as enforced by the type constructor `ty -dur-> tyB`. 
+as enforced by the type constructor `ty -{dur}-> tyB`. 
 As a consequence, all Eclat functions have one argument (e.g., a pair).
 
-Type variables are noted: ```'a, `a, `d, `s```.
+Type variables are noted: ```'a, ~a, `$a, ?a```.
 
 We use some syntactic sugar: 
-* `ty => tyB` for `ty -0-> tyB`
-* `ty -> tyB` for `ty -1-> tyB`
+* `ty => tyB` for `ty -{0}-> tyB`
+* `ty -> tyB` for `ty -{1}-> tyB`
 
-The main Eclat primitives have following type signatures:
+The main Eclat primitives have the following type signatures:
 
 ```
 (=) : forall `a . (`a * `a) => bool
@@ -255,12 +256,12 @@ in the generated RTL code.
 ## Structure of Eclat programs
 
 Eclat programs are sequences of declarations:
-- ```type x = ty ;;``` is an alias `x` for type `ty` ;
-- ```type x = X_1 of tyB_1 | ... X_n of ty_N``` define a sum type ;
-- ```type tyB x<sz> ;;``` defines an abstract basic type parametrized by a basic type `tyB` and a size `sz`, e.g., 'a vect<sz> ;
-   * ```type tyB x ;;``` is an abreviation for `tyB x<1>`
-- ```operator M.f : tyB1 -> tyB2``` defines the external operator `M.f`
-- ```external f : tyB1 -> tyB2``` defines the external function `f`
+- ```type (~a1, ... ~aN) x<?n1,...?nM> = tyB ;;``` introduces an alias `x` for basic type `tyB`; type variables in `tyB` must belongs to: `~a1, ... ~aN, ?n1,...?nM`) ;
+- ```type (~a1, ... ~aN) x<?n1,...?nM> = X_1 of tyB_1 | ... X_n of ty_N``` defines a sum type ; type variables in `tyB` must belongs to: `~a1, ... ~aN, ?n1,...?nM`) ;
+- ```type (~a1, ... ~aN) x<?n1,...?nM> ;;``` defines an abstract basic type parametrized by basic type `(~a1, ... ~aN)` and sizes `?n1,...?nM`, e.g., `~a vect<?n>`;
+- ```operator M.f : tyB1 => tyB2``` defines the external operator `M.f`
+- ```external f : tyB1 -{dur}-> tyB2``` defines the external function `f`
+- ```shared external f : tyB1 -{dur}-> tyB2``` defines shared external function `f`
 - ```let x = e ;;``` defines the value `x`
 
 
@@ -288,7 +289,7 @@ If the Eclat program is not instantaneous,
 the type system rejects it with the following message :
 
 ```
-Error: This program has type (t1 -{1}-> t2). It is not reactive. 
+Error: This program has type (t1 -> t2). It is not reactive. 
 ```
 
 To disable this check, use the compier flag `-relax` ;
@@ -322,7 +323,7 @@ Enter phrases (separated by ';;') then compile (or run) with ``#q.''
 
 > let sum i = 
     reg (fun s -> i + s) init 0;;
-val sum : forall '289  . (int<~z289> -{0}-> int<~z289>) | 0
+val sum : forall ?n870  . (int<?n870> => int<?n870>) | 0
 
 > let main (i:int<20>) : int<20> * int<20> =
     let o1 = sum(i) in    
@@ -330,7 +331,7 @@ val sum : forall '289  . (int<~z289> -{0}-> int<~z289>) | 0
     assert (o1 = o2);
     print_int o1; print_newline ();
     (o1, o2);;
-val main : (int<20> -{0}-> (int<20> * int<20>))
+val main : (int<20> => (int<20> * int<20>)) | 0
 
 > #q.
 $ make simul

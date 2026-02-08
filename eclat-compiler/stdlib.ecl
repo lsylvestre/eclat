@@ -1,7 +1,10 @@
-operator Values.size : `a => int<32> ;;
-operator Values.equal : (`a * `a) => bool ;;
+(* type int<?n> ;;*)
+
+operator Values.size : ~a => int<32> ;;
+operator Values.equal : (~a * ~a) => bool ;;
 
 let size_val = Values.size;;
+let size_of_val = Values.size;;
 let equal = Values.equal;;
 
 (*******************************)
@@ -16,9 +19,9 @@ operator Bool.land : (bool * bool) => bool ;;
 operator Bool.lxor : (bool * bool) => bool ;;
 
 operator Print.print_newline : unit => unit @impure ;;
-operator Print.print_value   : `a => unit @impure ;;
+operator Print.print_value   : ~a => unit @impure ;;
 operator Print.print_string   : string => unit @impure ;;
-operator Print.print_ascii   : `a => unit @impure ;;
+operator Print.print_ascii   : ~a => unit @impure ;;
 
 let print = Print.print_value ;;
 let print_string = Print.print_string ;;
@@ -101,9 +104,11 @@ operator Uint.ge :     (uint<?n> * uint<?n>) => bool ;;
 (************ vect *************)
 (*******************************)
 
-type `a vect<'b> ;;
+type ~a vect<?n> ;;
 
-operator%with_sizes Vect.create : `a => `a vect<?n> ;;
+operator%with_sizes Vect.create : ~a => ~a vect<?n> ;;
+
+
 let vect_make<<?n>> (x:`a) : `a vect<?n> = Vect.create(x) ;;
 
 operator%with_sizes Vect.nth : (`a vect<?n> * int<32>) => `a;;
@@ -297,7 +302,7 @@ let fixpoint (f) =
 (**************************************************)
 
 type char@8 ;;       (* new type constructor for 8-bits values *)
-type bytes<'s>@8 ;;  (* sequence of chars *)
+type bytes<?s>@8 ;;  (* sequence of chars *)
 
 operator Char.code : char => int<8> ;;
 operator Char.chr : int<8> => char ;;
@@ -331,11 +336,11 @@ let bytes_to_hex = Bytes.to_hex ;;
 let bytes_vect_map ((f,b):(char vect<?n> => char vect<?m>) * bytes<?n>) : bytes<?m> = 
   bytes_from_vect(f(bytes_to_vect b));;
 
-let bytes_cons ((x,b):char * bytes<'n>) : bytes<'n+1> =
-  let cons (v:char vect<'n>) : char vect<'n+1> = vect_cons(x,v) in  
+let bytes_cons ((x,b):char * bytes<?n>) : bytes<?n+1> =
+  let cons (v:char vect<?n>) : char vect<?n+1> = vect_cons(x,v) in  
   bytes_from_vect(cons(bytes_to_vect b));;
 
-let bytes_tail (b:bytes<'n+1>) : bytes<'n> = 
+let bytes_tail (b:bytes<?n+1>) : bytes<?n> = 
   bytes_vect_map(vect_tail,b);;
 
 let print_char = char_print ;;
@@ -344,8 +349,8 @@ let print_bytes = bytes_print ;;
 (************** file manipulations ****************)
 (**************************************************)
 
-operator%with_sizes IOFile.read_file : string => bytes<'n> @impure ;;
-operator            IOFile.write_file : (string * bytes<'n>) => unit @impure ;;
+operator%with_sizes IOFile.read_file : string => bytes<?n> @impure ;;
+operator            IOFile.write_file : (string * bytes<?n>) => unit @impure ;;
 
 let input_file = IOFile.read_file ;;
 let output_file = IOFile.write_file ;;

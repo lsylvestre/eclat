@@ -71,7 +71,15 @@ module Errors = struct
     pp fmt;
     Format.pp_print_flush fmt ()
 
-
+  let note ?(note_kw="Note") ?loc pp : unit =
+    let fmt = err_formatter in
+    (match loc with
+    | None -> ()
+    | Some loc -> fprintf fmt "%s%a%s:\n" bold pp_loc loc reset);
+    fprintf fmt "%s%s%s%s: " bold green note_kw reset;
+    pp fmt;
+    Format.pp_print_flush fmt ()
+  
   (** emit syntax-error and raise [Caml_error] *)
 
   let syntax_error ?msg loc =

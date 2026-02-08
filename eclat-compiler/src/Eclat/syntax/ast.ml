@@ -146,7 +146,7 @@ and genv = {
     (** ordered sequence of static global arrays *)
     (x * static) list ; 
   
-  abstract_types : (string * Types.size list * Types.tyB list * int list) SMap.t ; 
+  abstract_types : alias_entry SMap.t ; 
     (* each type in the map is the shape 
        of the corresponding abstract type *)
 
@@ -275,12 +275,6 @@ let rec e2c e =
                      | _ -> raise Not_a_constant)
   | _ -> raise Not_a_constant
 
-
-
-(* todo: avoid this global variable (and associated side effects) *)
-let typ_decl_abstract : (string, string * Types.size list * Types.tyB list * int list) Hashtbl.t 
-  = Hashtbl.create 10
-
 let create_abstract_type_smap () =
-  SMap.of_seq @@ Hashtbl.to_seq typ_decl_abstract
+  SMap.of_seq @@ Hashtbl.to_seq Types.global_type_declarations
 

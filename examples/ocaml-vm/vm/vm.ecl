@@ -3,7 +3,7 @@ type others = bool * bool ;;
 
 let fst (a,_) = a;;
 
-type state = (short * value * short * (value * char * short) * others) ;;
+type state = (short * value * short * (value * byte * short) * others) ;;
 
 let caml_set_finish (_,led) =
   (true,led) ;;
@@ -190,11 +190,11 @@ let interp_vm (s: state) : state =
                let (v2,sp) = pop_stack(sp) in
                let next_env = v2 in
                let (v3,sp) = pop_stack(sp) in
-               let next_extra_args = char_of_long(long_val(v3)) in
+               let next_extra_args = byte_of_long(long_val(v3)) in
                (next_pc,acc,sp, (next_env, next_extra_args, next_trap_sp), others)
 
            | PUSHTRAP(l) ->
-               let sp = push_stack(val_long(long_of_char(extra_args)),sp) in
+               let sp = push_stack(val_long(long_of_byte(extra_args)),sp) in
                let sp = push_stack(env,sp) in
                let c = val_long(as_long(l)) in
                let sp = push_stack(val_long(as_long(trap_sp)),sp) in
@@ -203,11 +203,11 @@ let interp_vm (s: state) : state =
                (pc_plus_1, acc, sp,(env, extra_args, next_trap_sp), others)
 
            | RESTART() -> (* (nbargs+1)+1 cycles *)
-               let nbargs = char_of_short(size_val(env)) - 2 in
+               let nbargs = byte_of_short(size_val(env)) - 2 in
                print_string "=======GGGGGGG;"; print_int (size_val(env));
                let rec loop_push(sp,i) =
                  if (* pause *) (i >= nbargs) then sp else
-                 let sp = imm_push_stack(get_field(env,short_of_char(i+2)),sp) in
+                 let sp = imm_push_stack(get_field(env,short_of_byte(i+2)),sp) in
                  loop_push(sp,i+1)
                in
                let sp = loop_push(sp,0) in
@@ -242,7 +242,7 @@ let interp_vm (s: state) : state =
                if u then (
                  let then_next_pc = as_short(long_val(stack_get(sp-1))) in
                  let next_env =                              stack_get(sp-2)   in
-                 let next_extra_args = char_of_long(long_val(stack_get(sp-3))) in
+                 let next_extra_args = byte_of_long(long_val(stack_get(sp-3))) in
                  (then_next_pc,acc,sp-3,(next_env, next_extra_args, trap_sp), others))
                else (
                  (* 1 cycle *) 
@@ -252,7 +252,7 @@ let interp_vm (s: state) : state =
                  (next_pc, acc, sp,(next_env, next_extra_args, trap_sp), others))
 
            | APPTERM(n,s) -> 
-                 let n8 = char_of_short(n) in
+                 let n8 = byte_of_short(n) in
                  let next_sp = sp - s + n in
                  let rec w i =
                     if i = 0 then () else (
@@ -271,7 +271,7 @@ let interp_vm (s: state) : state =
                     let (arg2,sp) = if i2 then pop_stack(sp) else (dont_care,sp) in
                     let (arg3,sp) = (if i3 then pop_stack(sp) else (dont_care,sp)) in
 
-                    let sp = push_stack(val_long(long_of_char(extra_args)),sp) in
+                    let sp = push_stack(val_long(long_of_byte(extra_args)),sp) in
                     let sp = push_stack(env,sp) in
                     let sp = push_stack(val_long(as_long(pc_plus_1)),sp) in
 
@@ -301,14 +301,14 @@ let interp_vm (s: state) : state =
                then let next_extra_args = x - c in
                     (pc_plus_1,acc,sp, (env, next_extra_args, trap_sp), others)
                else (
-                 let (_,env,next_acc) = make_block(sp,acc,env,closure_tag,short_of_char(x + 3)) in
+                 let (_,env,next_acc) = make_block(sp,acc,env,closure_tag,short_of_byte(x + 3)) in
                  (* print_string "%%%%%%%%%%%%%%%%%%%%%%%%%%%%=>"; print_int (pc - 1);*) (* minus 2 ? *)
                  set_field0(next_acc, val_long (as_long(pc - 1)));
                  imm_set_field(next_acc, 1, env);
                  let rec loop(i,sp) =       (* todo *)
                    if i > x then sp else
                    let (v,sp) = pop_stack(sp) in
-                   imm_set_field(next_acc,short_of_char(i+2),v);
+                   imm_set_field(next_acc,short_of_byte(i+2),v);
                    loop(i+1,sp)
                  in
                  let sp = loop(0,sp) in
@@ -317,11 +317,11 @@ let interp_vm (s: state) : state =
                  let w = stack_get(sp-2) in
                  let next_env = w in
                  let u = stack_get(sp-3) in
-                 let next_extra_args = char_of_long(long_val(u)) in
+                 let next_extra_args = byte_of_long(long_val(u)) in
                  (next_pc,next_acc,sp-3, (next_env, next_extra_args, trap_sp), others))
 
            | CLOSUREREC(f,v,o,l) ->
-                 let f = short_of_char(f) in
+                 let f = short_of_byte(f) in
                  let sp = if v > 0 then imm_push_stack(acc,sp) else sp in
                  pause();
                  let closure_size = (twice f) - 1 + v in
@@ -353,7 +353,7 @@ let interp_vm (s: state) : state =
                  let sp = w3(1,sp) in
                  (pc_plus_1, next_acc, sp,(env, extra_args, trap_sp), others)
           | PUSHRETADDR(n) -> (* 3 cycles *)
-              let sp = push_stack(val_long(long_of_char(extra_args)),sp) in
+              let sp = push_stack(val_long(long_of_byte(extra_args)),sp) in
               let c = val_long (as_long n) in
               let sp = push_stack(env,sp) in
               let sp = imm_push_stack(c,sp) in
