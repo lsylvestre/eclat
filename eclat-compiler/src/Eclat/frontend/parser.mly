@@ -30,6 +30,20 @@
     if Types.alias_find_tyB x tyB then
       Prelude.Errors.note ~loc (fun fmt -> 
         Format.fprintf fmt "Types are not recursive@,")
+  
+  let check_no_free_type_variable_decl ~loc x' ty tyargs szs =
+    let vs = Types.vars_of_ty ty in
+    Vs.iter (fun u _ -> 
+              match u.name with
+              | None -> ()
+              | Some name -> 
+                 if (List.mem name tyargs || List.mem name szs)
+                 then () else 
+                   Prelude.Errors.syntax_error
+                           ~msg:("The type variable `"^name^"` is unbound in this type declaration ("^
+                            x'^").")
+                           loc;
+                 ) vs
 
   let add_alias x (tyB,szs,args) loc =
     Hashtbl.add Types.global_type_declarations x (Alias ((tyB,szs,args),loc))
@@ -306,22 +320,11 @@ type_decl:
     let x' = rename_new_type_ident x in
     match a with
     | `Ty ty ->   
-       let vs = Types.vars_of_ty ty in
-       (Vs.iter (fun u _ -> 
-                  match u.name with
-                  | None -> ()
-                  | Some name -> 
-                     if (List.mem name tyargs || List.mem name szs)
-                     then () else 
-                       Prelude.Errors.syntax_error
-                               ~msg:("The type variable "^name^" is unbound in this type declaration ("^
-                                x'^").")
-                               (with_file $loc(kw));
-                     ) vs);
-       let tyB = Types.as_tyB ~loc:(with_file $loc) ty in
-       note_no_recursive_type ~loc:(with_file $loc) x tyB; (* x is the previous name *)
-       add_alias x' (tyB,szs,tyargs) (with_file $loc);
-       None
+        check_no_free_type_variable_decl ~loc:(with_file $loc(kw)) x' ty tyargs szs;
+        let tyB = Types.as_tyB ~loc:(with_file $loc) ty in
+        note_no_recursive_type ~loc:(with_file $loc) x tyB; (* x is the previous name *)
+        add_alias x' (tyB,szs,tyargs) (with_file $loc);
+        None
     | `R r ->
         let tyargs = List.map (fun x -> new_tyB_unknown ~name:x ()) tyargs in
         let szs = List.map (fun x -> new_size_unknown ~name:x ()) szs in
@@ -331,6 +334,7 @@ type_decl:
         None
     | `Sum tyBs ->
         let tyB = TyB_sum tyBs in
+        check_no_free_type_variable_decl ~loc:(with_file $loc(kw)) x' (Ty_base tyB) tyargs szs;
         note_no_recursive_type ~loc:(with_file $loc) x tyB; (* x is the previous name *)
         add_alias x' (tyB,szs,tyargs) (with_file $loc);
         clear_tyvar_constraints();
