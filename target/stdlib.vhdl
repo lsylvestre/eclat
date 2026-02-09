@@ -337,7 +337,10 @@ package body int is -- signed int
     variable num_unsigned : unsigned(0 to v'length-1);
     variable w : unsigned(0 to 31);
     type tab_w is array (positive range <>) of unsigned(0 to 31);
-    variable a : tab_w(0 to v'length/32) := (others => to_unsigned(0,32));
+    variable a : tab_w(0 to (v'length+29)/29) := (others => to_unsigned(0,32)); 
+    -- 29 is a safe lower bound of the number 
+    -- of bits in each word taken from v 
+    -- (because 9^10=0X3B9ACA00)
     variable i : integer := 0;
     variable b : boolean := FALSE;
   begin
@@ -352,7 +355,9 @@ package body int is -- signed int
     end if;
     while (num_unsigned /= 0) loop
       w := num_unsigned mod k;
+      --if i < a'length then
       a(a'length-1-i) := w;
+      --end if;
       i := i + 1;
       num_unsigned := num_unsigned / k;
     end loop;
