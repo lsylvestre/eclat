@@ -341,7 +341,10 @@ package body int is -- signed int
     variable i : integer := 0;
     variable b : boolean := FALSE;
   begin
-    if num < 0 then 
+    if num = 0 then
+      work.Util.echo("0");
+      return;
+    elsif num < 0 then 
       work.Util.echo("-"); 
       num_unsigned := unsigned(abs(num));
     else
