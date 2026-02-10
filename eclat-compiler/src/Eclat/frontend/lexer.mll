@@ -54,12 +54,10 @@
        "tuple_of_int",TUPLE_OF_INT;
        "int_of_tuple",INT_OF_TUPLE;
        "type", TYPE;
-       "array", ARRAY;
        "to", TO;
        "do", DO;
        "done", DONE;
        "for", FOR;
-       "ref", REF;
        "macro_for", MACRO_FOR;
        "parfor", PARFOR;
        "macro_generate", MACRO_GENERATE;
@@ -69,11 +67,8 @@
        "array_create",ARRAY_CREATE;
        "init_tuple",INIT_TUPLE;
        "init_int",INIT_INT;
-       "array_length", ARRAY_LENGTH;
        "unroll", UNROLL;
-       "set", SET;
        "create", CREATE;
-       "length", LENGTH;
        "get_start", GET_START;
        "get_end", GET_END;
        "size_create", SIZE_CREATE;
@@ -176,7 +171,6 @@ rule token = parse
 | "}->"               { RCUR_MINUS_GT }
 (* | "%"              { PERCENT }*)
 | "^"                 { HAT }
-| ".length"           { DOT_LENGTH }
 | "loop:"             { LOOP }
 | ['"']([^'"']* as s)['"'] { STRING_LIT s }
 | ['\r']['\n'] | ['\n']| ['\r'] { (Lexing.new_line lexbuf) ; (token lexbuf) }

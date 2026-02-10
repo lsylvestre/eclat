@@ -80,14 +80,16 @@ let rec filter ty =
   | Ty_array _
   | Ty_signal _ 
   | Ty_trap _
-  | Ty_size _
-  -> Ty_base TyB_unit
-| Ty_var _ -> ty
-
+  | Ty_size _ -> Ty_base TyB_unit
+  | Ty_var _ -> ty
+  | Ty_alias(y,sz_list,ty_list) ->
+      Prelude.Errors.warning (fun fmt -> 
+          Format.fprintf fmt "manipulating type aliases in specialization (compilation) pass is costly ; alias should be replaced by their definition before compiling.@,");
+      filter @@ Types.alias_instance y sz_list ty_list
 
 (** in function [f = fun p -> ...],
     transforms the pattern [p] by replacing 
-    each name that has a function type by constant () *)
+    each name that has a function type by the constant () *)
 let p_without_non_basic_values f p ty =
   let open Types in
   let rec aux ty p = 
@@ -102,7 +104,10 @@ let p_without_non_basic_values f p ty =
         P_unit (* this case is important to remove function parameters 
                   that does not occur in the function body, e.g.,
                   let f(g) = 42 in f(fun x -> x) *)
-    *)| _ -> p
+    *)
+    | Ty_alias(y,sz_list,ty_list),p ->
+        aux (Types.alias_instance y sz_list ty_list) p
+    | _ -> p
   in
   aux ty p
 
@@ -116,15 +121,15 @@ let specialize_slow e =
         (match e1 with
         | E_fun(_,(ty,_),_) when not_tyB ty ->  
               has_changed := true;
-              Ast_subst.subst_e x ~when_var:Inline.subst_ty e1 e2
+              Ast_subst.subst_e x ~when_var:Inline.instantiate_types_in_e e1 e2
         | E_fix(f,(p,(ty,tyB),e0)) when not_tyB ty ->            
               let p' = p_without_non_basic_values f p ty in
               (* has_changed := true;*)
-              let e0' = Ast_subst.subst_e f ~when_var:Inline.subst_ty 
+              let e0' = Ast_subst.subst_e f ~when_var:Inline.instantiate_types_in_e 
                  (E_fun(p,(ty,tyB),E_app(E_var f,Pattern.pat2exp p'))) e0 in
               let e1' = E_fun(p,(ty,tyB),
                               E_app(E_fix(f,(p',(filter ty,tyB), e0')),Pattern.pat2exp p')) in
-              Ast_subst.subst_e x ~when_var:Inline.subst_ty e1' e2
+              Ast_subst.subst_e x ~when_var:Inline.instantiate_types_in_e e1' e2
         | _ -> E_letIn(P_var x,ty,spec e1, spec e2))
     | e -> Ast_mapper.map spec e
   in
@@ -137,7 +142,7 @@ let specialize e =
     match e with
     | E_var x -> (match SMap.find_opt x env with
                   | None -> e
-                  | Some e0 -> Inline.subst_ty e0)
+                  | Some e0 -> Inline.instantiate_types_in_e e0)
     | E_letIn(P_var x,ty,e1,e2) ->
         (match e1 with
         | E_fun(_,(ty,_),_) when not_tyB ty ->

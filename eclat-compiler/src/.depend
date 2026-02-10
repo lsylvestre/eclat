@@ -359,6 +359,7 @@ src/Eclat/compile/middle_end/transform/specialize.cmo : \
     src/Eclat/typing/types.cmo \
     src/Eclat/syntax/rename_fix.cmo \
     src/Eclat/compile/middle_end/normalize/propagation.cmo \
+    src/prelude.cmo \
     src/Eclat/syntax/pattern.cmo \
     src/Eclat/compile/middle_end/normalize/let_floating.cmo \
     src/Eclat/compile/middle_end/transform/inline.cmo \
@@ -371,6 +372,7 @@ src/Eclat/compile/middle_end/transform/specialize.cmx : \
     src/Eclat/typing/types.cmx \
     src/Eclat/syntax/rename_fix.cmx \
     src/Eclat/compile/middle_end/normalize/propagation.cmx \
+    src/prelude.cmx \
     src/Eclat/syntax/pattern.cmx \
     src/Eclat/compile/middle_end/normalize/let_floating.cmx \
     src/Eclat/compile/middle_end/transform/inline.cmx \
@@ -517,10 +519,12 @@ src/Eclat/syntax/ast_subst.cmx : \
     src/Eclat/syntax/ast_mapper.cmx \
     src/Eclat/syntax/ast.cmx
 src/Eclat/syntax/ast_undecorated.cmo : \
+    src/Eclat/typing/types.cmo \
     src/Eclat/syntax/map_pi.cmo \
     src/Eclat/syntax/ast_mapper.cmo \
     src/Eclat/syntax/ast.cmo
 src/Eclat/syntax/ast_undecorated.cmx : \
+    src/Eclat/typing/types.cmx \
     src/Eclat/syntax/map_pi.cmx \
     src/Eclat/syntax/ast_mapper.cmx \
     src/Eclat/syntax/ast.cmx

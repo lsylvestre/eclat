@@ -20,7 +20,8 @@ type c =                (** constant [c] *)
   | C_size of size      (** integer constant used only at compile time *)
   | Inj of x            (* non-applyed constructor (data type) *)
   | C_appInj of x * c * tyB (* constructor (data type) *)
-
+  | Ref
+  
 and op = (** primitives *)
        (* instantaneous primitives *)
         Runtime of Operators.op

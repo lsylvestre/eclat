@@ -1,8 +1,8 @@
 (* ./eclat -relax tests/good/specialize/sp9.ecl  -arg="()" -nostdlib *)
 
 let rec foo(f,x) =
-  let _ : int<'N> = x in
-  let tab = create<'N>() in
+  let _ : int<?n> = x in
+  let tab = create<?n>() in
   let _ = (length(tab)) in
   foo(f,42) ;; (* inifine loop *)
 

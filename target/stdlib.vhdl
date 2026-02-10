@@ -355,9 +355,8 @@ package body int is -- signed int
     end if;
     while (num_unsigned /= 0) loop
       w := num_unsigned mod k;
-      --if i < a'length then
+      assert (i < a'length);
       a(a'length-1-i) := w;
-      --end if;
       i := i + 1;
       num_unsigned := num_unsigned / k;
     end loop;

@@ -59,7 +59,7 @@ let monomorphize_exp e =
             | Some (p,e1) ->
             let (tyA,tyB) = extract_arg_res_fun ty' in
             Typing.unify_ty ~loc:Prelude.dloc tyA ty_arg;
-            Inline.subst_ty @@
+            Inline.instantiate_types_in_e @@
             E_letIn(P_var f,ty',E_fix(f,(p,(tyA,tyB),aux ds e1)),E_app(E_var f,arg)))
         | Some (`Ty ty0) -> 
             match ty0 with

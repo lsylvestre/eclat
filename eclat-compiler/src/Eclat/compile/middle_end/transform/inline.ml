@@ -91,6 +91,7 @@ let fv_type_in ?(s=Types.Vs.empty) e =
                          | External_fun (op,ty) -> r := !r ++ free_vars_of_type (Vs.empty,ty)
                          | _ -> ())
                       | op -> ())
+        | Ref -> assert false
         in ss_const c
     | e -> Ast_mapper.iter ss e
   in
@@ -99,7 +100,7 @@ let fv_type_in ?(s=Types.Vs.empty) e =
 
 (* instanciate type annotation in expression [e]
    while preserving sharing *)
-let subst_ty e = (* todo: rename this function and remove the unused parameter *)
+let instantiate_types_in_e e = (* todo: rename this function *)
   let open Types in
   let vs = fv_type_in e in
   let unknowns = Hashtbl.create (Vs.cardinal vs) in
@@ -110,10 +111,7 @@ let subst_ty e = (* todo: rename this function and remove the unused parameter *
     let open Operators in
     match e with
     | E_letIn(p, ty, e1, e2) ->
-        E_letIn(p, (* rename_ty unknowns ty *) Types.new_ty_unknown() 
-                       (* fresh unknown because duplication breaks polymorphism.
-                          todo: avoid this unknown (which can cause the lost of a type annotation) *)
-                , ss e1, ss e2)
+        E_letIn(p, rename_ty unknowns ty, ss e1, ss e2)
     | E_fun(p, (ty,tyB), e1) ->
        E_fun(p, (rename_ty unknowns ty,rename_tyB unknowns tyB), ss e1)
     | E_fix(f, (p, (ty, tyB), e1)) ->
@@ -137,6 +135,7 @@ let subst_ty e = (* todo: rename this function and remove the unused parameter *
                           | External_fun (op,ty) -> External_fun(op,(rename_ty unknowns ty))
                           | _ -> prim)
                         | op -> op)
+        | Ref -> assert false
         in E_const (ss_const c)
     | E_for(x,sz1,sz2,e1,deco) -> 
         E_for(x,rename_size unknowns sz1,rename_size unknowns sz2,ss e1,deco)
@@ -162,14 +161,14 @@ let inline_with_statics ~statics e =
         (match p,e1 with
         | P_var x,E_fun _ -> 
             has_changed := true;
-            inline @@ subst_e ~when_var:subst_ty x e1 e2
+            inline @@ subst_e ~when_var:instantiate_types_in_e x e1 e2
         | _ -> E_letIn(p,ty,inline e1,inline e2))
 
     | E_app(E_fun(p,(ty,tyB),e1),e2) ->
         has_changed := true;
         (* substitution is needed (rather than a let-binding)
            since e2 could be a function (fun x -> e3)       (* no, first order now *) (* ah ? *) *)
-        inline @@ subst_ty @@ E_letIn(p,ty,e2,e1)
+        inline @@ instantiate_types_in_e @@ E_letIn(p,ty,e2,e1)
 
 (*     | E_generate((p,e1),init,e_st3,loc) ->
         has_changed := true;

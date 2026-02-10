@@ -15,7 +15,6 @@ let print_elaborated_code_flag = ref true
 
 
 let compile ?(vhdl_comment="") ?(prop_fsm=true) arg_list name ty fmt pi =
-
   let pi = if !nonormalization then Inline.inl_pi pi 
            else Middle_end.compile ~globalize:!globalize_flag arg_list ty pi 
   in

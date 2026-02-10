@@ -187,7 +187,9 @@ let rec translate_tyB =
       let n = List.fold_left (max) 0 @@ List.map (fun (_,t) -> size_ty (translate_tyB t)) cs in
       TTuple[TInt(TSize size_tag);TVect(n)]
   | TyB_alias(x,sz_list,tyB_list) ->
-      let tyB' = alias_instance x sz_list tyB_list in
+      let ty_list = List.map (fun t -> Ty_base t) tyB_list in
+      let tyB' = Types.as_tyB ~loc:Prelude.dloc @@ 
+                 alias_instance x sz_list ty_list in
       translate_tyB tyB'
   | TyB_string sz -> TString (translate_size sz)
 
@@ -230,6 +232,8 @@ let rec translate_ty =
   | Ty_trap _ -> assert false
   | Ty_fun _ -> assert false
   | Ty_size _ -> assert false
+  | Ty_alias(y,sz_list,ty_list) ->
+      translate_ty @@ Types.alias_instance y sz_list ty_list
 
 let rec typing_c = function
   |  Unit -> TUnit

@@ -231,10 +231,10 @@ let rec unify_tyB ~loc tyB1 tyB2 =
       List.iter2 (unify_size ~loc) sz_list1 sz_list2;
       List.iter2 (unify_tyB ~loc) tyB_list1 tyB_list2
   | tyB1,TyB_alias(x2,sz_list2,tyB_list2) ->
-      let tyB3 = alias_instance x2 sz_list2 tyB_list2 in
+      let tyB3 = Types.as_tyB ~loc @@ alias_instance x2 sz_list2 (List.map (fun t -> Ty_base t) tyB_list2) in
       unify_tyB ~loc tyB1 tyB3
   | TyB_alias(x1,sz_list1,tyB_list1),tyB2 ->
-      let tyB3 = alias_instance x1 sz_list1 tyB_list1 in
+      let tyB3 = Types.as_tyB ~loc @@ alias_instance x1 sz_list1 (List.map (fun t -> Ty_base t) tyB_list1) in
       unify_tyB ~loc tyB3 tyB2;
   | _ -> raise @@ CannotUnify(loc,TyB(tyB1,tyB2)::[])
 
@@ -296,6 +296,22 @@ let unify_ty ~loc ty1 ty2 =
         unify_tyB ~loc tyB1 tyB2
     | Ty_trap(tyB1),Ty_trap(tyB2) ->
         unify_tyB ~loc tyB1 tyB2
+    | Ty_alias(x1,sz_list1,ty_list1),Ty_alias(x2,sz_list2,ty_list2) when x1 = x2 ->
+        List.iter2 (unify_size ~loc) sz_list1 sz_list2;
+        List.iter2 (unify ~loc) ty_list1 ty_list2
+    | ty1,Ty_alias(x2,sz_list2,ty_list2) ->
+        let ty3 = alias_instance ~loc x2 sz_list2 ty_list2 in
+        (match canon_ty ty3 with
+        | Ty_base tyB -> 
+            unify ~loc ty1 (Ty_base (TyB_alias(x2,sz_list2,List.map (as_tyB ~loc) ty_list2)))
+        | _ -> unify ~loc ty1 ty3)
+    | Ty_alias(x1,sz_list1,ty_list1),ty2 ->
+        let ty3 = alias_instance ~loc x1 sz_list1 ty_list1 in
+        (match canon_ty ty3 with
+        | Ty_base tyB -> 
+            unify ~loc (Ty_base (TyB_alias(x1,sz_list1,List.map (as_tyB ~loc) ty_list1))) ty2
+        | _ -> unify ~loc ty3 ty2)
+
     | Ty_base tyB1, Ty_tuple ty_list2 ->
         let tyB_list2 = List.map (fun ty -> 
                           let v = new_tyB_unknown () in
@@ -428,10 +444,11 @@ let sum_instance ~loc ctors x =
            | None -> error_unbound_constructor ~loc x in
   (match Hashtbl.find_opt global_type_declarations xt with
   | None | Some (Abstract _) -> assert false
-  | Some (Alias ((tyB,sz_list,tyB_list),_)) ->
-     let sz_list' = List.map (fun x -> new_size_unknown ~name:x ()) sz_list in
-     let tyB_list' = List.map (fun x -> new_tyB_unknown ~name:x ()) tyB_list in
-     let tyB = match alias_instance xt sz_list' tyB_list' with
+  | Some (Alias ((ty,szx_list,tyx_list),_)) ->
+     let sz_list' = List.map (fun x -> new_size_unknown ~name:x ()) szx_list in
+     let tyB_list' = List.map (fun x -> new_tyB_unknown ~name:x ()) tyx_list in
+     let ty_list' = List.map (fun tyB -> Ty_base tyB) tyB_list' in
+     let tyB = match as_tyB ~loc @@ alias_instance ~loc xt sz_list' ty_list' with
                | TyB_sum(ctors) -> List.assoc x ctors
                | _ -> assert false
      in
@@ -472,6 +489,9 @@ let rec typ_const ~loc ~ctors = function
       unify_tyB ~loc tyB_arg tc;
       tyB
   | Inj _ -> assert false (* to remove from constants *)
+  | Ref -> 
+     Prelude.Errors.error ~loc (fun fmt ->
+        Format.fprintf fmt "partial application of `ref` is ill typed.")
   | _ -> assert false
 
 let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~loc g e =
@@ -652,11 +672,12 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
       let ctors_2 = 
         match Hashtbl.find_opt global_type_declarations xt with
         | None | Some (Abstract _) -> assert false
-        | Some (Alias ((tyB,sz_list,tyB_list),_)) ->
-            let sz_list' = List.map (fun x -> new_size_unknown ~name:x ()) sz_list in
-            let tyB_list' = List.map (fun x -> new_tyB_unknown ~name:x ()) tyB_list in
+        | Some (Alias ((tyB,szx_list,tyx_list),_)) ->
+            let sz_list' = List.map (fun x -> new_size_unknown ~name:x ()) szx_list in
+            let tyB_list' = List.map (fun x -> new_tyB_unknown ~name:x ()) tyx_list in
+            let ty_list' = List.map (fun tyB -> Ty_base tyB) tyB_list' in
             unify_ty ~loc:(loc_of e1) ty1 (Ty_base (TyB_alias(xt,sz_list',tyB_list')));
-            match alias_instance xt sz_list' tyB_list' with
+            match Types.as_tyB ~loc @@ alias_instance xt sz_list' ty_list' with
             | TyB_sum(ctors) -> SMap.of_seq (List.to_seq ctors)
             | _ -> assert false
       in

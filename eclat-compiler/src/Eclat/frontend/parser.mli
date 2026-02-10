@@ -29,7 +29,6 @@ type token =
   | SIZE_CREATE
   | SIGNAL
   | SHARED
-  | SET
   | SEMI_SEMI
   | SEMI
   | RUN
@@ -39,7 +38,6 @@ type token =
   | RESIZE_INT
   | RESET
   | REGISTER
-  | REF
   | REC
   | RCUR_MINUS_GT
   | RCUR
@@ -76,7 +74,6 @@ type token =
   | LOR
   | LOOP
   | LET
-  | LENGTH
   | LEFT_ARROW
   | LE
   | LCUR
@@ -100,7 +97,6 @@ type token =
   | GT
   | GET_START
   | GET_END
-  | GET
   | GE
   | FUN
   | FOR
@@ -116,7 +112,6 @@ type token =
   | EMIT
   | ELSE
   | DUR_VAR_IDENT of (string)
-  | DOT_LENGTH
   | DOT
   | DONE
   | DOLLARD
@@ -135,9 +130,7 @@ type token =
   | ASSERT
   | ASR
   | ARRAY_MAKE
-  | ARRAY_LENGTH
   | ARRAY_CREATE
-  | ARRAY
   | AND
   | AMP_AMP
   | AMP

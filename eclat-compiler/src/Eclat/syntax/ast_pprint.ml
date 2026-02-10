@@ -86,6 +86,9 @@ let rec pp_const (fmt:fmt) (c:c) : unit =
       fprintf fmt "%s" x
   | C_appInj(x,c,_) ->
       fprintf fmt "%s(%a)" x pp_const c
+  | Ref ->
+      fprintf fmt "ref"
+
 (** pretty printer for patterns *)
 let rec pp_pat (fmt:fmt) (p:p) : unit =
   match p with

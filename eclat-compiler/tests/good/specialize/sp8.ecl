@@ -1,8 +1,8 @@
 (* ./eclat -relax tests/good/specialize/sp8.ecl  -arg="()" -nostdlib *)
 
 let foo(f,x) =
-  let _ : int<'N> = x in
-  let tab = create<'N>() in
+  let _ : int<?n> = x in
+  let tab = create<?n>() in
   length(tab) ;;
 
 let main () =

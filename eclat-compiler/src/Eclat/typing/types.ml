@@ -55,7 +55,7 @@ type ty = Ty_var of ty var
         | Ty_signal of tyB
         | Ty_trap of tyB
         | Ty_size of size
-
+        | Ty_alias of x * size list * ty list
 let dur_add d1 d2 =
   Dur_max(d1,d2)
 
@@ -158,9 +158,11 @@ let rec canon_ty = function
     Ty_trap(canon_tyB tyB)
 | Ty_size(sz) ->
     Ty_size(canon_size sz)
+| Ty_alias (x,sz_list,ty_list) ->
+    Ty_alias (x,List.map canon_size sz_list, List.map canon_ty ty_list)
 
 type alias_entry = 
-| Alias of (tyB * x list * x list) * Prelude.loc
+| Alias of (ty * x list * x list) * Prelude.loc
 | Abstract of (string * size list * tyB list * int list) * Prelude.loc
 
 let global_type_declarations : (x,alias_entry) Hashtbl.t = Hashtbl.create 10
@@ -202,14 +204,14 @@ pp_print_list
       pp fmt vs;
 fprintf fmt ")"
 
-let pp_tyB_ident fmt pp_tyB x sz_list tyB_list =
+let pp_tyX_ident fmt pp_tyX x sz_list tyX_list =
   let open Format in
-  if tyB_list <> [] then
-    (fprintf fmt "(";
-     pp_print_list
-       ~pp_sep:(fun fmt () -> fprintf fmt ", ") pp_tyB fmt tyB_list;
-     fprintf fmt ") ") 
-  else ();
+  let n = List.compare_length_with tyX_list 1 in
+  if n > 0 then fprintf fmt "(";
+  pp_print_list
+       ~pp_sep:(fun fmt () -> fprintf fmt ", ") pp_tyX fmt tyX_list;
+  if n > 0 then fprintf fmt ")"; 
+  if tyX_list <> [] then fprintf fmt " ";
   (fprintf fmt "%s" x;
   match sz_list with
   | [] -> ()
@@ -241,9 +243,9 @@ let pp_tyB fmt (tyB:tyB) : unit =
   | TyB_string sz -> fprintf fmt "string<%a>" pp_size sz
   | TyB_abstract (x,sz_list,tyB_list) ->
       (* fprintf fmt "abstract:"; *)
-      pp_tyB_ident fmt pp x sz_list tyB_list
+      pp_tyX_ident fmt pp x sz_list tyB_list
  | TyB_alias (x,sz_list,tyB_list) ->
-      pp_tyB_ident fmt pp x sz_list tyB_list
+      pp_tyX_ident fmt pp x sz_list tyB_list
  in pp fmt tyB
 
 let pp_ty fmt (ty:ty) : unit =
@@ -262,15 +264,17 @@ let pp_ty fmt (ty:ty) : unit =
       | Dur_zero -> fprintf fmt "(%a => %a)" pp ty1 pp_tyB tyB2
       | Dur_one -> fprintf fmt "(%a -> %a)" pp ty1 pp_tyB tyB2
       | _ -> fprintf fmt "(%a -{%a}-> %a)" pp ty1 pp_dur d pp_tyB tyB2)
-  | Ty_ref tyB -> fprintf fmt "ref<%a>" pp_tyB tyB
+  | Ty_ref tyB -> fprintf fmt "%a ref" pp_tyB tyB
   | Ty_array(sz,tyB) ->
       fprintf fmt "%a array<%a>" pp_tyB tyB pp_size sz
   | Ty_signal(tyB) ->
-      fprintf fmt "signal<%a>" pp_tyB tyB
+      fprintf fmt "%a signal" pp_tyB tyB
   | Ty_trap(tyB) ->
-      fprintf fmt "trap<%a>" pp_tyB tyB
+      fprintf fmt "%a trap" pp_tyB tyB
   | Ty_size(sz) ->
       fprintf fmt "size<%a>" pp_size sz
+  | Ty_alias (x,sz_list,ty_list) ->
+      pp_tyX_ident fmt pp x sz_list ty_list
   in pp fmt ty
 
 
@@ -370,6 +374,8 @@ let rec occur_ty v ty =
       occur_tyB v tyB
   | Ty_size sz ->
       occur_size v sz
+  | Ty_alias(_, sz_list, ty_list) ->
+    List.iter (occur_size v) sz_list; List.iter occ ty_list
   in occ ty
 
 let test_occur occ o =
@@ -434,6 +440,9 @@ let vars_of_ty ?(s=Vs.empty) ty =
       vars_of_tyB ~s:s tyB
   | Ty_size sz ->
       vars_of_size ~s sz
+  | Ty_alias (_, sz_list, ty_list) -> 
+      let s = List.fold_left (fun s -> vars_of_size ~s) s sz_list in
+      List.fold_left vars s ty_list
   in vars s ty
 
 let vs_diff vs1 vs2 =
@@ -527,6 +536,8 @@ instance_aux (Forall(vs,ty)) =
       Ty_trap(inst_tyB tyB)
   | Ty_size sz ->
       Ty_size(inst_size sz) 
+  | Ty_alias (x,sz_list,ty_list) ->
+      Ty_alias (x,List.map inst_size sz_list,List.map inst_ty ty_list)
   in
   inst_ty ty
 
@@ -591,6 +602,8 @@ let rec rename_ty unknowns = function
     Ty_trap(rename_tyB unknowns tyB)
 | Ty_size sz ->
     Ty_size(rename_size unknowns sz)
+| Ty_alias(x,sz_list,ty_list) ->
+    Ty_alias (x,List.map (rename_size unknowns) sz_list,List.map (rename_ty unknowns) ty_list)
 
 let free_vars_of_type_env l =
   List.fold_left (fun vs (x,(Forall (v,t))) ->
@@ -612,15 +625,31 @@ let rec subst_size vsize = function
 | Sz_add(sz,n) -> Sz_add (subst_size vsize sz, n)
 | Sz_twice(sz) -> Sz_twice(subst_size vsize sz)
 
+let rec as_tyB ~loc ty = 
+  match ty with
+  | Ty_base tyB -> tyB
+  | Ty_tuple(tys) -> TyB_tuple(List.map (as_tyB ~loc) tys)
+  | Ty_var({contents=Unknown v} as r) -> 
+      TyB_var(Obj.magic r)
+  | Ty_alias(x,sz_list,ty_list) -> 
+      let ty' = alias_instance ~loc x sz_list ty_list in
+      (match canon_ty ty' with
+       | Ty_base _ -> 
+          TyB_alias(x,sz_list,List.map (as_tyB ~loc) ty_list)
+       | _ -> Prelude.Errors.raise_error ~loc ()
+                 ~msg:"basic type expected")
+  | _ -> Prelude.Errors.raise_error ~loc ()
+                 ~msg:"basic type expected"
 
-let rec subst_tyB vsize va = function
+
+and subst_tyB vsize va = function
 | TyB_var {contents=Unknown u} as tyB ->
     (match u.name with
     | None -> tyB
     | Some x ->
        (match SMap.find_opt x va with
         | None -> tyB
-        | Some tyB' -> tyB'))
+        | Some ty -> as_tyB ~loc:Prelude.dloc ty))
 | TyB_var {contents=Is tyB} ->
     subst_tyB vsize va tyB
 | TyB_bool | TyB_unit as tyB -> tyB
@@ -635,18 +664,52 @@ let rec subst_tyB vsize va = function
 | TyB_alias(x,sz_list,tyB_list) ->
     TyB_alias (x,List.map (subst_size vsize) sz_list,List.map (subst_tyB vsize va) tyB_list)
 
-let alias_instance x sz_list tyB_list =
+and subst_ty vsize va = function
+| Ty_var {contents=Unknown u} as ty ->
+    (match u.name with
+    | None -> ty
+    | Some x ->
+       (match SMap.find_opt x va with
+        | None -> ty
+        | Some ty' -> ty'))
+| Ty_var {contents=Is ty} ->
+    subst_ty vsize va ty
+| Ty_base tyB ->
+    Ty_base(subst_tyB vsize va tyB)
+| Ty_tuple ty_list ->
+    Ty_tuple(List.map (subst_ty vsize va) ty_list)
+| Ty_fun(ty1,d,tyB2) ->
+    Ty_fun(subst_ty vsize va ty1,d,subst_tyB vsize va tyB2)
+| Ty_ref(tyB) ->
+    Ty_ref(subst_tyB vsize va tyB)
+| Ty_array(sz,tyB) ->
+    Ty_array(subst_size vsize sz, subst_tyB vsize va tyB)
+| Ty_signal(tyB) ->
+    Ty_signal(subst_tyB vsize va tyB)
+| Ty_trap(tyB) ->
+    Ty_trap(subst_tyB vsize va tyB)
+| Ty_size sz ->
+    Ty_size(subst_size vsize sz)
+| Ty_alias(x,sz_list,ty_list) ->
+    Ty_alias (x,List.map (subst_size vsize) sz_list,List.map (subst_ty vsize va) ty_list)
+
+and alias_instance ?(loc=Prelude.dloc) x sz_list ty_list =
   match Hashtbl.find global_type_declarations x with
-  | Alias ((tyB',sz_argvs,tyB_argsvs),_) ->
-      if List.compare_lengths sz_argvs sz_list <> 0 then assert false;
-      if List.compare_lengths tyB_argsvs tyB_list <> 0 then assert false;
+  | Alias ((ty',sz_argvs,ty_argsvs),_) ->
+      if List.compare_lengths sz_argvs sz_list <> 0 then
+         Prelude.Errors.error ~loc (fun fmt -> 
+          Format.fprintf fmt "instantiation of type %s expect %d type parameters." x (List.length ty_argsvs));
+      if List.compare_lengths ty_argsvs ty_list <> 0 then
+          Prelude.Errors.error ~loc (fun fmt -> 
+          Format.fprintf fmt "instantiation of type %s expect %d size parameters." x (List.length ty_argsvs));
       let sz_argvs' = List.fold_left2 (fun m vx sz -> 
                         SMap.add vx sz m) SMap.empty sz_argvs sz_list in
-      let tyB_argsvs' = List.fold_left2 (fun m vx tyB -> 
-                        SMap.add vx tyB m) SMap.empty tyB_argsvs tyB_list in
-      let tyB'' = subst_tyB sz_argvs' tyB_argsvs' tyB' in
-      tyB''
+      let ty_argsvs' = List.fold_left2 (fun m vx ty -> 
+                        SMap.add vx ty m) SMap.empty ty_argsvs ty_list in
+      let ty'' = subst_ty sz_argvs' ty_argsvs' ty' in
+      ty''
   | _ -> assert false (* not an alias *)
+
 
 let generalize ?(only_functions=true) r ty =
   let ty = canon_ty ty in
@@ -665,14 +728,6 @@ let generalize ?(only_functions=true) r ty =
 let copy_ty ty =
   instance (generalize ~only_functions:false [] ty)
 
-let rec as_tyB ~loc ty = 
-  match ty with
-  | Ty_base tyB -> tyB
-  | Ty_tuple(tys) -> TyB_tuple(List.map (as_tyB ~loc) tys)
-  | Ty_var({contents=Unknown v} as r) -> 
-      TyB_var(Obj.magic r)
-  | _ -> Prelude.Errors.raise_error ~loc ()
-                 ~msg:"basic type expected"
 
 let rec is_tyB ty =
   (* alias for basic type should be put 
@@ -709,6 +764,7 @@ let contains_fun ty =
   | Ty_signal _
   | Ty_trap _
   | Ty_size _ -> ()
+  | Ty_alias(x,_,ty_list) -> assert false (* todo *)
   in
   try aux ty; false 
   with Find -> true ;;
@@ -748,8 +804,8 @@ let size_tyB tyB =
     | _ -> Format.(fprintf std_formatter "[%a]" pp_tyB tyB); assert false (* todo *)
   in loop tyB *)
 
-let alias_find_tyB x tyB =
-  let exception Find in
+exception Find
+let alias_find_exn_tyB x tyB =
   let rec alias tyB = 
     match tyB with
     | TyB_var {contents=Unknown _} ->
@@ -767,4 +823,75 @@ let alias_find_tyB x tyB =
         if x = y then raise Find
         else List.iter alias tyB_list
   in
-  try alias tyB; false with Find -> true
+  alias tyB
+
+let alias_find_tyB x tyB =
+  try alias_find_exn_tyB x tyB; false with Find -> true
+
+
+
+let alias_find_ty x ty =
+  let exception Find in
+  let rec alias ty = 
+    match ty with
+    | Ty_var {contents=Is ty1} -> alias ty1
+    | Ty_var _ -> ()
+    | Ty_base tyB -> alias_find_exn_tyB x tyB
+    | Ty_tuple ty_list -> List.iter alias ty_list
+    | Ty_fun(tya,_,tyB) ->
+        alias tya;
+        alias_find_exn_tyB x tyB
+    | Ty_ref(tyB)
+    | Ty_array(_,tyB)
+    | Ty_signal(tyB) 
+    | Ty_trap(tyB) -> alias_find_exn_tyB x tyB
+    | Ty_size _ -> ()
+    | Ty_alias(y,_,ty_list) ->
+        if x = y then raise Find
+        else List.iter alias ty_list
+  in
+  try alias ty; false with Find -> true
+
+let rec remove_alias_tyB tyB =
+  match tyB with
+  | TyB_var {contents=Unknown _} -> tyB
+  | TyB_var {contents=Is tyB'} ->
+      remove_alias_tyB tyB'
+  | TyB_bool 
+  | TyB_unit
+  | TyB_int _ -> tyB
+  | TyB_tuple tyB_list ->
+      TyB_tuple (List.map remove_alias_tyB tyB_list)
+  | TyB_sum ctors ->
+      TyB_sum (List.map (fun (tag,tyB) -> tag,remove_alias_tyB tyB) ctors)
+  | TyB_string _ -> tyB
+  | TyB_abstract(x,sz_list,tyB_list) ->
+      TyB_abstract (x,sz_list,List.map remove_alias_tyB tyB_list)
+  | TyB_alias(y,sz_list,tyB_list) ->
+      remove_alias_tyB @@
+      let ty = alias_instance y sz_list (List.map (fun t -> Ty_base t) tyB_list) in
+      as_tyB ~loc:Prelude.dloc ty
+      
+and remove_alias_ty ty =
+  match ty with
+  | Ty_var {contents=Unknown _} -> ty
+  | Ty_var {contents=Is ty'} ->
+      remove_alias_ty ty'
+  | Ty_base tyB ->
+      Ty_base(remove_alias_tyB tyB)
+  | Ty_tuple ty_list ->
+      Ty_tuple(List.map remove_alias_ty ty_list)
+  | Ty_fun(ty1,d,tyB2) ->
+      Ty_fun(remove_alias_ty ty1,d,remove_alias_tyB tyB2)
+  | Ty_ref(tyB) ->
+      Ty_ref(remove_alias_tyB tyB)
+  | Ty_array(sz,tyB) ->
+      Ty_array(sz, remove_alias_tyB tyB)
+  | Ty_signal(tyB) ->
+      Ty_signal(remove_alias_tyB tyB)
+  | Ty_trap(tyB) ->
+      Ty_trap(remove_alias_tyB tyB)
+  | Ty_size _ -> ty
+  | Ty_alias(x,sz_list,ty_list) ->
+      remove_alias_ty @@
+      alias_instance x sz_list (List.map remove_alias_ty ty_list)

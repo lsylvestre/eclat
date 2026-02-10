@@ -154,6 +154,7 @@ let rec to_c ~genv = function
 | Ast.(Op op) ->
     Format.(fprintf std_formatter "-->%a" Ast_pprint.pp_op op);  assert false
 | Ast.V_loc _ -> assert false
+| Ast.Ref -> assert false
 
 let to_op = function
 | Ast.TyConstr ty -> TyConstr (MiniHDL_typing.translate_ty ty)
