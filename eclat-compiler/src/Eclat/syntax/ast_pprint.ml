@@ -174,6 +174,19 @@ let pp_exp (fmt:fmt) (e:e) : unit =
   | E_exec(e1,e2,e3,x) ->
       fprintf fmt "(@[<v>exec[%s] %a default %a@])"
         x (pp_e ~paren:false) e1 (pp_e ~paren:false) e2
+  | E_record (b_list) ->
+    fprintf fmt "{";
+    pp_print_list
+          ~pp_sep:(fun fmt () -> fprintf fmt "; ")
+        (fun fmt (x,ei) ->
+           fprintf fmt "%s = %a" x (pp_e ~paren:true) ei) fmt b_list;
+    fprintf fmt "}"
+  | E_record_field(e1,x,_) ->
+    fprintf fmt "%a.%s" (pp_e ~paren:true) e1 x;
+  | E_record_update(e1,x2,e2,_) ->
+    fprintf fmt "{ %a with %s = %a }" 
+       (pp_e ~paren:false) e1 x2
+       (pp_e ~paren:false) e2
   | E_ref(e1) ->
       parenthesize ~paren (fun fmt () ->
         fprintf fmt "ref %a" (pp_e ~paren:true) e1) fmt ()

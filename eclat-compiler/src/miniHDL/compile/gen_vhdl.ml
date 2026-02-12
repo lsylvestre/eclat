@@ -126,6 +126,19 @@ let rec pp_s ~genv ~st fmt = function
         (pp_a ~genv) a Prelude.Errors.pp_loc loc;
    fprintf fmt "-- ===================================@,"
 
+| S_record_update(xdst,xsrc,y,a,t) ->
+     (match t with
+     | TRecord b_list ->
+         let k,k' = let rec loop n = function
+                    | [] -> assert false
+                    | (y',ty')::bs' ->
+                        if y' = y then n,n+size_ty ty' else
+                        loop (n+size_ty ty') bs'
+                    in loop 0 b_list
+         in
+         fprintf fmt  "%a := %a;@,%a(%d to %d) := %a;@," 
+            pp_ident xdst pp_ident xsrc pp_ident xdst k (k'-1) (pp_a ~genv) a
+     | _ -> assert false)
 
 (** code generator for FSMs *)
 and pp_fsm ~genv fmt ~state_var:st ~idle ~rdy (id,ts,s) =

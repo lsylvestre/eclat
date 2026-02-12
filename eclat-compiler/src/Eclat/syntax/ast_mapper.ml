@@ -86,6 +86,18 @@ let rec map f e =
       let e2' = f e2 in
       let e3' = Option.map f e3 in
       E_exec(e1', e2', e3', l)
+
+  | E_record(b) ->
+      let b' = List.map (fun (xi,ei) -> xi, f ei) b in
+      E_record(b')
+  | E_record_field(e1,x,t) ->
+      let e1' = f e1 in
+      E_record_field(e1',x,t)
+  | E_record_update(e1,x2,e2,t) ->
+      let e1' = f e1 in
+      let e2' = f e2 in
+      E_record_update(e1',x2,e2',t)
+
   | E_vector es ->
       let es' = List.map f es in
       E_vector es'
@@ -156,6 +168,12 @@ let rec iter f (e:e) : unit =
       f e1; f e0
   | E_exec(e1,e2,e3,_) ->
       f e1; f e2; Option.iter f e3
+  | E_record(b) ->
+      List.iter (fun (_,ei) -> f ei) b
+  | E_record_field(e1,_,_) ->
+      f e1
+  | E_record_update(e1,_,e2,_) ->
+      f e1; f e2
   | E_array_make(_,e1,_) ->
       f e1
   | E_array_create _ ->
@@ -250,10 +268,10 @@ let accum f (e:e) =   (* : ((x * ty * e) list * e)*)
             let ds3,e3' = aux e3 in
             ds1@ds2@ds3,E_if(e1',e2',e3')
         | E_case(e1,hs,e_els) ->
-          let ds1,e1' = aux e1 in
-          let dss,hs' = List.split @@ List.map (fun (c,e) -> let ds,e' = aux e in ds,(c,e')) hs in
-          let ds,e_els' = aux e_els in
-          ds1@List.concat dss@ds, E_case(e1',hs',e_els')
+            let ds1,e1' = aux e1 in
+            let dss,hs' = List.split @@ List.map (fun (c,e) -> let ds,e' = aux e in ds,(c,e')) hs in
+            let ds,e_els' = aux e_els in
+            ds1@List.concat dss@ds, E_case(e1',hs',e_els')
         | E_match(e1,hs,eo) ->
           let ds1,e1' = aux e1 in
           let dss,hs' = List.split @@ List.map (fun (x,(p,e)) -> let ds,e' = aux e in ds,(x,(p,e'))) hs in
@@ -263,6 +281,18 @@ let accum f (e:e) =   (* : ((x * ty * e) list * e)*)
                                      (dsw,Some ew')
           in
           ds1@List.concat dss@dsw, E_match(e1',hs',eo')
+        | E_record(b_list) ->
+            let dss,b_list' = List.split @@ List.map (fun (xi,ei) -> 
+                                let ds,ei' = aux ei in
+                                ds, (xi,ei')) b_list in
+            List.concat dss,E_record(b_list')
+        | E_record_field(e1,x,t) ->
+            let ds,e1' = aux e1 in
+            ds,E_record_field(e1',x,t)
+        | E_record_update(e1,x2,e2,t) ->
+            let ds1,e1' = aux e1 in
+            let ds2,e2' = aux e2 in
+            ds1@ds2,E_record_update(e1',x2,e2',t)
         | E_ref(e1) ->
             let ds1,e1' = aux e1 in
             ds1,E_ref(e1')

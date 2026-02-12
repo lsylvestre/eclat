@@ -193,19 +193,19 @@ let globalize_e (e:e) : ((x * _ * e) list * e) =
         let ds3,e3' = glob e3 in
         ds1@ds2@ds3,E_if(e1',e2',e3')
     | E_case(e1,hs,e_els) ->
-      let ds1,e1' = glob e1 in
-      let dss,hs' = List.split @@ List.map (fun (c,e) -> let ds,e' = glob e in ds,(c,e')) hs in
-      let ds,e_els' = glob e_els in
-      ds1@List.concat dss@ds, E_case(e1',hs',e_els')
+        let ds1,e1' = glob e1 in
+        let dss,hs' = List.split @@ List.map (fun (c,e) -> let ds,e' = glob e in ds,(c,e')) hs in
+        let ds,e_els' = glob e_els in
+        ds1@List.concat dss@ds, E_case(e1',hs',e_els')
     | E_match(e1,hs,eo) ->
-      let ds1,e1' = glob e1 in
-      let dss,hs' = List.split @@ List.map (fun (x,(p,e)) -> let ds,e' = glob e in ds,(x,(p,e'))) hs in
-      let dsw,eo' = match eo with
-                    | None -> [],eo
-                    | Some ew -> let dsw,ew' = glob ew in
-                                 (dsw,Some ew')
-      in
-      ds1@List.concat dss@dsw, E_match(e1',hs',eo')
+        let ds1,e1' = glob e1 in
+        let dss,hs' = List.split @@ List.map (fun (x,(p,e)) -> let ds,e' = glob e in ds,(x,(p,e'))) hs in
+        let dsw,eo' = match eo with
+                      | None -> [],eo
+                      | Some ew -> let dsw,ew' = glob ew in
+                                   (dsw,Some ew')
+        in
+        ds1@List.concat dss@dsw, E_match(e1',hs',eo')
     (* | E_letIn(P_var x,(E_array_create (e3,_) as e1),e2) ->
         (match e3 with
         | E_const _ ->
@@ -226,6 +226,18 @@ let globalize_e (e:e) : ((x * _ * e) list * e) =
         let ds1,e1' = glob e1 in
         let ds2,e2' = glob e2 in
         ds1@ds2,E_letIn(p,ty,e1',e2')
+    | E_record(b_list) ->
+        let dss,b_list' = List.split @@ List.map (fun (xi,ei) -> 
+                            let ds,ei' = glob ei in
+                            ds, (xi,ei')) b_list in
+        List.concat dss,E_record(b_list')
+    | E_record_field(e1,x,t) ->
+        let ds,e1' = glob e1 in
+        ds,E_record_field(e1',x,t)
+    | E_record_update(e1,x2,e2,t) ->
+        let ds1,e1' = glob e1 in
+        let ds2,e2' = glob e2 in
+        ds1@ds2,E_record_update(e1',x2,e2',t)
     | E_ref(e1) ->
         let ds1,e1' = glob e1 in
         ds1,E_ref(e1')

@@ -28,6 +28,10 @@ let clean_fsm ~rdy ~result (ts,s) typing_env =
       Hashtbl.add vs_read x ()
   | A_vector aa ->
       List.iter collect_read_a aa
+  | A_record b_list ->
+      List.iter (fun (_,a) -> collect_read_a a) b_list
+  | A_record_field(x,_,_) ->
+      Hashtbl.add vs_read x ()
   in
 
   let rec collect_s = function
@@ -80,6 +84,9 @@ let clean_fsm ~rdy ~result (ts,s) typing_env =
       collect_read_a a
   | S_assert(a,_) ->
       collect_read_a a
+  | S_record_update(_,xsrc,x,a,_) ->
+      Hashtbl.add vs_read xsrc ();
+      collect_read_a a
   in
   List.iter (fun (_,s) -> collect_s s) ts;
   collect_s s;
@@ -122,6 +129,7 @@ let clean_fsm ~rdy ~result (ts,s) typing_env =
   | S_external_run _ -> s
   | S_assert _ ->
       s
+  | S_record_update _ -> s
   in
   let fsm' = (List.map (fun (q,s) -> q, clean s) ts, clean s) in
   Hashtbl.iter (fun x _ -> Hashtbl.remove typing_env x) vs_assigned_but_never_read;

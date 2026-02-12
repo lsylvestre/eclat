@@ -112,6 +112,7 @@ type token =
   | EMIT
   | ELSE
   | DUR_VAR_IDENT of (string)
+  | DOT_DOT
   | DOT
   | DONE
   | DOLLARD
@@ -146,4 +147,4 @@ val pi: (Lexing.lexbuf -> token) -> Lexing.lexbuf -> (((Ast.x * (Types.ty * bool
   (Ast.x * Ast.static) list * (Ast.x * (Ast.x * Types.tyB) list) list *
   ((Ast.p * Ast.e) * Prelude.loc) list)
 
-val exp_eof: (Lexing.lexbuf -> token) -> Lexing.lexbuf -> (Ast.e)
+val arguments_eof: (Lexing.lexbuf -> token) -> Lexing.lexbuf -> (Ast.e list)

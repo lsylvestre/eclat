@@ -227,6 +227,40 @@ let rec unify_tyB ~loc tyB1 tyB2 =
         (try unify_tyB ~loc tyBi1 tyBi2
          with CannotUnify(_,l) ->
                 raise @@ CannotUnify(loc,TyB(tyB1,tyB2)::l))) ctors ctors'
+  | TyB_record{fields=fs1;row=TyB_unit},
+    TyB_record{fields=fs2;row=TyB_unit} ->
+      SMap.iter (fun x tyB ->
+                  match SMap.find_opt x fs2 with
+                  | None -> raise @@ CannotUnify(loc,[TyB(tyB1,tyB2)])
+                  | Some tyB0 -> unify_tyB ~loc tyB0 tyB) fs1;
+      if SMap.union (fun _ _ _ -> None) fs1 fs2 |> SMap.is_empty then () else
+        raise @@ CannotUnify(loc,[TyB(tyB1,tyB2)])
+  | TyB_record{fields=fs1;row=TyB_unit},
+    TyB_record{fields=fs2;row=r2} ->
+      let acc = SMap.fold (fun x tyB acc ->
+                  match SMap.find_opt x fs2 with
+                  | None -> SMap.add x tyB acc
+                  | Some tyB0 -> (unify_tyB ~loc tyB0 tyB; acc)) fs1 SMap.empty in
+      unify_tyB ~loc r2 (TyB_record{fields=acc;row=TyB_unit})
+  | TyB_record{fields=fs1;row=r1},
+    TyB_record{fields=fs2;row=TyB_unit} ->
+      let acc = SMap.fold (fun x tyB acc ->
+                  match SMap.find_opt x fs1 with
+                  | None -> SMap.add x tyB acc
+                  | Some tyB0 -> (unify_tyB ~loc tyB0 tyB; acc)) fs2 SMap.empty in
+      unify_tyB ~loc r1 (TyB_record{fields=acc;row=TyB_unit})
+  | TyB_record{fields=fs1;row=r1},
+    TyB_record{fields=fs2;row=r2} ->
+      let acc1 = SMap.fold (fun x tyB acc ->
+                  match SMap.find_opt x fs2 with
+                  | None -> SMap.add x tyB acc
+                  | Some tyB0 -> (unify_tyB ~loc tyB0 tyB; acc)) fs1 SMap.empty in
+      let acc2 = SMap.fold (fun x tyB acc ->
+                  match SMap.find_opt x fs1 with
+                  | None -> SMap.add x tyB acc
+                  | Some tyB0 -> (unify_tyB ~loc tyB0 tyB; acc)) fs2 SMap.empty in
+      unify_tyB ~loc r1 (TyB_record{fields=acc1;row=new_tyB_unknown ~name:"row" ()});
+      unify_tyB ~loc r2 (TyB_record{fields=acc2;row=new_tyB_unknown ~name:"row" ()})
   | TyB_alias(x1,sz_list1,tyB_list1),TyB_alias(x2,sz_list2,tyB_list2) when x1 = x2 ->
       List.iter2 (unify_size ~loc) sz_list1 sz_list2;
       List.iter2 (unify_tyB ~loc) tyB_list1 tyB_list2
@@ -235,7 +269,7 @@ let rec unify_tyB ~loc tyB1 tyB2 =
       unify_tyB ~loc tyB1 tyB3
   | TyB_alias(x1,sz_list1,tyB_list1),tyB2 ->
       let tyB3 = Types.as_tyB ~loc @@ alias_instance x1 sz_list1 (List.map (fun t -> Ty_base t) tyB_list1) in
-      unify_tyB ~loc tyB3 tyB2;
+      unify_tyB ~loc tyB3 tyB2
   | _ -> raise @@ CannotUnify(loc,TyB(tyB1,tyB2)::[])
 
 (** unify actual type ty1 and expected type ty2;
@@ -576,7 +610,8 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
          let xs = vars_of_p p in
          fprintf std_formatter "@[<v>";
          SMap.iter (fun x _ ->
-             fprintf std_formatter "val %s : " x;
+             Prelude.Errors.(emph bold std_formatter "val");
+             fprintf std_formatter " %s : " x;
              let (Forall(vs,tyx)) = SMap.find x g' in
              pp_scheme std_formatter @@ Forall(vs,tyx);
              fprintf std_formatter " | %a"
@@ -707,6 +742,35 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
             Format.fprintf fmt "This pattern matching is not exhaustive.")
       );
       ty_result,!r
+  | E_record(b_list) ->
+      let bs,ns = List.split @@ List.map (fun (x,ei) ->
+                    let (t,n) = typ_exp ~collect_sig ~statics ~genv ~ctors
+                                  ~toplevel:false ~loc:(loc_of ei) g ei in
+                    let tyB = new_tyB_unknown () in
+                    unify_ty ~loc:(loc_of ei) t (Ty_base tyB);
+                    (x,tyB),n) b_list
+      in
+      let n = List.fold_left (fun acc n -> Dur_max(acc,n)) Dur_zero ns in
+      Ty_base(TyB_record{fields=smap_of_list bs;row=TyB_unit}),n
+  | E_record_field(e1,x,t) ->
+      let ty1,d1 = typ_exp ~collect_sig ~statics ~genv ~ctors
+                           ~toplevel:false ~loc:(loc_of e1) g e1 in
+      let tyB = new_tyB_unknown () in
+      let v = new_tyB_unknown ~name:"row" () in
+      unify_ty ~loc:(loc_of e1) ty1 (Ty_base(TyB_record{fields=SMap.singleton x tyB;row=v}));
+      unify_ty ~loc:(loc_of e1) (Ty_base t) ty1;
+      Ty_base tyB,d1
+  | E_record_update(e1,x2,e2,t) ->
+      let ty1,d1 = typ_exp ~collect_sig ~statics ~genv ~ctors
+                           ~toplevel:false ~loc:(loc_of e1) g e1 in
+      let ty2,d2 = typ_exp ~collect_sig ~statics ~genv ~ctors
+                           ~toplevel:false ~loc:(loc_of e2) g e2 in
+      let tyB1 = new_tyB_unknown ~name:"row" () in
+      let tyB2 = new_tyB_unknown () in
+      unify_ty ~loc:(loc_of e1) ty1 (Ty_base(TyB_record{fields=SMap.singleton x2 tyB2;row=tyB1}));
+      unify_ty ~loc:(loc_of e2) ty2 (Ty_base tyB2);
+      unify_ty ~loc:(loc_of e1) (Ty_base t) ty1;
+      ty1, Dur_max(d1,d2)
   | E_ref(e1) ->
       let ty,d = typ_exp ~collect_sig ~statics ~genv ~ctors
                          ~toplevel:false ~loc:(loc_of e1) g e1 in
@@ -1076,7 +1140,8 @@ let when_repl statics ~genv : bool -> ((p * e) * Prelude.loc) -> unit =
            let xs = vars_of_p p in
            fprintf std_formatter "@[<v>";
            SMap.iter (fun x _ ->
-             fprintf std_formatter "val %s : " x;
+             Prelude.Errors.(emph bold std_formatter "val");
+             fprintf std_formatter " %s : " x;
              let (Forall(vs,tyx)) = SMap.find x !r in
              pp_scheme std_formatter @@ Forall(vs,tyx);
              fprintf std_formatter " | %a@,"

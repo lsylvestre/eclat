@@ -121,7 +121,8 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ ~genv:_ _ _ -> ()))
                                   statics=gs;
                                   operators=smap_operators_of_list exts2;
                                   externals=exts1;
-                                  sums=ts} in
+                                  sums=ts;
+                                  record_fields=SMap.empty} in
                       let () = List.iter (when_repl gs ~genv false) ds in
                       loop (i+1) (exts1,exts2) gs ts ds)
                   (fun () -> 
@@ -137,7 +138,8 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ ~genv:_ _ _ -> ()))
                                    statics=gs'';
                                    operators=smap_operators_of_list exts2'';
                                    externals=exts1'';
-                                   sums=ts''} in
+                                   sums=ts'';
+                                   record_fields=SMap.empty} in
                        let w = (when_repl gs'' ~genv) in
                        List.iter (w false) ds;
                        List.iter (w true) ds';
@@ -153,15 +155,11 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ ~genv:_ _ _ -> ()))
         else exts_from_files,gs_from_files,ts_from_files,ds_from_files) in
 
   let values_list =
-
-    String.split_on_char ';' str_arg |>
-    (function | [""] -> [] | l -> l) |>
-    List.mapi (fun i s ->
-        Current_filename.current_file_name := "%command-line-argument-"^string_of_int (i+1)^" (input: "^s^")";
-        let lexbuf = Lexing.from_string s in
-        syntax_error_handler (fun lexbuf ->
-        Parser.exp_eof Lexer.token lexbuf)
-        lexbuf)
+    Current_filename.current_file_name := "%command-line-argument";
+    let lexbuf = Lexing.from_string str_arg in
+    syntax_error_handler (fun lexbuf ->
+    Parser.arguments_eof Lexer.token lexbuf)
+    lexbuf
   in
   
   (* check if the entry point is defined *)
@@ -183,6 +181,7 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ ~genv:_ _ _ -> ()))
   ({genv={abstract_types=create_abstract_type_smap ();
           statics=gs;
           operators=smap_operators_of_list (snd exts);
-          externals=(fst exts);sums=ts};
+          externals=(fst exts);sums=ts;
+          record_fields=SMap.empty};
          main}, values_list)
 

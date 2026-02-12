@@ -139,6 +139,17 @@ let rec anf (e:e) : e =
       (match eo' with
        | None -> E_exec(anf e1,xc0,None,l)
        | Some e3' -> plug e3' @@ fun xc3 -> E_exec(anf e1,xc0,Some xc3,l))
+  | E_record(b_list) ->
+      let xs,es' = List.split @@ List.map (fun (x,ei) -> x, glob ei) b_list in
+      plug_n es' @@ fun vs -> E_record(List.combine xs vs)
+  | E_record_field(e1,x,t) ->
+      let e1' = glob e1 in
+      plug e1' @@ fun xc1 ->
+      E_record_field(xc1,x,t)
+  | E_record_update(e1,x2,e2,t) ->
+      plug (glob e1) @@ fun v1 ->
+      plug (glob e2) @@ fun v2 ->
+      E_record_update(v1,x2,v2,t)
   | E_ref(e1) ->
       let e1' = glob e1 in
       plug e1' @@ fun xc1 ->

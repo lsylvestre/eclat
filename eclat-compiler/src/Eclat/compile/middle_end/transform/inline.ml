@@ -93,6 +93,10 @@ let fv_type_in ?(s=Types.Vs.empty) e =
                       | op -> ())
         | Ref -> assert false
         in ss_const c
+    | E_record_field(e1,_,tyB) ->
+        ss e1; r := !r ++ free_vars_of_type (Vs.empty,Ty_base tyB);
+    | E_record_update(e1,_,e2,tyB) ->
+        ss e1; ss e2; r := !r ++ free_vars_of_type (Vs.empty,Ty_base tyB);
     | e -> Ast_mapper.iter ss e
   in
   ss e;
@@ -142,6 +146,10 @@ let instantiate_types_in_e e = (* todo: rename this function *)
     | E_generate((p,(ty,tyB),e1),e2,sz1,sz2,deco) ->
         E_generate((p,(rename_ty unknowns ty, rename_tyB unknowns tyB),ss e1),ss e2,
                     rename_size unknowns sz1,rename_size unknowns sz2,deco)
+    | E_record_update(e1,x2,e2,tyB) ->
+       E_record_update(ss e1, x2, ss e2, rename_tyB unknowns tyB)
+    | E_record_field(e1,x,tyB) ->
+       E_record_field(ss e1, x, rename_tyB unknowns tyB)
     | e -> Ast_mapper.map ss e
   in
   let e'= ss e in

@@ -77,7 +77,8 @@ let contains_return s =
   | S_case(_,hs,so) ->
       List.exists (fun (_,s) -> aux s) hs || (match so with None -> false | Some s1 -> aux s1)
   | S_fsm _ | S_in_fsm _ -> false (* ok? *)
-  | S_external_run _ -> false in
+  | S_external_run _ -> false
+  | S_record_update _ -> false in
   aux s
 
 
@@ -131,7 +132,8 @@ let rec insert_kont ~is_zero w ~idle ~x s =
     | S_array_set _ 
     | S_sig_set _
     | S_array_from_file _
-    | S_assert _ -> s
+    | S_assert _
+    | S_record_update _ -> s
   in
   Some (aux s)
 
@@ -205,6 +207,12 @@ let rec to_a ~genv (e:Ast.e) : a =
         A_tuple[A_const(n);A_encode(z,ty_n,arg_size)])
   | Ast.E_vector(es) -> A_vector (List.map (to_a ~genv) es)  
   | Ast.E_sig_get x -> A_sig_get x
+  | Ast.E_record b_list ->
+     let l = List.sort (fun (x,_) (x',_) -> compare x x') b_list in
+     A_record (List.map (fun (x,a) -> x, to_a ~genv a) l)
+  | Ast.E_record_field(e1,y,tyB) ->
+      let t = MiniHDL_typing.translate_tyB (Types.canon_tyB tyB) in (* canonize tyB is important *)
+      let_plug_a (to_a ~genv e1) @@ fun z -> A_record_field(z,y,t)
   | _ ->
       Format.fprintf Format.std_formatter "--> %a\n"  Ast_pprint.pp_exp  e; assert false
 
@@ -691,6 +699,13 @@ let rec to_s ~endloop ~traps ~is_zero ~genv gs e x k =
   | E_assert(e1,loc) ->
       let a = to_a ~genv e1 in
       SMap.empty,SMap.empty,return_ @@ S_assert(a,loc)
+  
+
+  | E_record_update(e1,x2,e2,tyB) ->
+      let z1 = Ast.gensym () in
+      let t = MiniHDL_typing.translate_tyB (Types.canon_tyB tyB) in (* canonize tyB is important *)
+      SMap.empty, SMap.empty,S_letIn(z1,to_a ~genv e1,return_ @@ S_record_update(x,z1,x2,to_a ~genv e2,t))
+
   | e -> Ast_pprint.pp_exp Format.std_formatter e; assert false (* todo *)
 
 (* takes a program and translates it into an FSM *)

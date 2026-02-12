@@ -25,6 +25,8 @@ let rec canon = function
   | TSize_twice(size) -> TSize_twice(canon size)
   | TAbstract(x,ns,ts) -> TAbstract(x,List.map canon ns,List.map canon ts)
   | TSig t -> TSig (canon t)
+  | TRecord b_list -> TRecord (List.map (fun (x,t) -> x,canon t) b_list)
+
 (** [size_ty t] returns the size (in number of bytes) of type [t]
   Unspecified size are fixe to 32 bits by default
   (customizable via argument [?when_tvar]) *)
@@ -73,6 +75,7 @@ let rec size_ty =
                                 int_of_string degit * (List.fold_left (+) 0 (List.map size_ty ns))
         | Some (Types.Alias _) -> assert false (* should not happen *))
    | TSig t -> size_ty t
+   | TRecord b_list -> List.fold_left (fun acc (_,t) -> acc + size_ty t) 0 b_list
 
 let rec string_of_ty = function
   | TInt tz -> "int<"^string_of_ty tz^">"
@@ -91,6 +94,10 @@ let rec string_of_ty = function
   | TAbstract(x,ns,ts) ->  "("^(String.concat "," @@ List.map string_of_ty ts)^") " 
                            ^ x^"<"^ (String.concat "," @@ List.map string_of_ty ns) ^">" 
   | TSig t -> "sig<"^string_of_ty t^">"
+  | TRecord b_list ->
+      "{"^String.concat ";" (
+      List.map (fun (x,t) -> x^" : "^string_of_ty t) b_list
+      ) ^ "}"
 
 exception CannotUnify of (ty*ty)
 
@@ -154,6 +161,16 @@ let rec unify t1 t2 =
       then cannot_unify t1 t2
       else (List.iter2 unify ts ts'; List.iter2 unify ns ns')
   | TSig t1, TSig t2 -> unify t1 t2
+  | TRecord bs1, TRecord bs2 ->
+      let rec loop l1 l2 =
+        match l1,l2 with
+        | [],[] -> ()
+        | (x,t)::xs,(y,t')::ys -> 
+            if x <> y then cannot_unify t1 t2;
+            unify t t';
+            loop xs ys
+        | _ -> cannot_unify t1 t2
+      in loop bs1 bs2 
   | t1,t2 -> cannot_unify t1 t2
 
 let add_typing_env h (x:string) (t:ty) =
@@ -192,6 +209,10 @@ let rec translate_tyB =
                  alias_instance x sz_list ty_list in
       translate_tyB tyB'
   | TyB_string sz -> TString (translate_size sz)
+  | TyB_record{fields;row} ->
+      (* assert (rank = TyB_unit); *)
+      let bs = List.map (fun (x,tyB) -> x, translate_tyB tyB) (SMap.bindings fields) in
+      TRecord(bs)
 
   and translate_size = 
     let open Types in
@@ -345,6 +366,13 @@ let rec typing_a ~genv h a =
       let t = new_tvar () in
       add_typing_env h x (TSig(t));
       t
+  | A_record(b_list) ->
+      TRecord(List.map (fun (x,a) -> x,typing_a ~genv h a) b_list)
+  | A_record_field(x,y,t) ->
+      add_typing_env h x t;
+      (match t with
+       | TRecord(b_list) -> List.assoc y b_list
+       | _ -> assert false)
 
 let error_unbound_external x =
   Prelude.Errors.error (fun fmt -> 
@@ -445,6 +473,13 @@ let rec typing_s ~genv ~result h s =
   | S_assert(a,_) ->
       let t = typing_a ~genv h a in
       unify t TBool
+  | S_record_update(xdst,xsrc,x,a,t) ->
+      add_typing_env h xdst t;
+      add_typing_env h xsrc t;
+      let ta = typing_a ~genv h a in
+      unify ta (match t with
+                | TRecord(b_list) -> List.assoc x b_list
+                | _ -> assert false)
 
 (* typing of an fsm *)
 and typing_fsm h ~genv ~rdy ~result ~ty_result (ts,s) =

@@ -130,7 +130,7 @@ let check_abstract_type ~loc x szs tyB_list =
 
 %token LPAREN RPAREN LCUR RCUR LBRACKET RBRACKET COMMA PIPE_PIPE PIPE_COMMA_PIPE EQ EQ_EQ COL SEMI HAT STATIC
 %token LBRACKET_PIPE PIPE_RBRACKET
-%token FUN AMP DOT REGISTER EXEC INIT DEFAULT RESET WHERE RETURNS PERCENT
+%token FUN AMP DOT DOT_DOT REGISTER EXEC INIT DEFAULT RESET WHERE RETURNS PERCENT
 %token NODE IMPLY MINUS_LCUR RCUR_MINUS_GT
 %token MATCH WITH PIPE END
 %token OF
@@ -190,8 +190,7 @@ let check_abstract_type ~loc x szs tyB_list =
 
 %start <((x * (ty * bool * Prelude.loc)) list * (x * (ty * (bool * int * bool * Prelude.loc))) list) 
           * (x * static) list * (x * (x * tyB) list) list * ((p*e) * Prelude.loc) list> pi
-%start <e> exp_eof
-
+%start <e list> arguments_eof
 %%
 
 pi:
@@ -217,9 +216,10 @@ pi:
 | g=static pi=pi        { let (ecs,efs),gs,ts,ds = pi in ((ecs,    efs), g::gs, ts,    ds   ) }
 | d=type_decl pi=pi     { match d with 
                           | None -> pi 
-                          | Some d ->
+                          | Some (x,l) ->
                              let (ecs,efs),gs,ts,ds = pi in
-                             ((ecs,    efs), gs,    d::ts, ds   ) }
+                             ((ecs,    efs), gs,    (x,l)::ts, ds   )
+                        }
 | d=decl pi=pi          { let (ecs,efs),gs,ts,ds = pi in ((ecs,    efs), gs,    ts,    d::ds) }
 | EOF                   { ([],[]),[],[],[] }
 
@@ -264,9 +264,6 @@ static: /* todo: add loc and type annotation [tyopt] */
     }
 
 static_dim_exp: HAT e=aexp { e }
-
-exp_eof:
-| e=exp EOF {e}
 
 decl:
 | d=decl_all 
@@ -361,6 +358,9 @@ type_decl_end:
 | EQ ty=ty SEMI_SEMI? {`Ty ty }
 | r=rest_abstract { `R r }
 | EQ tyBs=separated_nonempty_list(PIPE,ty_case) SEMI_SEMI?  {`Sum tyBs }
+(*| EQ LCUR  bs=separated_nonempty_list(SEMI,record_field_tyB) RCUR SEMI_SEMI? {
+    `Record (bs) } *)
+
 
 %inline rest_abstract:
 | SEMI_SEMI ?  { ("mul",[]) }
@@ -556,8 +556,18 @@ apty:
 
 aty:
 | tyB=ty_or_TyB_unknown_decl { tyB }
+| LCUR bs=separated_nonempty_list(SEMI,record_field_tyB) r=row { 
+    Ty_base (TyB_record{fields=smap_of_list bs;row=r})
+  }
 | LT_LT sz=size GT_GT { Ty_size sz }
 | LPAREN ty=ty RPAREN { ty }
+
+record_field_tyB:
+| x=IDENT COL ty=ty { x, Types.as_tyB ~loc:(with_file $loc(ty)) ty }
+
+row:
+| SEMI DOT_DOT RCUR { TyB_unit }
+| RCUR              { Types.new_tyB_unknown () }
 
 ty_list:
 | LPAREN ts=ty_list RPAREN {ts}
@@ -592,13 +602,6 @@ size_unknown:
     x
   }
 
-tyB_unknown:
-| x=TYB_VAR_IDENT { x }
-| x=TVAR_IDENT { 
-    Prelude.Errors.warning ~loc:(with_file $loc(x)) (fun fmt -> 
-          Format.fprintf fmt "basic type variable '%s should be prefixed with `~`." x);
-   x }
-
 ty_or_TyB_unknown:
 | x=TYB_VAR_IDENT { (x,($loc(x),false)) }
 | x=TVAR_IDENT    { (x,($loc(x),true)) }
@@ -622,7 +625,7 @@ lvalue:
       {
         let p,ty_opt = p_ty_opt in
         mk_fun_ty_annot p ty_opt e
-    }
+      }
 
 avalue:
 | LPAREN e=value RPAREN { e }
@@ -948,6 +951,9 @@ aexp_desc:
                 | _ -> assert false (* todo error *) }
 
 | x=UNROLL AT k=INT_LIT { E_const (Op(Runtime(Unroll k))) }
+| e=aexp DOT x=IDENT  { E_record_field(e,x,new_tyB_unknown()) }
+| LCUR bs=separated_list(SEMI,record_binding) RCUR { E_record(bs) }
+| LCUR e1=aexp WITH x2=IDENT EQ e2=lexp RCUR { E_record_update(e1,x2,e2,new_tyB_unknown()) }
 | x=IDENT { let open Ast_mk in
             let loc_x = with_file $loc(x) in
             let mk e = mk_loc loc_x e in
@@ -1018,6 +1024,9 @@ aexp_desc:
 | PARFOR x=IDENT EQ sz1=size TO sz2=size DO e=exp DONE 
       { E_for(x,sz1,sz2,e,with_file $loc) }
 | LOOP e=exp END { E_loop(e) }
+
+record_binding:
+| x=IDENT EQ e1=lexp { x,e1 }
 
 const_exp:
 | c=const_without_vect { E_const c}
@@ -1112,3 +1121,7 @@ const_without_vect:
 | LSL        { External_fun("Int.lsl",new_ty_unknown ()) }
 | LSR        { External_fun("Int.lsr",new_ty_unknown ()) }
 | ASR        { External_fun("Int.asr",new_ty_unknown ()) }
+
+arguments_eof:
+| es=separated_list(SEMI,lexp) EOF { es }
+

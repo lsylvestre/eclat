@@ -55,6 +55,12 @@ let fv ?(get_sig=true) ?(get_arrays=true) ?(xs=SMap.empty) e =
       aux xs e1 ++ aux xs e2 ++ (match eo with 
                                  | None -> SMap.empty 
                                  | Some e3 -> aux xs e3)
+  | E_record(b_list) ->
+      fv_list xs (List.map snd b_list)
+  | E_record_field(e1,x,_) ->
+      aux xs e1
+  | E_record_update(e1,x2,e2,_) ->
+      aux xs e1 ++ aux xs e2
   | E_ref(e1) ->
       aux xs e1
   | E_get(e1) ->
@@ -184,6 +190,12 @@ let fv_arrays ?(xs=SMap.empty) e =
       aux xs e1 ++ aux xs e2 ++ (match eo with 
                                  | None -> SMap.empty 
                                  | Some e3 -> aux xs e3)
+  | E_record(b_list) ->
+      fv_list xs (List.map snd b_list)
+  | E_record_field(e1,x,_) ->
+      aux xs e1
+  | E_record_update(e1,x2,e2,_) ->
+      aux xs e1 ++ aux xs e2
   | E_ref(e1) ->
       aux xs e1
   | E_get(e1) ->

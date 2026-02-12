@@ -53,6 +53,13 @@ let rec prop env a =
   | A_decode(x,ty) -> 
       prop_ident_a env x (fun y -> A_decode(y,ty))
   | A_vector aas -> A_vector(List.map (prop env) aas)
+  | A_record b_list ->
+      A_record (List.map (fun (x,a) -> x,prop env a) b_list)
+  | A_record_field(x,y,_) ->
+      (match SMap.find_opt x env with
+      | None -> a
+      | Some(A_record bs) -> List.assoc x bs
+      | Some _ -> assert false)
 
 let rec prop_s env s =
   match s with
@@ -106,6 +113,8 @@ let rec prop_s env s =
       S_external_run(f,i,res,rdy,prop env a)
   | S_assert(a1,loc) ->
       S_assert(prop env a1,loc)
+  | S_record_update(xdst,xsrc,x,a,t) ->
+      S_record_update(xdst,xsrc,x,prop env a,t)
 let propagation_s s =
   prop_s SMap.empty s
 

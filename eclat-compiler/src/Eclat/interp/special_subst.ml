@@ -86,6 +86,12 @@ let subst_e x ex e =
         E_reg((p,tyB,e1'),ss (0::id) e0,l)
     | E_exec(e1,e2,eo,l) ->
         E_exec(ss (0::id) e1,ss (1::id) e2,Option.map (ss (2::id)) eo,l)
+    | E_record(b_list) ->
+        E_record(List.mapi (fun i (xi,ei) -> xi,ss (i::id) ei) b_list)
+    | E_record_field(e1,x,t) ->
+        E_record_field(ss (0::id) e1, x,t)
+    | E_record_update(e1,x2,e2,t) ->
+        E_record_update(ss (0::id) e1, x2, ss (1::id) e2,t)
     | E_array_length(y,loc) ->
         let z = if x <> y then y else as_ident ex in
         E_array_length(z,loc)

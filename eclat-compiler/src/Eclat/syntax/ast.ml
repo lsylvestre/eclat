@@ -21,7 +21,7 @@ type c =                (** constant [c] *)
   | Inj of x            (* non-applyed constructor (data type) *)
   | C_appInj of x * c * tyB (* constructor (data type) *)
   | Ref
-  
+
 and op = (** primitives *)
        (* instantaneous primitives *)
         Runtime of Operators.op
@@ -55,8 +55,14 @@ type e =                      (** expression     [e]                       *)
   | E_fix of x * (p * (ty * tyB) * e) (** recursive function [fix (fun p -> e)]    *)
   | E_par of e list                   (** parallel tuple             [(e1 || e2 ... en)] *)
 
-  | E_reg of (p * tyB * e) * e * l  (** register       [reg^l (fun p -> e) last e] *)
+  | E_reg of (p * tyB * e) * e * l   (** register       [reg^l (fun p -> e) last e] *)
   | E_exec of e * e * e option * l   (** exec           [(exec^l e default e [reset when e])]    *)
+
+  | E_record of (x * e) list        (** {x1=e1; ... xn=en} *)
+  | E_record_field of e * x * tyB   (** [e.x], annotation (with the type of [e]) 
+                                           is required for code generation *)
+  | E_record_update of e * x * e * tyB (** { e with xi = ei }, annotation (with the type of [e]) 
+                                           is required for code generation *)
 
   | E_array_create of size * deco   (** [create<sz>] *)
   | E_array_make of size * e * deco (** [make<sz> e] *)
@@ -162,6 +168,10 @@ and genv = {
   sums : 
      (** sum types, non recursive *)
      (x * (x * tyB) list) list ;
+
+  record_fields : 
+     (** field of record types and associated alias type *)
+     x SMap.t ;
 }
 
 

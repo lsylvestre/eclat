@@ -265,8 +265,19 @@ and pp_a ~genv fmt = function
    fprintf fmt "%a%s" pp_ident y (let m = size_ty ty in if n = m then "" else "&"^const_zero (n-m))
 | A_decode(y,ty) ->
    fprintf fmt "%a(0 to %d)" pp_ident y (size_ty ty - 1)
-
-
+| A_record(b_list) -> pp_tuple fmt (pp_a ~genv) @@ List.map snd b_list
+| A_record_field(x,y,t) ->
+    (match t with
+     | TRecord b_list ->
+         let k,k' = let rec loop n = function
+                    | [] -> assert false
+                    | (y',ty')::bs' ->
+                        if y' = y then n,n+size_ty ty' else
+                        loop (n+size_ty ty') bs'
+                    in loop 0 b_list
+         in
+         fprintf fmt  "%a(%d to %d)" pp_ident x k (k'-1)
+     | _ -> assert false)
 let print_external fmt (n,(ty,shared,_)) =
   let arg,d,ret = match ty with
   | Types.Ty_fun(arg,d,ret) -> 

@@ -46,6 +46,10 @@ let rec combinational ?(with_sig_get=true) ~externals (e:e) : bool =
 	    false
 	| E_reg _ | E_exec _ ->
 	    false (* have an internal state *)
+	| E_record b_list ->
+	    List.for_all (fun (_,ei) -> combinational ~externals ei) b_list
+  | E_record_field(e1,_,_) -> combinational ~externals e1
+  | E_record_update _ -> false (* because it is implemented with a VHDL instruction *)
   | E_array_length _ ->
 	    true
 	| E_array_make _ 
@@ -111,6 +115,11 @@ let rec instantaneous ?(with_sig=true) ~externals (e:e) : bool =
 	    false
 	| E_reg _ | E_exec _ ->
 	    true (* have an internal state *)
+ 	| E_record b_list ->
+	    List.for_all (fun (_,ei) -> instantaneous ~externals ei) b_list
+  | E_record_field(e1,_,_) -> instantaneous ~externals e1
+  | E_record_update(e1,_,e2,_) ->
+     instantaneous ~externals e1 && instantaneous ~externals e2
   | E_array_length _ ->
 	    true
 	| E_array_make _ 

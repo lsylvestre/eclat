@@ -66,6 +66,7 @@ let rec ocaml_type t =
   | TAbstract _ -> "'" ^ gensym ()
   | TSize _ -> assert false (* already removed *)
   | TVect _ -> "Bitvector.t"
+  | TRecord b_list -> ocaml_type (TTuple (List.map snd b_list))
   | _ -> "'" ^ gensym ()
 
 
@@ -195,7 +196,17 @@ and pp_a typing_env operators fmt = function
    fprintf fmt "Bitvector.decode !%a"
      pp_ident y
 | A_sig_get(x) -> assert false (* todo *)
-
+| A_record(b_list) -> pp_tuple (pp_a typing_env operators) fmt (List.map snd b_list)
+| A_record_field(x,y,t) ->
+    let b_list = match MiniHDL_typing.canon t with
+                 | TRecord b_list -> b_list
+                 | _ -> assert false in
+    let rec pos n = function
+    | [] -> assert false
+    | (y',t')::ys -> if y' = y then (n,t') else pos (n+1) ys
+    in
+    let k,t' = pos 0 b_list in
+    fprintf fmt "( tuple_get_ (%d,%a) : %s)@," k pp_ident x (ocaml_type t')
 
 let pp_a2 typing_env x operators fmt a =
   fprintf fmt "%a := %a" 
@@ -263,7 +274,7 @@ let rec pp_s typing_env operators externals ~st fmt = function
         pp_ident idx 
         (pp_a typing_env operators) a
   | S_array_from_file _ -> assert false (* not supported yet *)
-| ( S_seq(S_skip,s) 
+  | ( S_seq(S_skip,s) 
   | S_seq(s,S_skip) ) -> 
       pp_s typing_env operators externals ~st fmt s
 | S_seq(s1,s2) ->
@@ -292,7 +303,18 @@ let rec pp_s typing_env operators externals ~st fmt = function
 | S_assert(a,loc) ->
    fprintf fmt "if %a then () else (print_string \"%a\"; assert false);@,"
         (pp_a typing_env operators) a Prelude.Errors.pp_loc loc
-
+| S_record_update(xdst,xsrc,y,a,t) ->
+    let b_list = match MiniHDL_typing.canon t with
+                 | TRecord b_list -> b_list
+                 | _ -> assert false in
+    let rec pos n = function
+    | [] -> assert false
+    | (y',t')::ys -> if y' = y then (n,t') else pos (n+1) ys
+    in
+    let k,t' = pos 0 b_list in
+    fprintf fmt "%a := %a;@,tuple_set_ (%a,%d,%a)@," 
+        pp_ident xdst pp_ident xsrc pp_ident xdst k 
+          (pp_a typing_env operators) a
 
 
 (** code generator for FSMs *)
@@ -360,7 +382,8 @@ let rec default_zero t =
   | TVect _ ->
       "Bitvector.dummy"
   | TSig _ -> assert false (* todo *)
-
+  | TRecord(b_list) -> default_zero (TTuple (List.map snd b_list)
+)
 let type_state_var fmt state_var idle xs =
   fprintf fmt "type %s = %a " state_var pp_state idle;
   List.iter (fun q -> fprintf fmt " | %a" pp_state q) xs;

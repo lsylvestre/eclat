@@ -13,6 +13,7 @@ and ty = TInt of ty | TBool | TUnit
        | TSize_add of ty * int
        | TSize_twice of ty
        | TSig of ty
+       | TRecord of (x * ty) list (* sorted by keys *)
 and size = ty
 
 let new_tvar = let c = ref 0 in fun () -> incr c; TVar (ref (V ("'a"^string_of_int !c)))
@@ -54,6 +55,8 @@ type a = A_letIn of x * a * a
   | A_decode of x * ty
   | A_encode of x * ty * int
   | A_sig_get of x
+  | A_record of (x * a) list (* sorted by keys *)
+  | A_record_field of x * x * ty
 
 type write = Delayed | Immediate
 
@@ -82,6 +85,7 @@ type s = (* all instructions terminates in one clock cycle *)
   | S_external_run of x * l * x * x * a (* (f,id,result,rdy,a) *)
   | S_sig_set of x * a
   | S_assert of a * Prelude.loc
+  | S_record_update of x * x * x * a * ty
 
 and t = (x * s)
 
@@ -121,6 +125,10 @@ module Debug = struct
   | TSize_twice(size) -> fprintf fmt "(2 * %a)" pp_ty size
   | TStatic {elem ; size} -> fprintf fmt "%a static<%a>" pp_ty elem pp_ty size
   | TSig t -> fprintf fmt "tsig<%a>" pp_ty t
+  | TRecord bs -> fprintf fmt "@[<v>{";
+      pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "; ")
+        (fun fmt (x,t) -> fprintf fmt "%s : %a" x pp_ty t) fmt bs;
+      fprintf fmt "}@]"
 
 let pp_tuple = Ast_pprint.pp_tuple
 let pp_vector = Ast_pprint.pp_vector
@@ -167,6 +175,14 @@ let pp_vector = Ast_pprint.pp_vector
   | A_encode(x,_,n) -> fprintf fmt "encode(%s,%d)" x n
   | A_sig_get(x) ->
       fprintf fmt "@[<v>?%s@]" x
+  | A_record(b_list) ->
+      fprintf fmt "@[<v>{";
+      pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "; ")
+        (fun fmt (x,a) -> fprintf fmt "%s = %a" x pp_a a) fmt b_list;
+      fprintf fmt "}@]"
+  | A_record_field(x,y,t) ->
+      fprintf fmt "(%s:%a).%s" x pp_ty t y
+
   let rec pp_s fmt = function
   | S_skip -> fprintf fmt "skip"
   | S_continue q ->
@@ -216,6 +232,9 @@ let pp_vector = Ast_pprint.pp_vector
       fprintf fmt "@[<v>%s <= %a;@]" x pp_a a
   | S_assert(a,_) ->
       fprintf fmt "@[assert(%a);@]" pp_a a
+  | S_record_update(xdst,xsrc,x,a,t) ->
+      fprintf fmt "%s := {%s : %a with %s = %a}@]" xdst xsrc pp_ty t x pp_a a
+
   and pp_fsm fmt (ts,s) =
     let pp_t fmt (x,s) = fprintf fmt "@[%s = %a@]@," x pp_s s in
     fprintf fmt "@[<v>let rec ";

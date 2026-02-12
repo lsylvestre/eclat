@@ -72,6 +72,18 @@ let rec lfloat (e:e) : e =
                     | Some e3 -> let ds3,e3' = glob e3 in
                     ds3,Some e3 in
       ds0@ds3,E_exec(lfloat e1,e0',eo',l)
+  | E_record(b_list) ->
+      let dss,b' = List.split @@ List.map (fun (xi,ei) -> 
+                       let ds,ei' = glob ei in
+                       ds, (xi,ei')) b_list in
+      List.concat dss,E_record(b')
+  | E_record_field(e1,x,t) ->
+      let ds,e1' = glob e1 in
+      ds,E_record_field(e1',x,t)
+  | E_record_update(e1,x2,e2,t) ->
+      let ds1,e1' = glob e1 in
+      let ds2,e2' = glob e2 in
+      ds1@ds2,E_record_update(e1',x2,e2',t)
   | E_ref(e1) ->
       let ds1,e1' = glob e1 in
       ds1,E_ref(e1')

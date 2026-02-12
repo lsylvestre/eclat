@@ -23,12 +23,16 @@ let rec flat = function
 | A_array_get _
 | A_array_length _
 | A_encode _
-| A_decode _ 
+| A_decode _
 | A_sig_get _ as a ->  (* no sub-atoms*)
     [],a
 | A_vector(aas) ->
     let bss,aas' = List.map flat aas |> List.split in
     List.concat bss, A_vector(aas')
+| A_record(b_list) ->
+    let bss,b_list' = List.map (fun (x,a) -> let bs,a' = flat a in bs,(x,a')) b_list |> List.split in
+    List.concat bss, A_record(b_list')
+| A_record_field _ as a -> [],a
 
 let s_let_bindings bs s =
   List.fold_right (fun (x,a) s -> S_letIn(x,a,s)) bs s
@@ -85,6 +89,9 @@ let rec flat_s s =
   | S_assert(a,loc) ->
      let bs,a' = flat a in
      s_let_bindings bs @@ S_assert(a',loc)
+  | S_record_update(xdst,xsrc,x,a,t) ->
+     let bs,a' = flat a in
+     s_let_bindings bs @@ S_record_update(xdst,xsrc,x,a',t)
 
 let flat_let_atom (ts,s) =
   List.map (fun (x,s) -> x,flat_s s) ts, flat_s s

@@ -151,6 +151,11 @@ e ::=                         -- expression
 // size
     | << sz >>
 
+// records
+    | {x1=e1; ... xn=en}
+    | e.y
+    | {e1 with x = e2}
+
 // Esterel-like features
     | pause
     | trap x in e
@@ -172,7 +177,7 @@ p ::= () | x | (p1, ... pn)  -- pattern
 
 c ::= () | true | false      -- constant
     | (c1, ... cn)           * tuple
-    | {c1, ... cn}           * vector
+    | [c1, ... cn]           * vector
     | op                     * operator
 
 ```
@@ -194,13 +199,17 @@ basic type  -- tyB ::= bool
                     | tyB_1 * ... tyB_n 
                     | (X_1 of tyB_1 | ... X_n of ty_N)
                     | string
+                    | {x1=tyB1; ... xn=tyB1} | {x1=tyB1; ... xn=tyB1; row}
                     | ~a
+
 duration    -- dur ::= 
 * instantaneous       0
 * multi-cycle       | 1
                     | max(dur,dur)
                     | $a
 size        -- sz ::= n | sz + n | 2 * sz | ?a
+row variable-- row::= tyB
+
 type scheme -- sigma ::= ty | forall v1 ... vN . sigma
             -- vi    ::= 'a | ~a | $a | ?a
 ```
@@ -223,29 +232,29 @@ We use some syntactic sugar:
 The main Eclat primitives have the following type signatures:
 
 ```
-(=) : forall `a . (`a * `a) => bool
+(=) : forall ~a . (~a * ~a) => bool
 (or) : (bool * bool) => bool
 (&) : (bool * bool) => bool
 (xor) : (bool * bool) => bool
 not : bool => bool
 
-abs : forall `sz . int<`sz> => int<`sz>
-(+) : forall `sz . (int<`sz> * int<`sz>) => int<`sz>
-(-) : forall `sz . (int<`sz> * int<`sz>) => int<`sz>
-( * ) : forall `sz . (int<`sz> * int<`sz>) => int<`sz>
-(/) : forall `sz . (int<`sz> * int<`sz>) => int<`sz>
-(mod) : forall `sz . (int<`sz> * int<`sz>) => int<`sz>
-get_bit : forall `sz . (int<`sz> * int<32>) => bool
-update_bit : forall `sz . (int<`sz> * int<32> * bool) => int<`sz>
-int_resize : forall `sz1 `sz2 . (<<`sz2>> * int<`sz1>) => int<`sz2>
+abs : forall ?n . int<?n> => int<?n>
+(+) : forall ?n . (int<?n> * int<?n>) => int<?n>
+(-) : forall ?n . (int<?n> * int<?n>) => int<?n>
+( * ) : forall ?n . (int<?n> * int<?n>) => int<?n>
+(/) : forall ?n . (int<?n> * int<?n>) => int<?n>
+(mod) : forall ?n . (int<?n> * int<?n>) => int<?n>
+get_bit : forall ?n . (int<?n> * int<32>) => bool
+update_bit : forall ?n . (int<?n> * int<32> * bool) => int<?n>
+int_resize : forall ?n1 ?n2 . (<<?n2>> * int<?n1>) => int<?n2>
 
-vect_nth: forall `sz `a . (`a vect<`sz> * int<32>) => `a
-vect_size: forall `sz `a . `a vect<`sz> => int<32>
-vect_copy_with: forall `sz `a . (`a vect<`sz> * int<32> * `a) => `a vect<`sz> 
-vect_make : forall `sz `a . (<<`sz>> * `a) => `a vect<`sz>
+vect_nth: forall ?n ~a . (~a vect<?n> * int<32>) => ~a
+vect_size: forall ?n ~a . ~a vect<?n> => int<32>
+vect_copy_with: forall ?n ~a . (~a vect<?n> * int<32> * ~a) => ~a vect<?n> 
+vect_make : forall ?n ~a . (<<?n>> * ~a) => ~a vect<?n>
 
 print_string : string => unit
-print_int : forall `sz . int<`sz> => unit
+print_int : forall ?n . int<?n> => unit
 print_newline : unit => unit
 ```
 
