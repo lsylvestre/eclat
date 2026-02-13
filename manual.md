@@ -208,7 +208,7 @@ duration    -- dur ::=
                     | max(dur,dur)
                     | $a
 size        -- sz ::= n | sz + n | 2 * sz | ?a
-row variable-- row::= tyB
+row variable-- row::= ~a | {x1=tyB1; ... xn=tyB1}
 
 type scheme -- sigma ::= ty | forall v1 ... vN . sigma
             -- vi    ::= 'a | ~a | $a | ?a

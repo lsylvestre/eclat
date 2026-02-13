@@ -27,6 +27,8 @@ type kind_error =
 | Cyclic_Ty of int * ty
 | Cyclic_Dur of int * dur
 | Cyclic_Size of int * size
+| Missing_record_field of x
+| Record_field_mismatch of x * tyB * tyB
 
 exception CannotUnify of Prelude.loc * kind_error list
 
@@ -230,13 +232,21 @@ let rec unify_tyB ~loc tyB1 tyB2 =
   | TyB_record{fields=fs1;row=TyB_unit},
     TyB_record{fields=fs2;row=TyB_unit} ->
       SMap.iter (fun x tyB ->
-                  match SMap.find_opt x fs2 with
-                  | None -> raise @@ CannotUnify(loc,[TyB(tyB1,tyB2)])
-                  | Some tyB0 -> unify_tyB ~loc tyB0 tyB) fs1;
+                  match SMap.find_opt x fs1 with
+                  | None -> raise @@ CannotUnify(loc,[TyB(tyB1,tyB2);Missing_record_field(x)])
+                  | Some tyB0 -> try unify_tyB ~loc tyB0 tyB with
+                                 | CannotUnify _ -> raise @@ CannotUnify(loc,TyB(tyB1,tyB2)::Record_field_mismatch(x,tyB0,tyB)::[])
+                ) fs2;
       if SMap.union (fun _ _ _ -> None) fs1 fs2 |> SMap.is_empty then () else
         raise @@ CannotUnify(loc,[TyB(tyB1,tyB2)])
   | TyB_record{fields=fs1;row=TyB_unit},
     TyB_record{fields=fs2;row=r2} ->
+      SMap.iter (fun x tyB ->
+                    match SMap.find_opt x fs1 with
+                    | None -> raise @@ CannotUnify(loc,[TyB(tyB1,tyB2);Missing_record_field(x)])
+                    | Some tyB0 -> try unify_tyB ~loc tyB0 tyB with
+                                   | CannotUnify _ -> raise @@ CannotUnify(loc,TyB(tyB1,tyB2)::Record_field_mismatch(x,tyB0,tyB)::[])
+                    ) fs2;
       let acc = SMap.fold (fun x tyB acc ->
                   match SMap.find_opt x fs2 with
                   | None -> SMap.add x tyB acc
@@ -244,17 +254,35 @@ let rec unify_tyB ~loc tyB1 tyB2 =
       unify_tyB ~loc r2 (TyB_record{fields=acc;row=TyB_unit})
   | TyB_record{fields=fs1;row=r1},
     TyB_record{fields=fs2;row=TyB_unit} ->
+      SMap.iter (fun x tyB ->
+                    match SMap.find_opt x fs2 with
+                    | None -> raise @@ CannotUnify(loc,[TyB(tyB1,tyB2);Missing_record_field(x)])
+                    | Some tyB0 -> try unify_tyB ~loc tyB0 tyB with
+                                   | CannotUnify _ -> raise @@ CannotUnify(loc,TyB(tyB1,tyB2)::Record_field_mismatch(x,tyB0,tyB)::[])
+                    ) fs1;
       let acc = SMap.fold (fun x tyB acc ->
                   match SMap.find_opt x fs1 with
                   | None -> SMap.add x tyB acc
-                  | Some tyB0 -> (unify_tyB ~loc tyB0 tyB; acc)) fs2 SMap.empty in
+                  | Some tyB0 -> (try unify_tyB ~loc tyB0 tyB with
+                                  | CannotUnify _ ->
+                                      Prelude.Errors.error ~loc
+                                         (fun fmt -> 
+                                             Format.fprintf fmt "field %s have type %a but souhld have type %a"
+                                               x pp_tyB tyB0 pp_tyB tyB));
+                                  acc) fs2 SMap.empty in
       unify_tyB ~loc r1 (TyB_record{fields=acc;row=TyB_unit})
   | TyB_record{fields=fs1;row=r1},
     TyB_record{fields=fs2;row=r2} ->
       let acc1 = SMap.fold (fun x tyB acc ->
                   match SMap.find_opt x fs2 with
                   | None -> SMap.add x tyB acc
-                  | Some tyB0 -> (unify_tyB ~loc tyB0 tyB; acc)) fs1 SMap.empty in
+                  | Some tyB0 -> (try unify_tyB ~loc tyB0 tyB with
+                                  | CannotUnify _ ->
+                                      Prelude.Errors.error ~loc 
+                                         (fun fmt -> 
+                                             Format.fprintf fmt "field %s have type %a but souhld have type %a"
+                                               x pp_tyB tyB0 pp_tyB tyB));
+                                 acc) fs1 SMap.empty in
       let acc2 = SMap.fold (fun x tyB acc ->
                   match SMap.find_opt x fs1 with
                   | None -> SMap.add x tyB acc
@@ -966,6 +994,8 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
 let typing_handler ?(msg="") f () =
   let open Format in
   let open Prelude.Errors in
+  let pp_tyB fmt tyB = pp_tyB fmt (rebase_tyB tyB) in
+  let pp_ty fmt ty = pp_ty fmt (rebase_ty ty) in
   try f () with
   | CannotUnify(loc,cannot::l) ->
       error ~loc (fun fmt ->
@@ -1010,15 +1040,22 @@ let typing_handler ?(msg="") f () =
                 (emph_pp bold (fun fmt () -> fprintf fmt "%s" x1)) () 
                 (emph_pp bold (fun fmt () -> fprintf fmt "%s" x2)) () 
           | Cyclic_Ty(n,t) ->
-              fprintf fmt "%s@,An expression %a has a cyclic type %a\n"
+              fprintf fmt "%s@,An expression %a has a cyclic type %a"
                 msg  (emph_pp purple Ast_pprint.pp_exp) !trace_last_exp
                 (emph_pp bold pp_ty) (canon_ty t)
           | Cyclic_Dur(n,dur) ->
-              fprintf fmt "The type of response time %a is cyclic\n"
+              fprintf fmt "The type of response time %a is cyclic"
               (emph_pp bold pp_dur) (canon_dur dur)
           | Cyclic_Size(n,sz) ->
-              fprintf fmt "The type of size %a is cyclic\n"
+              fprintf fmt "The type of size %a is cyclic"
               (emph_pp bold pp_size) (canon_size sz)
+          | Missing_record_field(x) ->
+              fprintf fmt "Missing record field %a" (emph_pp blue pp_print_string) x
+          | Record_field_mismatch(x,tyB1,tyB2) ->
+              fprintf fmt "The record field %a has type %a but was expected of type %a" 
+                               (emph_pp blue pp_print_string) x
+                               (emph_pp bold pp_tyB) (canon_tyB tyB1)
+                               (emph_pp bold pp_tyB) (canon_tyB tyB2)
           );
           List.iter (fun _ -> fprintf fmt "@]") l;
           fprintf fmt "@,"
@@ -1075,6 +1112,13 @@ let typing_handler ?(msg="") f () =
        | Cyclic_Size(n,sz) ->
           fprintf fmt "The type of size %a is cyclic\n"
           (emph_pp bold pp_size) (canon_size sz)
+       | Missing_record_field(x) ->
+          fprintf fmt "Missing record field %a" (emph_pp blue pp_print_string) x
+       | Record_field_mismatch(x,tyB1,tyB2) ->
+              fprintf fmt "The record field %a has type %a but was expected of type %a" 
+                               (emph_pp blue pp_print_string) x
+                               (emph_pp bold pp_tyB) (canon_tyB tyB1)
+                               (emph_pp bold pp_tyB) (canon_tyB tyB2)
         );
           inspect l';
           List.iter (fun _ -> fprintf fmt "@]") l;

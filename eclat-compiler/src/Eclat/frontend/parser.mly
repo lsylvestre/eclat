@@ -130,7 +130,7 @@ let check_abstract_type ~loc x szs tyB_list =
 
 %token LPAREN RPAREN LCUR RCUR LBRACKET RBRACKET COMMA PIPE_PIPE PIPE_COMMA_PIPE EQ EQ_EQ COL SEMI HAT STATIC
 %token LBRACKET_PIPE PIPE_RBRACKET
-%token FUN AMP DOT DOT_DOT REGISTER EXEC INIT DEFAULT RESET WHERE RETURNS PERCENT
+%token FUN AMP DOT REGISTER EXEC INIT DEFAULT RESET WHERE RETURNS PERCENT
 %token NODE IMPLY MINUS_LCUR RCUR_MINUS_GT
 %token MATCH WITH PIPE END
 %token OF
@@ -358,8 +358,6 @@ type_decl_end:
 | EQ ty=ty SEMI_SEMI? {`Ty ty }
 | r=rest_abstract { `R r }
 | EQ tyBs=separated_nonempty_list(PIPE,ty_case) SEMI_SEMI?  {`Sum tyBs }
-(*| EQ LCUR  bs=separated_nonempty_list(SEMI,record_field_tyB) RCUR SEMI_SEMI? {
-    `Record (bs) } *)
 
 
 %inline rest_abstract:
@@ -556,18 +554,29 @@ apty:
 
 aty:
 | tyB=ty_or_TyB_unknown_decl { tyB }
-| LCUR bs=separated_nonempty_list(SEMI,record_field_tyB) r=row { 
-    Ty_base (TyB_record{fields=smap_of_list bs;row=r})
+| LCUR v=record_ext { 
+    let (bs,row) = v in
+    Ty_base (TyB_record{fields=smap_of_list bs;row})
   }
 | LT_LT sz=size GT_GT { Ty_size sz }
 | LPAREN ty=ty RPAREN { ty }
 
+record_ext:
+| name=TYB_VAR_IDENT RCUR { [],new_tyB_unknown ~name () }
+| RCUR         { [],TyB_unit }
+| b=record_field_tyB v=record_ext_next { 
+    let (l,row) = v in (b::l,row) 
+  }
+
+record_ext_next:
+| SEMI name=TYB_VAR_IDENT RCUR { [],new_tyB_unknown ~name () }
+| SEMI? RCUR        { [],TyB_unit }
+| SEMI b=record_field_tyB  v=record_ext_next {
+    let (l,row) = v in (b::l,row)
+  }
+
 record_field_tyB:
 | x=IDENT COL ty=ty { x, Types.as_tyB ~loc:(with_file $loc(ty)) ty }
-
-row:
-| SEMI DOT_DOT RCUR { TyB_unit }
-| RCUR              { Types.new_tyB_unknown () }
 
 ty_list:
 | LPAREN ts=ty_list RPAREN {ts}

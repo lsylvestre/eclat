@@ -753,6 +753,15 @@ let rebase scm = (* type variable renumbering from 1, 2, 3 ... *)
     (ref (Unknown{id=(incr c; !c);name})) in
   (generalize ~only_functions:false [] (instance ~new_unknown scm))
 
+let rebase_ty ty =
+  let (Forall(_,ty')) = rebase(generalize ~only_functions:false [] ty) in
+  ty'
+
+let rebase_tyB tyB =
+  match rebase_ty (Ty_base tyB) with
+  | Ty_base tyB' -> tyB'
+  | _ -> assert false 
+
 let pp_scheme fmt scm =
   let (Forall(vs,ty)) = rebase scm in
   let open Format in 
