@@ -112,7 +112,6 @@ type token =
   | EMIT
   | ELSE
   | DUR_VAR_IDENT of (string)
-  | DOT_DOT
   | DOT
   | DONE
   | DOLLARD
