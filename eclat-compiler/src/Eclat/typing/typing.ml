@@ -9,9 +9,6 @@ let monomorphic = ref false
 
 let accept_ref_arg_flag = ref true (* see lambda-lifting.ml *)
 
-let trace_last_exp = ref (E_const Unit) (* fake *)
-
-
 exception PatTypeError
 
 type kind_error = 
@@ -265,10 +262,7 @@ let rec unify_tyB ~loc tyB1 tyB2 =
                   | None -> SMap.add x tyB acc
                   | Some tyB0 -> (try unify_tyB ~loc tyB0 tyB with
                                   | CannotUnify _ ->
-                                      Prelude.Errors.error ~loc
-                                         (fun fmt -> 
-                                             Format.fprintf fmt "field %s have type %a but souhld have type %a"
-                                               x pp_tyB tyB0 pp_tyB tyB));
+                                      raise @@ CannotUnify(loc,TyB(tyB1,tyB2)::Record_field_mismatch(x,tyB0,tyB)::[]));
                                   acc) fs2 SMap.empty in
       unify_tyB ~loc r1 (TyB_record{fields=acc;row=TyB_unit})
   | TyB_record{fields=fs1;row=r1},
@@ -278,17 +272,14 @@ let rec unify_tyB ~loc tyB1 tyB2 =
                   | None -> SMap.add x tyB acc
                   | Some tyB0 -> (try unify_tyB ~loc tyB0 tyB with
                                   | CannotUnify _ ->
-                                      Prelude.Errors.error ~loc 
-                                         (fun fmt -> 
-                                             Format.fprintf fmt "field %s have type %a but souhld have type %a"
-                                               x pp_tyB tyB0 pp_tyB tyB));
+                                      raise @@ CannotUnify(loc,TyB(tyB1,tyB2)::Record_field_mismatch(x,tyB0,tyB)::[]));
                                  acc) fs1 SMap.empty in
       let acc2 = SMap.fold (fun x tyB acc ->
                   match SMap.find_opt x fs1 with
                   | None -> SMap.add x tyB acc
                   | Some tyB0 -> (unify_tyB ~loc tyB0 tyB; acc)) fs2 SMap.empty in
-      unify_tyB ~loc r1 (TyB_record{fields=acc1;row=new_tyB_unknown ~name:"row" ()});
-      unify_tyB ~loc r2 (TyB_record{fields=acc2;row=new_tyB_unknown ~name:"row" ()})
+      unify_tyB ~loc r1 (TyB_record{fields=acc2;row=new_tyB_unknown ~name:"row" ()});
+      unify_tyB ~loc r2 (TyB_record{fields=acc1;row=new_tyB_unknown ~name:"row" ()})
   | TyB_alias(x1,sz_list1,tyB_list1),TyB_alias(x2,sz_list2,tyB_list2) when x1 = x2 ->
       List.iter2 (unify_size ~loc) sz_list1 sz_list2;
       List.iter2 (unify_tyB ~loc) tyB_list1 tyB_list2
@@ -1040,9 +1031,8 @@ let typing_handler ?(msg="") f () =
                 (emph_pp bold (fun fmt () -> fprintf fmt "%s" x1)) () 
                 (emph_pp bold (fun fmt () -> fprintf fmt "%s" x2)) () 
           | Cyclic_Ty(n,t) ->
-              fprintf fmt "%s@,An expression %a has a cyclic type %a"
-                msg  (emph_pp purple Ast_pprint.pp_exp) !trace_last_exp
-                (emph_pp bold pp_ty) (canon_ty t)
+              fprintf fmt "%s@,This expression has a cyclic type %a"
+                msg (emph_pp bold pp_ty) (canon_ty t)
           | Cyclic_Dur(n,dur) ->
               fprintf fmt "The type of response time %a is cyclic"
               (emph_pp bold pp_dur) (canon_dur dur)
@@ -1103,9 +1093,8 @@ let typing_handler ?(msg="") f () =
                 (emph_pp bold (fun fmt () -> fprintf fmt "%s" x1)) () 
                 (emph_pp bold (fun fmt () -> fprintf fmt "%s" x2)) () 
        | Cyclic_Ty(n,t) ->
-          fprintf fmt "%s@,An expression %a has a cyclic type %a\n"
-            msg  (emph_pp purple Ast_pprint.pp_exp) !trace_last_exp
-            (emph_pp bold pp_ty) (canon_ty t)
+          fprintf fmt "%s@,An expression has a cyclic type %a\n"
+            msg (emph_pp bold pp_ty) (canon_ty t)
        | Cyclic_Dur(n,dur) ->
           fprintf fmt "The type of response time %a is cyclic\n"
           (emph_pp bold pp_dur) (canon_dur dur)

@@ -961,7 +961,15 @@ aexp_desc:
 
 | x=UNROLL AT k=INT_LIT { E_const (Op(Runtime(Unroll k))) }
 | e=aexp DOT x=IDENT  { E_record_field(e,x,new_tyB_unknown()) }
-| LCUR bs=separated_list(SEMI,record_binding) RCUR { E_record(bs) }
+| LCUR bs=separated_list(SEMI,record_binding) RCUR 
+    { let rec loop m = function
+      | [] -> ()
+      | (x,_)::bs' -> if SMap.mem x m 
+                      then Prelude.Errors.raise_error ~loc:(with_file $loc)
+                              ~msg:("Two occurrences of field "^x^ " in the same record") ()
+                      else loop (SMap.add x () m) bs'
+      in loop SMap.empty bs;
+      E_record(bs) }
 | LCUR e1=aexp WITH x2=IDENT EQ e2=lexp RCUR { E_record_update(e1,x2,e2,new_tyB_unknown()) }
 | x=IDENT { let open Ast_mk in
             let loc_x = with_file $loc(x) in
