@@ -24,7 +24,7 @@ let read_phrase () =
     match String.rindex_opt s ';' with
     | None -> loop ~first_call:false new_acc
     | Some n ->
-       if n < String.length s && s.[n-1] = ';' then new_acc else
+       if n < String.length s && n >= 1 && s.[n-1] = ';' then new_acc else
        loop ~first_call:false new_acc
   in loop ~first_call:true ""
   (* todo: accept comments in the input *)

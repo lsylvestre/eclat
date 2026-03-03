@@ -1,6 +1,6 @@
 open MiniHDL_syntax
 
-let ref_set_lock_flag = ref true
+let ref_set_lock_flag = ref false
 
 module NameC = Naming_convention
 

@@ -825,12 +825,22 @@ app_exp_desc:
                                             of type annotation *)
         | E_const Get,[e1] -> let loc_x = loc_of e in
                                  (match un_deco e1 with
-                                  | E_tuple[e1;e2] -> (match un_deco e1 with E_var x -> E_array_get((x, loc_x), e2) | _ -> assert false)
-                                  | _ -> assert false (* todo *))
+                                  | E_tuple[e1;e2] -> 
+                                     (match un_deco e1 with
+                                      | E_var x -> E_array_get((x, loc_x), e2) 
+                                      | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
+                                               ~msg:"the first argument of function `get` should be a variable" ())
+                                  | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
+                                           ~msg:"`get` expects 2 arguments" ())
         | E_const Set,[e1] -> let loc_x = loc_of e in
                                  (match un_deco e1 with
-                                  | E_tuple[e1;e2;e3] -> (match un_deco e1 with E_var x -> E_array_set((x, loc_x), e2,e3) | _ -> assert false) 
-                                  | _ -> assert false (* todo *))
+                                  | E_tuple[e1;e2;e3] ->
+                                      (match un_deco e1 with
+                                       | E_var x -> E_array_set((x, loc_x), e2,e3) 
+                                       | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
+                                               ~msg:"the first argument of function `set` should be a variable" ())
+                                  | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
+                                           ~msg:"`set` expects 3 arguments" ())
         | _ -> E_app((mk_loc (with_file $loc(e)) e), mk_loc (with_file $loc(es)) @@ group_es es) }
       (* 
         let es = match es with
