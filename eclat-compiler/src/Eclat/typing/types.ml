@@ -78,15 +78,26 @@ let rec canon_size = function
 | Sz_add(sz,0) -> canon_size sz
 | Sz_add(sz,n) ->
    (match canon_size sz with
-    | Sz_lit m -> Sz_lit(n+m)
+    | Sz_lit m as sz' -> 
+        let k = n+m in 
+        if k >= n (* avoid overflow *)
+        then Sz_lit(k)
+        else Sz_add(sz',n)
     | sz -> Sz_add (sz,n))
 | Sz_twice(sz) -> 
     (match canon_size sz with
-    | Sz_lit m -> Sz_lit(2*m)
+    | Sz_lit m as sz' -> 
+        let k = 2*m in 
+        if k >= m (* avoid overflow *)
+        then Sz_lit(k)
+        else sz'
     | sz -> Sz_twice (sz))
 | Sz_pow2(sz) ->
     (match canon_size sz with
-    | Sz_lit m -> Sz_lit(2 lsl (m-1))
+    | Sz_lit m ->
+        if m >= 63 (* avoid overflow *)
+        then Sz_pow2(sz)
+        else Sz_lit(2 lsl (m-1))
     | sz -> Sz_pow2 (sz))
 
 let rec canon_label = function
@@ -165,15 +176,15 @@ let rec canon_dur = function
     | Dur_int _,_ -> Dur_add(d2,d1)
     | _ -> Dur_add(d1,d2))
 | Dur_mulDiv(sz1,d2,sz3) ->
-    let sz1,d2,sz3 = canon_size sz1,canon_dur d2,canon_size sz3 in
+    (* let sz1,d2,sz3 = canon_size sz1,canon_dur d2,canon_size sz3 in
     (match sz1,d2,sz3 with
      | _,Dur_top,_ -> Dur_top
      | Sz_lit 0,_,_ -> Dur_int 0
      | _,Dur_int 0,_ -> Dur_int 0
      | Sz_lit 1,_,Sz_lit 1 -> d2
-     | Sz_lit n,Dur_int m,Sz_lit k ->
-          if n mod k = 0 then Dur_int (n/k*m) else Dur_int ((n/k+1)*m)
-     | _ -> Dur_mulDiv(sz1,d2,sz3))
+     | Sz_lit n,Dur_int m,Sz_lit k -> 
+          if n mod k = 0 then Dur_int ((n/k)*m) else Dur_int ((n/k+1)*m)
+     | _ -> *)Dur_mulDiv(sz1,d2,sz3)
 | Dur_shared(l,dx) ->
     Dur_shared(canon_label l,canon_dur dx)
 

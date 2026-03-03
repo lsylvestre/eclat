@@ -522,7 +522,7 @@ let unify_ty ~loc ty1 ty2 =
       raise @@ Cyclic_ty(n,ty1,loc)
 
 let ty_bindings ~loc p ty =
-  let rec ty_bindings_aux ~loc p ty =
+  let rec ty_bindings_aux ~loc p ty = 
     match p,canon_ty ty with
     | P_var x,t -> SMap.singleton x t
     | P_tuple ps,Ty_tuple ts ->
@@ -540,7 +540,7 @@ let ty_bindings ~loc p ty =
         List.fold_left2 (fun m p t -> 
                            ty_bindings_aux ~loc p t ++ m
           ) SMap.empty ps ty_list
-    | P_tyConstr(p,ty'),ty ->
+    | P_tyConstr(p,ty'),ty -> 
         unify_ty ~loc ty' ty; (* todo: fix loc *)
         ty_bindings_aux ~loc p ty'
         (* ty' is more precise  ~~~
@@ -1028,7 +1028,7 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
                  | E_const(Int(n,_)), E_const(Int(m,_)) ->
                     let sz = Sz_lit (m-n+1) in
                     let d = Dur_mulDiv(sz,Dur_add(d3,Dur_int 1),s) in
-                    (* Format.(fprintf std_formatter "---------->[%a]\n" pp_dur d); *)
+                     (* Format.(fprintf std_formatter "---------->[%a]\n" pp_dur d); *)
                     Some (d,sz)
                  | E_const(Int(n,_)), E_const(C_size sz1) ->
                     let sz = new_size_unknown () in
@@ -1043,8 +1043,9 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
                             ~toplevel:false ~loc:(loc_of e2) g e2 in
           unify_ty ~loc:(loc_of e1) ty1 (Ty_base (TyB_int (Sz_add(vsize,1))));
           unify_ty ~loc:(loc_of e2) ty2 (Ty_base (TyB_int (Sz_add(vsize,1))));
+          
           let sz = Sz_pow2(Sz_add(vsize,1)) in
-          (Dur_mulDiv(sz,d3,s),sz)
+          (Dur_mulDiv(sz,Dur_add(d3,Dur_int 1),s),sz)
       | Some (d,sz) -> (* Format.(fprintf std_formatter "=========>%a\n" pp_dur d);*) 
                (d,sz)) in
       let d'' = (* match Types.canon_size s with

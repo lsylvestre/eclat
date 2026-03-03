@@ -3419,7 +3419,7 @@ let _menhir_action_100 =
         if szs = [] then Ty_base TyB_bool else
         Prelude.Errors.raise_error ~loc:(with_file _loc)
           ~msg:"type bool expects no size parameter" ()
-    | "int" -> 
+    | "int" ->
         if (szs = []) then Ty_base (TyB_int(Sz_lit 32)) else
         (match szs with
         | [sz] -> Ty_base (TyB_int sz)
@@ -3562,7 +3562,7 @@ let _menhir_action_111 =
   fun p ty ->
     (
 # 685 "src/Eclat/frontend/parser.mly"
-                     (p, Some ty)
+                     (P_tyConstr(p,ty), Some ty)
 # 3567 "src/Eclat/frontend/parser.ml"
      : (Ast.p * Types.ty option))
 
@@ -4422,7 +4422,7 @@ let _menhir_action_192 =
                     List.map (fun (p,ty_opt) -> 
                                 match ty_opt with
                                 | None -> p, new_ty_unknown()
-                                | Some ty -> p,ty
+                                | Some ty -> P_tyConstr(p,ty),ty
                       ) p_ty_opt_list in
     let p_ty_opt = group_ps ps, Some (group_ts ts) in
 (*  let p_ty_opt = 
@@ -4454,7 +4454,7 @@ let _menhir_action_193 =
                     List.map (fun (p,ty_opt) -> 
                                 match ty_opt with
                                 | None -> p, new_ty_unknown()
-                                | Some ty -> p,ty
+                                | Some ty -> P_tyConstr(p,ty),ty
                       ) p_ty_opt_list in
     let p_ty_opt = group_ps ps, Some (group_ts ts) in
 (*  let p_ty_opt = 

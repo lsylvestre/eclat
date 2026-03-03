@@ -384,7 +384,7 @@ fun_decl(In_kw):
                     List.map (fun (p,ty_opt) -> 
                                 match ty_opt with
                                 | None -> p, new_ty_unknown()
-                                | Some ty -> p,ty
+                                | Some ty -> P_tyConstr(p,ty),ty
                       ) p_ty_opt_list in
     let p_ty_opt = group_ps ps, Some (group_ts ts) in
 (*  let p_ty_opt = 
@@ -562,7 +562,7 @@ apty:
         if szs = [] then Ty_base TyB_bool else
         Prelude.Errors.raise_error ~loc:(with_file $loc)
           ~msg:"type bool expects no size parameter" ()
-    | "int" -> 
+    | "int" ->
         if (szs = []) then Ty_base (TyB_int(Sz_lit 32)) else
         (match szs with
         | [sz] -> Ty_base (TyB_int sz)
@@ -682,7 +682,7 @@ exp_desc:
 
 arg_ty_unparen:
 | p=pat { p, None }
-| p=apat COL ty=aty  {p, Some ty}
+| p=apat COL ty=aty  {P_tyConstr(p,ty), Some ty} /* todo: check that Some(ty) is taken into account */
 
 arg_ty:
 | a=arg_ty_unparen
