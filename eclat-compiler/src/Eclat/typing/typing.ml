@@ -1029,30 +1029,27 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
                     let sz = Sz_lit (m-n+1) in
                     let d = Dur_mulDiv(sz,Dur_add(d3,Dur_int 1),s) in
                      (* Format.(fprintf std_formatter "---------->[%a]\n" pp_dur d); *)
-                    Some (d,sz)
+                    Some d
                  | E_const(Int(n,_)), E_const(C_size sz1) ->
                     let sz = new_size_unknown () in
                     unify_size ~loc (Sz_add(sz,n)) (Sz_add(sz1,1));
-                    Some (Dur_mulDiv(sz,Dur_add(d3,Dur_int 1),s),sz)
+                    Some (Dur_mulDiv(sz,Dur_add(d3,Dur_int 1),s))
                  | _ -> None in
-      let d',sz = (match dopt with        
-      | None -> (* todo *)
-          let ty1,d1 = typ_exp ~collect_sig ~statics ~genv ~ctors
-                            ~toplevel:false ~loc:(loc_of e1) g e1 in
-          let ty2,d2 = typ_exp ~collect_sig ~statics ~genv ~ctors
-                            ~toplevel:false ~loc:(loc_of e2) g e2 in
-          unify_ty ~loc:(loc_of e1) ty1 (Ty_base (TyB_int (Sz_add(vsize,1))));
-          unify_ty ~loc:(loc_of e2) ty2 (Ty_base (TyB_int (Sz_add(vsize,1))));
-          
-          let sz = Sz_pow2(Sz_add(vsize,1)) in
-          (Dur_mulDiv(sz,Dur_add(d3,Dur_int 1),s),sz)
-      | Some (d,sz) -> (* Format.(fprintf std_formatter "=========>%a\n" pp_dur d);*) 
-               (d,sz)) in
-      let d'' = (* match Types.canon_size s with
-        | Sz_lit 1 -> d'
-        | _ -> *)
-         (*if s = Sz_lit 1 then d' else*) d' in
-      Ty_base TyB_unit, Dur_add(Dur_int 1,d'')
+      let d' = match dopt with        
+               | None ->
+                  let ty1,d1 = typ_exp ~collect_sig ~statics ~genv ~ctors
+                                    ~toplevel:false ~loc:(loc_of e1) g e1 in
+                  let ty2,d2 = typ_exp ~collect_sig ~statics ~genv ~ctors
+                                    ~toplevel:false ~loc:(loc_of e2) g e2 in
+                  unify_ty ~loc:(loc_of e1) ty1 (Ty_base (TyB_int (Sz_add(vsize,1))));
+                  unify_ty ~loc:(loc_of e2) ty2 (Ty_base (TyB_int (Sz_add(vsize,1))));
+                  (match vsize with
+                   | Sz_lit n when n < 16 -> let sz = Sz_pow2(Sz_add(vsize,1)) in
+                                             Dur_mulDiv(sz,Dur_add(d3,Dur_int 1),s)
+                   | _ -> Dur_top)
+                | Some d -> d
+      in
+      Ty_base TyB_unit, Dur_add(Dur_int 1,d')
   | E_parfor(x,_,_,e3,_) ->
       let g' = env_extend ~loc g (P_var x) (Ty_base (TyB_int (new_size_unknown()))) in (* todo loc of pattern *)
       let (ty3,d3) = typ_exp ~collect_sig ~statics ~genv ~ctors
