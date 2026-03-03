@@ -12,6 +12,7 @@ and ty = TInt of ty | TBool | TUnit
        | TSize of int
        | TSize_add of ty * int
        | TSize_twice of ty
+       | TSize_pow of ty
        | TSig of ty
        | TRecord of (x * ty) list (* sorted by keys *)
 and size = ty
@@ -123,6 +124,7 @@ module Debug = struct
   | TSize n -> fprintf fmt "size<%d>" n
   | TSize_add(size,n) -> fprintf fmt "(%a + %d)" pp_ty size n
   | TSize_twice(size) -> fprintf fmt "(2 * %a)" pp_ty size
+  | TSize_pow(size) -> fprintf fmt "(2^%a)" pp_ty size
   | TStatic {elem ; size} -> fprintf fmt "%a static<%a>" pp_ty elem pp_ty size
   | TSig t -> fprintf fmt "tsig<%a>" pp_ty t
   | TRecord bs -> fprintf fmt "@[<v>{";

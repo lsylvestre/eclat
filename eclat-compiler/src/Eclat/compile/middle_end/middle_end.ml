@@ -7,7 +7,7 @@ let normalize (pi:pi) : pi =
   (** ensure that each long-running sub-expression is bound to a [let] *)
   let pi = Anf.anf_pi pi in
   display_pi Anf pi;
-  
+
   (** ensure each function called within an [exec], or [( || )] construct
       is defined locally in this construct *)
   let pi = Move_down_gfun_under_exec_and_par.move_down_gfun_under_exec_and_par_pi pi in
@@ -17,6 +17,7 @@ let normalize (pi:pi) : pi =
 
   let pi = Monomorphize.monomorphize pi in
   display_pi Monomorphize pi;
+
   (** renaming all bindings in the source program *)
   let pi = Ast_rename.rename_pi pi in
   (** enforce each recursive function [fix f (fun p -> e)] is bound to the name [f]
@@ -49,12 +50,13 @@ let compile ?globalize
   let pi = Fun_assign_name.name_pi pi in
   let pi = Unroll.unroll_pi pi in
   let pi = Let_floating.float_pi pi in
-  let pi = Anf.anf_pi pi in
+  let pi = Anf.anf_pi pi in  
   display_pi Anf pi;
   let _ = Typing.typing_with_argument pi arg_list in
-    display_pi Specialize pi;
+
   let pi = Specialize.specialize_pi pi in
   display_pi Specialize pi;
+  
   (** make explicit all lexical environments *)
   (* let pi = Ast_rename.rename_pi pi in *)
   let pi = Lambda_lifting.lambda_lifting_pi ?globalize pi in
@@ -87,6 +89,7 @@ let compile ?globalize
 
   Check_exec_mem_reset.check_pi pi;
   let pi = Insert_bound_checking.insert_pi pi in
+
   (** compile pattern matching *)
   let pi = Matching.matching_pi pi in
   display_pi Matching pi;
@@ -96,7 +99,7 @@ let compile ?globalize
   (** normalization *)
   
   let pi = normalize pi in
-  
+
   (** optimization *)
 
   let pi = if propagation then Propagation.propagation_pi pi else pi in

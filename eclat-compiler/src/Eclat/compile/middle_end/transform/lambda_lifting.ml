@@ -130,9 +130,9 @@ let lifting ~statics (env:env) (e:e) : e =
     | E_reg((p,tyB,e1),e0,l) ->
         let env' = env_filter env p in
         E_reg((p,tyB,lift env' e1),lift env e0,l)
-    | E_for(x,lc1,lc2,e1,loc) ->
+    | E_parfor(x,lc1,lc2,e1,loc) ->
         let env' = env_filter env (P_var x) in
-        E_for(x,lc1,lc2,lift env' e1,loc)
+        E_parfor(x,lc1,lc2,lift env' e1,loc)
     | E_vector_mapi(is_par,(p,tyB,e1),e2,ty) ->
         let env' = env_filter env p in
         E_vector_mapi(is_par,(p,tyB,lift env' e1),lift env e2,ty)
@@ -289,9 +289,14 @@ let globalize_e (e:e) : ((x * _ * e) list * e) =
                       | Some e3 -> let ds3,e3' = glob e3 in
                     ds3,Some e3 in
         ds0@ds3,E_exec(declare ds1 e1',e0',eo',l)
-    | E_for(x,sz1,sz2,e3,loc) ->
+    | E_for(x,e1,e2,e3,sz,loc) ->
+        let ds1,e1' = glob e1 in
+        let ds2,e2' = glob e2 in
         let ds3,e3' = glob e3 in
-        [],E_for(x,sz1,sz2,declare ds3 e3',loc)
+        [],E_for(x,e1',e2',declare ds3 e3',sz,loc)
+    | E_parfor(x,sz1,sz2,e3,loc) ->
+        let ds3,e3' = glob e3 in
+        [],E_parfor(x,sz1,sz2,declare ds3 e3',loc)
          (* NB: definitions in [e_st1] and [e_st2] and [e3]
             are *not* globalized *)
     | E_generate((p,tysig,e1),e2,sz3,sz4,loc) ->

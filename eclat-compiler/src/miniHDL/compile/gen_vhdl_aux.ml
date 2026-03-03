@@ -64,6 +64,7 @@ let pp_ident fmt (x:x) : unit =
     fprintf fmt "%s" (norm_ident x)
 
 let pp_state fmt (x:x) : unit =
+    assert (not (reserved x));
     pp_ident fmt (String.uppercase_ascii x)
 
 let qualify prefix y =

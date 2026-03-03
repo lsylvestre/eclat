@@ -51,16 +51,16 @@ let monomorphize_exp e =
     | E_app(E_app(E_const(Op(TyConstr ty')), E_var f),
             E_app(E_const(Op(TyConstr ty_arg)), arg)) ->
        (match Hashtbl.find_opt h f with
-        | None -> 
+        | None ->
             assert false (* should not happend *)
         | Some `Mono ->
             (match SMap.find_opt f ds with
             | None -> assert false
             | Some (p,e1) ->
-            let (tyA,tyB) = extract_arg_res_fun ty' in
-            Typing.unify_ty ~loc:Prelude.dloc tyA ty_arg;
-            Inline.instantiate_types_in_e @@
-            E_letIn(P_var f,ty',E_fix(f,(p,(tyA,tyB),aux ds e1)),E_app(E_var f,arg)))
+                let (tyA,tyB) = extract_arg_res_fun ty' in
+                Typing.unify_ty ~loc:Prelude.dloc tyA ty_arg;
+                Inline.instantiate_types_in_e @@
+                E_letIn(P_var f,ty',E_fix(f,(p,(tyA,tyB),aux ds e1)),E_app(E_var f,arg)))
         | Some (`Ty ty0) -> 
             match ty0 with
             | Ty_fun(Ty_base tyB,_,_) -> E_app(E_var f,arg)

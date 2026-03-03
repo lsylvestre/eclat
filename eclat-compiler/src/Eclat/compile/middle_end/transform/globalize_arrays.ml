@@ -46,7 +46,7 @@ let globalize_arrays pi =
   | [] -> List.rev acc
   |d::ds -> let d' = 
              (match d with 
-             | (x,(ty,E_array_create(sz,loc))) ->
+             | (x,(ty,E_array_create(sz,(_,loc)))) ->
                   x,Static_array_of(ty,loc)
              | (x,(ty,E_array_make(sz,e1,loc))) ->
                   x,Static_array_of(ty,loc)

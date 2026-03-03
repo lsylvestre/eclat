@@ -108,6 +108,7 @@ let p_without_non_basic_values f p ty =
     | Ty_alias(y,sz_list,ty_list),p ->
         aux (Types.alias_instance y sz_list ty_list) p
     | _ -> p
+    (* and P_tyConstr(p,ty) ??? *)
   in
   aux ty p
 

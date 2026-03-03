@@ -107,8 +107,10 @@ let rec map f e =
       E_vector_mapi (is_par, (p, typ, e1'), e2', ty)
   | E_run(i,e,l) ->
       E_run(i, f e, l)
-  | E_for(x,sz1,sz2,e,loc) ->
-      E_for(x,sz1,sz2,f e,loc)
+  | E_for(x,e1,e2,e3,sz,loc) ->
+      E_for(x,f e1,f e2,f e3,sz,loc)
+  | E_parfor(x,sz1,sz2,e3,loc) ->
+      E_parfor(x,sz1,sz2,f e3,loc)
   | E_generate((p, ty, e1), e2, sz3, sz4, loc) ->
       E_generate((p, ty, f e1), f e2, sz3, sz4, loc)
   | E_pause (l,e1) -> E_pause (l,f e1)
@@ -191,8 +193,10 @@ let rec iter f (e:e) : unit =
   | E_array_set_immediate(_,e1,e2) ->
       f e1; f e2
   | E_array_from_file(_,e1) -> f e1
-  | E_for(_,_,_,e,_) ->
-      f e
+  | E_for(_,e1,e2,e3,_,_) ->
+      f e1; f e2; f e3
+  | E_parfor(_,_,_,e3,_) ->
+      f e3
   | E_generate((_,_,e1),e2,_,_,_) ->
       f e1; f e2
   | E_vector es ->
@@ -342,9 +346,14 @@ let accum f (e:e) =   (* : ((x * ty * e) list * e)*)
                           | Some e3 -> let ds,e3' = aux e3 in
                                        ds,Some e3' in
             ds2@ds1@ds3,E_exec(e1',e2',eo',l)
-        | E_for(x,sz1,sz2,e3,loc) ->
+        | E_for(x,e1,e2,e3,sz,loc) ->
+            let ds1,e1' = aux e1 in
+            let ds2,e2' = aux e2 in
             let ds3,e3' = aux e3 in
-            ds3,E_for(x,sz1,sz2,e3,loc)
+            ds1@ds2,E_for(x,e1',e2',declare' ds3 e3',sz,loc)
+        | E_parfor(x,sz1,sz2,e3,loc) ->
+            let ds3,e3' = aux e3 in
+            [],E_parfor(x,sz1,sz2,declare' ds3 e3',loc)
              (* NB: definitions in [e_st1] and [e_st2] and [e3]
                 are *not* globalized *)
         | E_generate((p,ty,e1),e2,sz3,sz4,loc) ->

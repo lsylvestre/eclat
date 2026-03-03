@@ -33,12 +33,12 @@
   
   let check_no_free_type_variable_decl ~loc x' ty tyargs szs =
     let vs = Types.vars_of_ty ty in
-    Vs.iter (fun u _ -> 
+    Vs.iter (fun u _ ->
               match u.name with
-              | None -> ()
-              | Some name -> 
+              | None -> () (* type variable without name are simply ignored *)
+              | Some name ->
                  if (List.mem name tyargs || List.mem name szs)
-                 then () else 
+                 then () else
                    Prelude.Errors.syntax_error
                            ~msg:("The type variable `"^name^"` is unbound in this type declaration ("^
                             x'^").")
@@ -140,7 +140,7 @@ let check_abstract_type ~loc x szs tyB_list =
 %token <bool> BOOL_LIT
 %token <int> INT_LIT
 %token <char> CHAR_LIT
-%token PLUS MINUS TIMES LT LE GT GE NEQ NOT MOD DIV AMP_AMP OR WHEN FBY MERGE 
+%token PLUS MINUS TIMES LT LE GT GE NEQ NOT MOD DIV AMP_AMP OR WHEN FBY MERGE
 %token DOLLARD
 %token XOR LAND LOR LXOR LSL LSR ASR RESIZE_INT VECT_CREATE TUPLE_OF_INT INT_OF_TUPLE
 %token TUPLE_GET TUPLE_UPDATE
@@ -152,6 +152,7 @@ let check_abstract_type ~loc x szs tyB_list =
 %token <string> SYM
 %token <string> OPERATOR_IDENT
 %token ASSERT
+%token BY WCET
 
 %token EOF
 %token SEMI_SEMI
@@ -308,7 +309,6 @@ type_decl:
            szs=type_decl_sizes2 a=type_decl_end {
     let tyargs_with_annot,x = t_with_params in
     
-    
     let check_all_tyB_vars ~msg_basic_type () =
       List.iter (fun (x,(locx,b)) -> if b then
           let open Prelude.Errors in
@@ -371,10 +371,15 @@ ty_case:
 | x=UP_IDENT OF ty=ty { x,Types.as_tyB ~loc:(with_file $loc) ty }
 | x=UP_IDENT          { x,TyB_unit }
 
+wcet_opt(In_kw):
+| WCET d=dur In_kw { Some d }
+| In_kw { None }
+
+
 fun_decl(In_kw):
 | f=IDENT p_ty_opt_list=arg_ty_atomic+ 
       ty_opt_ret=ret_ty_annot_eq
-      e1=exp In_kw { 
+      e1=exp wo=wcet_opt(In_kw) { 
     let ps, ts = List.split @@ 
                     List.map (fun (p,ty_opt) -> 
                                 match ty_opt with
@@ -394,24 +399,29 @@ fun_decl(In_kw):
                          | Some ty -> ty]))) in *)
     let ef = mk_let_fun ~loc:(with_file ($startpos(f),$endpos(e1)))
                                ~p_ty_opt ~ty_opt_ret e1 in
-    (P_var f, ef)
+    (P_var f, match wo with 
+              | None -> ef
+              | Some dur -> 
+                 ty_annot ~ty:(Ty_fun(new_ty_unknown(),dur,new_tyB_unknown())) ef)
   }
 
 size_param_fun_decl:
 | LT_LT sz=size GT_GT { sz }
 
+rec_kw: REC | SHARED {}
+
 after_let(In_kw):
 | b=bindings(apat,exp) In_kw { b }
 | b=fun_decl(In_kw)          { b }
 | e=fun_rec_decl(In_kw)      { e }
-| REC f_ty_opt=ty_annot(IDENT) EQ e1=exp In_kw {
+| rec_kw f_ty_opt=ty_annot(IDENT) EQ e1=exp In_kw {
     let f,ty_opt = f_ty_opt in
     let loc_fun = with_file ($startpos(f_ty_opt),$endpos(e1)) in
     let v = mk_fix f (ty_annot_opt ~ty:ty_opt e1) loc_fun in
     P_var f, v
   }
 fun_rec_decl(In_kw):
-| REC f=IDENT p_ty_opt=arg_ty_atomic 
+| rec_kw f=IDENT p_ty_opt=arg_ty_atomic 
       ty_opt=ret_ty_annot_eq e1=exp In_kw {
     let p_ty_opt_f =
       let open Types in
@@ -439,31 +449,42 @@ size_list:
 
 ty:
 | ty=ty_tuple_next RIGHT_ARROW ty2=ty_tuple_next {
-    Ty_fun(ty,Dur_one,Types.as_tyB ~loc:(with_file $loc) ty2) 
+    Ty_fun(ty,Dur_int 1,Types.as_tyB ~loc:(with_file $loc) ty2) 
   } 
-| ty=ty_tuple_next MINUS_LCUR dur RCUR_MINUS_GT ty2=ty_tuple_next {
-    Ty_fun(ty,new_dur_unknown(),Types.as_tyB ~loc:(with_file $loc) ty2)
+| ty=ty_tuple_next MINUS_LCUR d=dur RCUR_MINUS_GT ty2=ty_tuple_next {
+    Ty_fun(ty,d,Types.as_tyB ~loc:(with_file $loc) ty2)
   } 
 | ty=ty_tuple_next IMPLY ty2=ty_tuple_next {
-    Ty_fun(ty,Dur_zero,Types.as_tyB ~loc:(with_file $loc) ty2) 
+    Ty_fun(ty,Dur_int 0,Types.as_tyB ~loc:(with_file $loc) ty2) 
   } 
 | ty=ty_tuple_next { ty }
 
 dur:
 | n=INT_LIT {
-    match n with
-    | 0 -> Dur_zero
-    | 1 -> Dur_one
-    | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
-             ~msg:("duration literal should be 0 or 1") ()
+    if n >= 0 then Dur_int n else
+           Prelude.Errors.raise_error ~loc:(with_file $loc)
+             ~msg:("duration literal should be postive") ()
   }
+
 | x=IDENT LPAREN d1=dur COMMA d2=dur RPAREN {
     match x with
     | "max" -> Dur_max(d1,d2)
     | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc(x))
               ~msg:("unexpected duration operator "^x) ()
   }
-| x=DUR_VAR_IDENT { decl_dur_var x } 
+| x=DUR_VAR_IDENT { decl_dur_var x }
+| x=SIZE_VAR_IDENT { let sz = decl_size_var x in Dur_mulDiv(sz,Dur_int 1,Sz_lit 1) } 
+| d1=dur PLUS d2=dur { Dur_add(d1,d2) }
+| d1=dur DIV sz=size { Dur_mulDiv(Sz_lit 1,d1,sz) }
+| sz=asize TIMES d2=dur { Dur_mulDiv(sz,d2,Sz_lit 1) }
+| sz=asize {Dur_mulDiv(sz,Dur_int 1,Sz_lit 1) }
+| LPAREN d=dur RPAREN {d}
+
+asize:
+| n=INT_LIT { assert (n >= 0); Sz_lit n }
+| x=size_unknown { decl_size_var x }
+| LPAREN sz=size RPAREN { sz }
+
 
 ty_tuple_next:
 | t1=apty0 TIMES ts=separated_nonempty_list(TIMES,apty0) {
@@ -507,7 +528,7 @@ apty0:
        (let open Prelude.Errors in 
         match tys,szs with
         | [ty],[sz] ->
-            Ty_array(sz,Types.as_tyB ~loc:(with_file $loc) ty)
+            Ty_array(sz,Types.as_tyB ~loc:(with_file $loc) ty, new_label_unknown())
         | _,[_] ->
             Prelude.Errors.raise_error ~loc:(with_file $loc)
               ~msg:"type array expects one type parameter" ();
@@ -734,6 +755,7 @@ ret_ty_annot_eq:
 | EQ { None }
 | COL ty=ty EQ { Some ty }
 
+
 bindings(P,E):
 | w=bindings_and(P,E)
   { match w with
@@ -761,7 +783,7 @@ app_exp_desc:
 | ASSERT e=aexp { E_assert(e,with_file ($loc(e))) }
 | ARRAY_MAKE LT sz=size GT e=aexp { E_array_make(sz, e, with_file $loc) }
 | ARRAY_CREATE LT sz=size GT LPAREN RPAREN
-| CREATE LT sz=size GT LPAREN RPAREN { E_array_create(sz, with_file $loc) }
+| CREATE LT sz=size GT LPAREN RPAREN { E_array_create(sz, (Ast.gensym ~prefix:"l" (), with_file $loc)) }
 | e1=aexp e2=aexp AT v=lvalue
 | e1=aexp e2=aexp AT_AT v=lvalue 
     { 
@@ -794,13 +816,6 @@ app_exp_desc:
     | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc(x))
               ~msg:("unknown operation `immediate "^x^"`") ()
   }
-/* | x=IDENT LBRACKET e1=exp RBRACKET
-| x=IDENT DOT LPAREN e1=exp RPAREN
-   { E_array_get(x,e1) }*/
-| x=IDENT e1=dot_get { E_array_get((x,with_file $loc(x)),e1) }
-| x=IDENT LBRACKET e1=exp RBRACKET LEFT_ARROW e2=app_exp
-| x=IDENT e1=dot_get LEFT_ARROW e2=app_exp 
-  { E_array_set((x,with_file $loc(x)),e1,e2) }
 | SIZE_CREATE n=INT_LIT { E_const(C_size (Sz_lit n)) 
     (* [size_create<n>], or simply: <n>, see rule const_without_vect: *)}
 | e=aexp  es=aexp+
@@ -808,6 +823,14 @@ app_exp_desc:
         | E_const Ref,[e1] -> E_ref e1 (* note: due to un_deco, this 
                                             could result in a loss 
                                             of type annotation *)
+        | E_const Get,[e1] -> let loc_x = loc_of e in
+                                 (match un_deco e1 with
+                                  | E_tuple[e1;e2] -> (match un_deco e1 with E_var x -> E_array_get((x, loc_x), e2) | _ -> assert false)
+                                  | _ -> assert false (* todo *))
+        | E_const Set,[e1] -> let loc_x = loc_of e in
+                                 (match un_deco e1 with
+                                  | E_tuple[e1;e2;e3] -> (match un_deco e1 with E_var x -> E_array_set((x, loc_x), e2,e3) | _ -> assert false) 
+                                  | _ -> assert false (* todo *))
         | _ -> E_app((mk_loc (with_file $loc(e)) e), mk_loc (with_file $loc(es)) @@ group_es es) }
       (* 
         let es = match es with
@@ -913,8 +936,10 @@ app_exp_desc:
 | EXIT x=UP_IDENT { E_exit(x,E_const(Unit)) }
 | SUSPEND e=app_exp WHEN x=IDENT { E_suspend(e,x) }
 
-dot_get:
-DOT LPAREN e=exp RPAREN { e }
+after_dot:
+| DOT x=IDENT { `R x }
+| DOT LPAREN e1=exp RPAREN { `A e1 }
+| DOT LPAREN e1=exp RPAREN LEFT_ARROW e2=app_exp { `W (e1,e2) }
 
 lpar_unmatched: 
 INIT | SEMI_SEMI | IN 
@@ -942,12 +967,12 @@ aexp_desc:
     { let tyB = new_tyB_unknown() in
       E_const (Op(Runtime(
         External_fun("Vect.create",
-                     Ty_fun(Ty_base tyB,Dur_zero,vect_ k tyB))))) }
+                     Ty_fun(Ty_base tyB,Dur_int 0,vect_ k tyB))))) }
 
 | v=RESIZE_INT LT k=size GT 
     { E_const (Op(Runtime(
         External_fun("Int.resize",
-                     Ty_fun(new_ty_unknown(),Dur_zero,TyB_int k))))) }
+                     Ty_fun(new_ty_unknown(),Dur_int 0,TyB_int k))))) }
 | TUPLE_OF_INT LT k=INT_LIT GT { E_const (Op(Runtime(Tuple_of_int k))) }
 | INT_OF_TUPLE LT k=INT_LIT GT { E_const (Op(Runtime(Int_of_tuple k))) }
 | VECTOR_MAPI e=aexp {
@@ -960,7 +985,13 @@ aexp_desc:
                 | _ -> assert false (* todo error *) }
 
 | x=UNROLL AT k=INT_LIT { E_const (Op(Runtime(Unroll k))) }
-| e=aexp DOT x=IDENT  { E_record_field(e,x,new_tyB_unknown()) }
+| ae=aexp a=after_dot { match un_deco ae,a with 
+                         | E_var x,`A e1 -> E_array_get((x,with_file $loc(ae)),e1)
+                         | E_var x,`W (e1,e2) -> E_array_set((x,with_file $loc(ae)),e1,e2)
+                         | _,`R y -> E_record_field(ae,y,new_tyB_unknown()) 
+                         | _ -> Prelude.Errors.raise_error ~loc:(with_file $loc)
+                              ~msg:("variable expected") ()
+                       }
 | LCUR bs=separated_list(SEMI,record_binding) RCUR 
     { let rec loop m = function
       | [] -> ()
@@ -991,16 +1022,16 @@ aexp_desc:
             | "array_length" | "length" ->
                 E_fun(P_var x, (Types.new_ty_unknown(),Types.new_tyB_unknown()), 
                           mk @@ E_array_length (x, loc_x))
-            | "get" -> let x = gensym () in let y = gensym () in
+            | "get" -> mk @@ E_const Get (* let x = gensym () in let y = gensym () in
                        E_fun(P_tuple[P_var x;P_var y], (Types.new_ty_unknown(),Types.new_tyB_unknown()), 
-                          mk @@ E_array_get((x,(with_file $loc)),mk @@ E_var y))
-            | "set" ->
+                          mk @@ E_array_get((x,(with_file $loc)),mk @@ E_var y))*)
+            | "set" -> mk @@ E_const Set (*
                 let x = gensym () in
                 let idx = gensym () in
                 let y = gensym () in
                 E_fun(P_tuple[P_var x;P_var idx;P_var y], (Types.new_ty_unknown(),Types.new_tyB_unknown()),
                    E_array_set((x,loc_x),(mk@@E_var idx),(mk@@E_var y)))
-            (* | "vect_size" -> E_const (Op(Runtime(Vector_length (Types.new_size_unknown()))))
+            *)(* | "vect_size" -> E_const (Op(Runtime(Vector_length (Types.new_size_unknown()))))
             | "vect_nth" -> E_const (Op(Runtime(Vector_get (Types.new_tyB_unknown()))))
             | "vect_copy_with" -> E_const (Op(Runtime(Vector_update (Types.new_tyB_unknown(),Types.new_size_unknown()))))
             *)
@@ -1022,8 +1053,11 @@ aexp_desc:
     PIPE? rev_cases=match_cases END?
       { let (hs,eo) = rev_cases in
         E_match(e,List.rev hs,eo) }
-| FOR i=IDENT EQ e1=exp TO e2=exp DO e=exp DONE
-      { let loop = gensym ~prefix:"loop" () in
+| FOR i=IDENT EQ e1=exp TO e2=exp sz=by_do e=exp DONE
+      { match Ast_undecorated.remove_deco e2 with
+        | E_app(E_var "int", E_sig_get(n)) ->
+            E_for(i,e1,E_const (C_size(decl_size_var n)),e,sz, with_file $loc)
+        | _ -> E_for(i, e1,e2,e,sz, with_file $loc) (* let loop = gensym ~prefix:"loop" () in
         let n0 = gensym ~prefix:"n0" () in
         let n = gensym ~prefix:"n" () in
         E_letIn(P_var n0,Types.new_ty_unknown(), e1,
@@ -1036,11 +1070,15 @@ aexp_desc:
                                     E_app(E_const(Op(Runtime(External_fun("Int.add",new_ty_unknown ())))),
                                         E_tuple[E_var i;E_const (Int (1,new_size_unknown()))])))))), 
                  E_app(E_var loop,E_var n0))))
-                }
+              *)  }
 
 | PARFOR x=IDENT EQ sz1=size TO sz2=size DO e=exp DONE 
-      { E_for(x,sz1,sz2,e,with_file $loc) }
+      { E_parfor(x,sz1,sz2,e,with_file $loc) }
 | LOOP e=exp END { E_loop(e) }
+
+by_do:
+| DO { Types.Sz_lit 1 }
+| BY sz=size DO { sz }
 
 record_binding:
 | x=IDENT EQ e1=lexp { x,e1 }
@@ -1080,6 +1118,7 @@ apat:
 | LPAREN p=pat RPAREN { p }
 | x=IDENT { P_var x }
 | LPAREN p=apat COL ty=ty RPAREN { P_tyConstr(p,ty) }
+| LT_LT sz=size GT_GT            { P_tyConstr(P_var (Ast.gensym ()),Ty_size sz) }
 
 (* const_with_neg_int:
 | c=const | LPAREN c=const_with_neg_int RPAREN  { c }

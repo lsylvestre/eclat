@@ -4,15 +4,19 @@ open Ast_subst
 let has_changed = ref false
 
 let eval_size ~loc sz =
-  match Types.canon_size sz with
-  | Types.Sz_lit n -> 
-      (* Printf.printf "=======================> %d\n\n" n; *)
+  let rec eval sz =
+    match Types.canon_size sz with
+    | Types.Sz_lit n -> n
+    | Types.Sz_add(sz',n) -> eval sz' + n
+    | Types.Sz_twice(sz') -> eval sz' * 2
+    | _ -> let open Prelude.Errors in
+           error ~loc (fun fmt ->
+           Format.fprintf fmt
+             "@[<v>Cannot statically determine size %a@]" 
+                 Types.pp_size sz)
+  in
+  let n = eval sz in
       (n,Types.new_size_unknown())
-  | _ -> let open Prelude.Errors in
-         error ~loc (fun fmt ->
-         Format.fprintf fmt
-           "@[<v>Cannot statically determine size %a@]" 
-               Types.pp_size sz)
 
 let eval_static_exp_int ~loc ~statics e =
   let exception Cannot in 
@@ -70,8 +74,45 @@ let rec expand ~statics e =
                let x = gensym () in
                E_letIn(P_tuple[P_var idx;P_var x], ty, Pattern.pat2exp p, E_var x)
          in loop (n0,init)))*)
-
-    | E_for(x,sz1,sz2,e3,loc) -> 
+      | E_for(x,e1,e2,e3,sz,loc) ->
+         (* let e2' = match e2 with 
+                   | E_const(C_size sz) ->
+                       let (n,sz') = eval_size ~loc sz in
+                       E_const (Int(n,sz'))
+                   | _ -> e2 in
+          E_for(x,expand ~statics @@ e1,expand ~statics @@ e2',expand ~statics @@ e3,sz,loc)
+*)      
+        let (c,w) = eval_size ~loc sz in
+        expand ~statics @@
+        let e2' = match e2 with 
+                   | E_const(C_size sz) ->
+                       let (n,sz') = eval_size ~loc sz in
+                       E_const (Int(n,sz'))
+                   | _ -> e2 in
+        let loop = gensym ~prefix:"loop" () in
+        let i = x in
+        let n0 = gensym ~prefix:"n0" () in
+        let n = gensym ~prefix:"n" () in
+        let ii = gensym ~prefix:"ii" () in
+        let j = gensym ~prefix:"j" () in
+        let open Types in
+        E_letIn(P_var n0,Types.new_ty_unknown(), e1,
+        E_letIn(P_var n, Types.new_ty_unknown(), e2',
+        E_letIn(P_var loop,Types.new_ty_unknown(),
+                          E_fix(loop,(P_var i,(Types.new_ty_unknown(),Types.new_tyB_unknown()),
+                              E_if(E_app(E_const(Op(Runtime(External_fun("Int.gt",new_ty_unknown ())))),E_tuple[E_var i;e2']),
+                                            E_const(Unit),
+                              let e4 = E_letIn(P_var j,Types.new_ty_unknown(), 
+                                               E_app(E_const(Op(Runtime(External_fun("Int.add",new_ty_unknown ())))),E_tuple[E_var i;E_var ii]),
+                                          E_if(E_app(E_const(Op(Runtime(External_fun("Int.gt",new_ty_unknown ())))),E_tuple[E_var j;e2']),
+                                            E_const(Unit),Ast_subst.subst_e x (E_var j) e3)) in
+                              E_letIn(P_unit,Types.new_ty_unknown(), 
+                                  E_parfor(ii,Sz_lit 0,Sz_lit(c-1),e4,loc),
+                                  E_letIn(P_var i,new_ty_unknown(),E_app(E_const(Op(Runtime(External_fun("Int.add",new_ty_unknown ())))),
+                                        E_tuple[E_var i;E_const (Int (c,w))]),
+                                        E_app(E_var loop,E_var i)))))),
+              E_app(E_var loop,E_var n0))))
+    | E_parfor(x,sz1,sz2,e3,loc) -> 
       expand ~statics @@ (
         Matching.matching @@ Anf.anf  (
         has_changed := true;

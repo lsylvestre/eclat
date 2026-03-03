@@ -7,6 +7,7 @@ type token =
   | WITH
   | WHERE
   | WHEN
+  | WCET
   | VECT_CREATE
   | VECTOR_MAPI
   | UP_IDENT of (string)
@@ -123,6 +124,7 @@ type token =
   | COL_EQ
   | COL
   | CHAR_LIT of (char)
+  | BY
   | BOOL_LIT of (bool)
   | BANG
   | AT_AT

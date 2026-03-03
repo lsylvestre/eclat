@@ -170,6 +170,7 @@ let () =
                     Frontend.no_stdlib_flag := true;
                     inputs := List.filter (function "stdlib.ecl" -> false | _ -> true) !inputs),
                  "Do not add stdlib.ecl to the list of input files");
+    ("-show-pwcet", Arg.Set Types.show_wcet_exp_flag, "show parametrized WCET expressions");
     ]
       add_input "Usage:\n  ./eclat file"
 ;;

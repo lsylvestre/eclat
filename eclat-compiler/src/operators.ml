@@ -32,10 +32,10 @@ let ty_op ~externals op =
   match op with
   | Tuple_of_int k ->
       let tyB = TyB_tuple (List.init k (fun _ -> TyB_bool)) in
-      Ty_fun(Ty_base (TyB_int (Sz_lit k)),Dur_zero,tyB)
+      Ty_fun(Ty_base (TyB_int (Sz_lit k)),Dur_int 0,tyB)
   | Int_of_tuple k ->
       let tyB = TyB_tuple (List.init k (fun _ -> TyB_bool)) in
-      Ty_fun(Ty_base tyB,Dur_zero, TyB_int (Sz_lit k))
+      Ty_fun(Ty_base tyB,Dur_int 0, TyB_int (Sz_lit k))
   | Unroll _ ->
       let v = new_ty_unknown() in
       let d = new_dur_unknown() in

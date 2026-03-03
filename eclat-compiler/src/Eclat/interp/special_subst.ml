@@ -118,9 +118,12 @@ let subst_e x ex e =
     | E_array_from_file(y,e1) ->
         let z = if x <> y then y else as_ident ex in
         E_array_from_file(z, ss (0::id) e1)
-    | E_for(y,sz1,sz2,e3,loc) ->
-       E_for(y,sz1,sz2,
-             (if x = y then e3 else ss (2::id) e3),loc)
+    | E_for(y,e1,e2,e3,sz,loc) ->
+       E_for(y,ss (0::id) e1,ss (1::id) e2,
+                (if x = y then e3 else ss (2::id) e3),sz,loc)
+    | E_parfor(y,sz1,sz2,e3,loc) ->
+       E_parfor(y,sz1,sz2,
+                (if x = y then e3 else ss (2::id) e3),loc)
     | E_generate((p,tyB,e1),e2,sz3,sz4,loc) ->
         let e1' = if pat_mem x p then e1 else ss (0::id) e1 in
         E_generate((p,tyB,e1'),ss (1::id) e2,sz3,sz4,loc)

@@ -16,6 +16,7 @@ type kind_error =
 | TyB of tyB * tyB 
 | Dur of dur * dur 
 | Size of size * size
+| Label of label * label
 | Imcompatible_length of ty * ty
 | Ty_TyB of ty * tyB
 | TyB_Ty of tyB * ty
@@ -24,6 +25,7 @@ type kind_error =
 | Cyclic_Ty of int * ty
 | Cyclic_Dur of int * dur
 | Cyclic_Size of int * size
+| Cyclic_label of int * label
 | Missing_record_field of x
 | Record_field_mismatch of x * tyB * tyB
 
@@ -64,9 +66,13 @@ let rec unify_size ~loc sz1 sz2 =
       else 
         if n1 <> n2 then raise @@ CannotUnify(loc,[Size(sz1,sz2)])
   | Sz_add(sz,n),Sz_add(sz',n') -> 
-      let m = n'-n in
-      if m = 0 then unify_size ~loc sz sz' else
-      unify_size ~loc sz (Sz_add(sz',m))
+      if n <= n' then
+        let m = n'-n in
+        if m = 0 then unify_size ~loc sz sz' else
+        unify_size ~loc sz (Sz_add(sz',m))
+      else
+        let m = n-n' in
+        unify_size ~loc (Sz_add(sz,m)) sz'
   | Sz_add(sz,n),Sz_lit n' | Sz_lit n',Sz_add(sz,n) -> 
       if n' >= n then unify_size ~loc sz (Sz_lit (n'-n))
       else raise @@ CannotUnify(loc,[Size(sz1,sz2)])
@@ -74,7 +80,7 @@ let rec unify_size ~loc sz1 sz2 =
   | Sz_twice(sz),Sz_add(sz',n) | Sz_add(sz',n),Sz_twice(sz) ->  
       if n = 0 then unify_size ~loc (Sz_twice(sz)) sz' 
       else (
-      let sz2 = Types.new_size_unknown() in    
+      let sz2 = Types.new_size_unknown() in
       if n mod 2 = 0 then (
         (** =====================
           for instance, with n := 2.
@@ -114,21 +120,95 @@ let rec unify_size ~loc sz1 sz2 =
   | Sz_twice(sz),Sz_lit n | Sz_lit n, Sz_twice(sz) -> 
       if n mod 2 = 0 then unify_size ~loc sz (Sz_lit (n/2))
       else raise @@ CannotUnify(loc,[Size(sz1,sz2)])
-  
-let rec unify_dur ~loc d1 d2 =
+  | Sz_lit n, Sz_pow2(sz)
+  | Sz_pow2(sz), Sz_lit n ->
+      let k = int_of_float (Float.log2 (float n)) in
+      if (n mod k) == 0 then unify_size ~loc sz (Sz_lit k)
+    else raise @@ CannotUnify(loc,[Size(sz1,sz2)])
+  | Sz_pow2(sz), Sz_pow2(sz') ->
+      unify_size ~loc sz sz'
+  | Sz_twice(sz'), Sz_pow2(sz)
+  | Sz_pow2(sz), Sz_twice(sz') -> 
+      let sz2 = Types.new_size_unknown() in
+      unify_size ~loc (Sz_add(sz2,1)) sz;
+      unify_size ~loc (Sz_pow2(sz2)) sz'
+  | Sz_add(sz',n),Sz_pow2(sz)
+  | Sz_pow2(sz), Sz_add(sz',n) ->
+      if n mod 2 == 0 then (
+        let sz2 = Types.new_size_unknown() in
+        unify_size ~loc (Sz_twice(sz2)) sz';
+        unify_size ~loc (Sz_pow2(sz)) (Sz_twice(Sz_add(sz2,n/2))))
+      else (let sz3 = Types.new_size_unknown() in
+            unify_size ~loc (Sz_add(sz',n+1)) sz3;
+            unify_size ~loc (Sz_pow2(sz)) sz3)
 
+
+let unify_dur ~loc d1_0 d2_0 =
+  let rec unify_d ~start d1 d2 =
+    let d1 = canon_dur d1 and d2 = canon_dur d2 in
+    (* Format.fprintf Format.std_formatter "[dur]-- ====> %a | %a\n"  pp_dur  d1  pp_dur  d2; *)
+    if d1 = d2 then () else
+    match d1,d2 with
+    | _,Dur_top -> ()
+    | Dur_var ({contents=(Unknown{id=n;_})} as v),
+      Dur_var {contents=Unknown{id=m;_}} ->
+      if n = m then () else v := Is d2
+    | _,Dur_var ({contents=Unknown{id=n;_}} as r2) ->
+        if test_occur (occur_dur n) d1 then raise (Cyclic_dur(n,d1,loc));
+        r2 := Is d1
+    | Dur_var ({contents=Unknown{id=n;_}} as r1),_ ->
+      if test_occur (occur_dur n) d2 then raise (Cyclic_dur(n,d2,loc));
+      r1 := Is d2
+    | Dur_top,_ -> raise @@ CannotUnify(loc,[Dur(d1_0,d2_0)])
+    | _ ->
+        let d1 = canon_dur @@ simpl_dur_wcet_with_rebase ~keep_sharing:true(*rebase_dur2*) d1 in
+        let d2 = canon_dur @@ simpl_dur_wcet_with_rebase (*rebase_dur2*) d2 in
+        if d1 = d2 then () else
+        (match d1,d2 with
+         | Dur_int m,Dur_int n -> if m <= n then () else raise @@ CannotUnify(loc,[Dur(d1_0,d2_0)])
+         | Dur_int 0,_ -> ()
+         | Dur_int n,(Dur_add(Dur_int m,_)) when n <= m -> ()
+         | Dur_int n,(Dur_add(_,Dur_int m)) when n <= m -> ()
+         (* | Dur_mul(dn,d1'), Dur_mul(dm,d2') when dn = dm -> unify_d d1' d2'*)
+         | _,_ -> 
+            let po_to_be_proven () =
+              Prelude.Errors.warning ~loc (fun fmt ->
+                  Prelude.Errors.(emph bold fmt "(PO) you must prove: ");
+                  Format.fprintf fmt "[%a <= %a]\n" pp_dur d1 pp_dur d2)
+            in
+            if start then (
+                let f da db =
+                  try unify_d ~start:false da db with
+                  | _ -> Prelude.Errors.error ~loc (fun fmt ->
+                           Format.fprintf fmt "Expect %a <= %a.\nIt is not always true.\n" 
+                              pp_dur (rebase_duration d1) pp_dur (rebase_duration d2);
+                           Format.fprintf fmt "For example, %a > %a.\n" pp_dur da pp_dur db)
+                in 
+              let ok = Types.Check_durations.check f d1 d2 in
+              if ok then () else po_to_be_proven())
+            else (
+              po_to_be_proven()
+            )) 
+  in
+  unify_d ~start:true d1_0 d2_0
+(*
   let warning_loss_of_precision d d' var =
     Prelude.Errors.warning ~loc (fun fmt ->
         Format.fprintf fmt "don't know how to unify durations %a and %a.\nVariable %a is set to 1 (this is safe, with loss of precision)\n"
           pp_dur d pp_dur d' pp_dur (Dur_var var))
   in
-
-  let d1,d2 = canon_dur d1,canon_dur d2 in
-  (* Format.fprintf Format.std_formatter "-- ====> %a / %a\n"  pp_dur  d1  pp_dur  d2; *)
+  let warning_loss_of_precision' d d' =
+    Prelude.Errors.warning ~loc (fun fmt ->
+        Format.fprintf fmt "loss of precision: cannot unify %a with %a\n"
+          pp_dur d pp_dur d')
+  in
+  let d1,d2 = canon_dur d1, canon_dur d2 in
+    Format.fprintf Format.std_formatter "-- ====> %a | %a\n"  pp_dur  d1  pp_dur  d2;
+  flush stdout;
+  if d1 = d2 then () else
   match d1,d2 with
-  | Dur_zero,Dur_one -> () (* 0 <= 1 *)
-  | Dur_zero,Dur_zero
-  | Dur_one,Dur_one -> ()
+  | _,  let d1,d2 = canon_dur d1, canon_dur d2 in -> ()
+  | Dur_int m,Dur_int n -> if m > n then raise @@ CannotUnify(loc,[Dur(d1,d2)])
   | d1,Dur_var {contents=Is d2}
   | Dur_var {contents=Is d1},d2 ->
       unify_dur ~loc d1 d2
@@ -141,36 +221,56 @@ let rec unify_dur ~loc d1 d2 =
   | Dur_var ({contents=Unknown{id=n;_}} as r1),d2 ->
       if test_occur (occur_dur n) d2 then raise (Cyclic_dur(n,d2,loc));
       r1 := Is d2
-  | Dur_max(Dur_zero,d1),d2
-  | Dur_max(d1,Dur_zero),d2
-  | d1,Dur_max(d2,Dur_zero)
-  | d1,Dur_max(Dur_zero,d2) -> unify_dur ~loc d1 d2
-  | Dur_max(Dur_one,_),d
-  | Dur_max(_,Dur_one),d
-  | d,Dur_max(Dur_one,_)
-  | d,Dur_max(_,Dur_one) ->
-      unify_dur ~loc d Dur_one
-  | Dur_max(d1,d2),Dur_zero
-  | Dur_zero,Dur_max(d1,d2) ->
-      unify_dur ~loc d1 Dur_zero;
-      unify_dur ~loc d1 Dur_zero
-  | Dur_max(Dur_var ({contents=(Unknown{id=n;_})} as r1),Dur_var ({contents=(Unknown{id=m;_})} as r2)),d2 ->
-    if n = m then let d = Dur_var r1 in r2 := Is d; unify_dur ~loc d d2 else
-      (warning_loss_of_precision d1 d2 r1;
-       r1 := Is Dur_one;
-       unify_dur ~loc Dur_one d2)
-  | _,Dur_max(Dur_var ({contents=(Unknown{id=n;_})} as r3),Dur_var ({contents=(Unknown{id=m;_})} as r4)) ->
-    if n = m then let d = Dur_var r3 in r4 := Is d; unify_dur ~loc d1 d else
-      (warning_loss_of_precision d1 d2 r3;
-       r3 := Is Dur_one;
-       unify_dur ~loc d1 Dur_one)
-  | _ ->
-    raise @@ CannotUnify(loc,[Dur(d1,d2)])
+  | Dur_max(d1,d2),Dur_int 0
+  | Dur_int 0,Dur_max(d1,d2)
+  | Dur_xor(d1,d2),Dur_int 0
+  | Dur_int 0,Dur_xor(d1,d2)
+  | Dur_add(d1,d2),Dur_int 0
+  | Dur_int 0,Dur_add(d1,d2) ->
+      unify_dur ~loc d1 (Dur_int 0);
+      unify_dur ~loc d1 (Dur_int 0)
+  | Dur_add(d1,Dur_int n),Dur_int m
+  | Dur_int n,Dur_add(d1,Dur_int m) ->
+      if m < n then raise @@ CannotUnify(loc,[Dur(d1,d2)]) else
+      unify_dur ~loc d1 (Dur_int (m-n))
+  | Dur_add(Dur_int n,d1'),Dur_add(Dur_int m,d2') 
+  | Dur_add(Dur_int n,d1'),Dur_add(d2',Dur_int m) 
+  | Dur_add(d1',Dur_int n),Dur_add(d2',Dur_int m) 
+  | Dur_add(d1',Dur_int n),Dur_add(Dur_int m,d2') ->
+      if n = m then unify_dur ~loc d1' d2' else
+      if n < m then unify_dur ~loc d1' (Dur_add(Dur_int (m-n),d2')) else
+      unify_dur ~loc (Dur_add(Dur_int (n-m),d1')) d2'
+(*  | Dur_mul(Sz_lit n,d1),Dur_int 0 ->
+      if n = 0 then () else unify_dur ~loc d1 (Dur_int 0) *)
+  | Dur_mul(Sz_lit n,d1),Dur_int m ->
+      if m = 0 then 
+        (if n = 0 then () 
+         else unify_dur ~loc d1 (Dur_int 0)) else
+      if n = 0 then raise @@ CannotUnify(loc,[Dur(d1,d2)]) else
+      if m mod n == 0 then unify_dur ~loc d1 (Dur_int(m/n)) else
+      raise @@ CannotUnify(loc,[Dur(d1,d2)])
+  
+  | Dur_mul(Sz_lit m,d1'),Dur_mul(Sz_lit n,d2') ->
+      if m > n && m mod n = 0 
+      then (let k = m / n in 
+           let d = List.fold_left (fun acc _ -> Dur_add(d2',acc)) d2' (List.init (k-1) (fun i -> i)) in
+           unify_dur ~loc d1' d)
+      else if n < m && n mod m = 0
+           then (let k = n / m in
+                 let d = List.fold_left (fun acc _ -> Dur_add(d1',acc)) d1' (List.init (k-1) (fun i -> i)) 
+                 in unify_dur ~loc d d2') 
+           else raise @@ CannotUnify(loc,[Dur(d1,d2)])
+  | Dur_top,_ -> raise @@ CannotUnify(loc,[Dur(d1,d2)])
+  | _,Dur_int 0 ->
+      (match simpl_dur_wcet (rebase_dur2 d1) with
+       | Dur_int 0 -> ()
+       | d' ->  Format.fprintf Format.std_formatter "-- ====> %a\n"  pp_dur  d1; raise @@ CannotUnify(loc,[Dur(d',d2)]))
+  | _ -> Format.fprintf Format.std_formatter "|||-- ====> %a\n"  pp_dur  d1;
+      warning_loss_of_precision' d1 d2;
+      unify_dur ~loc Dur_top d1;
+      unify_dur ~loc Dur_top d2
+  *)
 
-(* let () =  (* test *)
-   Printf.printf "===>\n";
-   unify_dur ~loc (Dur_max(new_dur_unknown(),new_dur_unknown()))
-                              (Dur_max(new_dur_unknown(),new_dur_unknown())) *)
 
 let rec unify_tyB ~loc tyB1 tyB2 =
   let tyB1,tyB2 = canon_tyB tyB1, canon_tyB tyB2 in
@@ -291,6 +391,32 @@ let rec unify_tyB ~loc tyB1 tyB2 =
       unify_tyB ~loc tyB3 tyB2
   | _ -> raise @@ CannotUnify(loc,TyB(tyB1,tyB2)::[])
 
+let rec unify_label ~loc l1 l2 =
+  let l1,l2 = canon_label l1, canon_label l2 in
+  (* Format.fprintf Format.std_formatter "&&      [label]====> %a / %a\n"  pp_label  l1  pp_label  l2;
+  *)match l1, l2 with
+  | Label_var ({contents=(Unknown{id=n;name})} as v),
+    Label_var {contents=Unknown({id=m;_} as r)} ->
+      if n = m then () else 
+        begin 
+          v := Is l2;
+          (match r.name with None -> r.name <- name | _ -> ());   
+        end
+  | Label_var ({contents=(Unknown{id=n;_})} as r1),l2 ->
+      if test_occur (occur_label n) l2 then 
+        raise @@ CannotUnify(loc,(Cyclic_label(n,l2))::[]);
+      r1 := Is l2
+  | l1,Label_var ({contents=(Unknown{id=n;_})} as r2) ->
+      if test_occur (occur_label n) l1 then
+        raise @@ CannotUnify(loc,(Cyclic_label(n,l1))::[]);
+      r2 := Is l1
+  | l1,Label_var {contents=Is l2}
+  | Label_var {contents=Is l1},l2 ->
+      unify_label ~loc l1 l2
+  | Label_name x1, Label_name x2 ->
+      if x1 <> x2 then raise (CannotUnify(loc,[Label(l1,l2)]))
+  
+
 (** unify actual type ty1 and expected type ty2;
     raise an exception [CannotUnify_ty(loc,ty1,ty2)]
     if both types are incompatible, while ensuring [loc] 
@@ -342,9 +468,10 @@ let unify_ty ~loc ty1 ty2 =
         unify_tyB ~loc tyB1 tyB2
     | Ty_ref(tyB1),Ty_ref(tyB2) ->
         unify_tyB ~loc tyB1 tyB2 
-    | Ty_array(sz1,tyB1),Ty_array(sz2,tyB2) ->
+    | Ty_array(sz1,tyB1,l1),Ty_array(sz2,tyB2,l2) ->
         unify_size ~loc sz1 sz2;
-        unify_tyB ~loc tyB1 tyB2
+        unify_tyB ~loc tyB1 tyB2;
+        unify_label ~loc l1 l2
     | Ty_signal(tyB1),Ty_signal(tyB2) ->
         unify_tyB ~loc tyB1 tyB2
     | Ty_trap(tyB1),Ty_trap(tyB2) ->
@@ -393,28 +520,6 @@ let unify_ty ~loc ty1 ty2 =
   | Cyclic_dur(n,_,_)
   | Cyclic_size(n,_,_) ->
       raise @@ Cyclic_ty(n,ty1,loc)
-
-let rec subtyping_dur ~loc d1 d2 =
-  let d1,d2 = canon_dur d1,canon_dur d2 in
-  match d1,d2 with
-  | Dur_zero,_
-  | _,Dur_one -> ()
-  | d1,Dur_var {contents=Is d2} -> subtyping_dur ~loc d1 d2
-  | Dur_var {contents=Is d1},d2 -> subtyping_dur ~loc d1 d2
-  | Dur_var ({contents=Unknown{id=n;_}} as r),Dur_zero ->
-    r := Is (Dur_zero)
-  | Dur_one,Dur_var ({contents=Unknown n} as r) ->
-    r := Is (Dur_one)
-  | Dur_max(Dur_zero,d),Dur_zero
-  | Dur_max(d,Dur_zero),Dur_zero -> subtyping_dur ~loc d Dur_zero
-  (* | Dur_var ({contents=(Unknown n)} as v),
-     Dur_var {contents=Unknown m} ->
-     if n = m then () else v := Is d2*)
-  | _ ->
-    raise @@ CannotUnify(loc,(Dur(d1,d2))::[])
-(* | d,({contents=Unknown n} as r) ->
-    let v = new_dur_unknown () in
-    r := Is (Dur_add(d,v))*)
 
 let ty_bindings ~loc p ty =
   let rec ty_bindings_aux ~loc p ty =
@@ -474,7 +579,7 @@ let ty_op ~genv ~loc op =
         Operators.ty_op ~externals:genv.operators p
     | Wait n ->
         let tyB = new_tyB_unknown () in
-        Ty_fun(Ty_base tyB,Dur_one,tyB)
+        Ty_fun(Ty_base tyB,Dur_int 1,tyB)
     | TyConstr ty -> assert false 
         (* todo : put [(e:t)] in the expression language *)
     | GetTuple _ -> assert false (* {pos;arity} ->
@@ -488,7 +593,7 @@ let ty_op ~genv ~loc op =
   in
   let ty1 = new_ty_unknown () in
   let tyB2 = new_tyB_unknown () in
-  unify_ty ~loc ty (Ty_fun(ty1,Dur_zero,tyB2));
+  unify_ty ~loc ty (Ty_fun(ty1,Dur_int 0,tyB2));
   ty
 
 let sum_instance ~loc ctors x =
@@ -542,7 +647,7 @@ let rec typ_const ~loc ~ctors = function
       unify_tyB ~loc tyB_arg tc;
       tyB
   | Inj _ -> assert false (* to remove from constants *)
-  | Ref -> 
+  | Ref | Get | Set -> 
      Prelude.Errors.error ~loc (fun fmt ->
         Format.fprintf fmt "partial application of `ref` is ill typed.")
   | _ -> assert false
@@ -552,7 +657,7 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
   | E_const (Op (Runtime(External_fun(x,tyx)))) ->
       let t = typ_ident ~loc g x in
       unify_ty ~loc tyx (Types.copy_ty t);
-      tyx, Dur_zero
+      tyx, Dur_int 0
   | E_app(E_const (Op(GetTuple{pos;arity})),e1) ->
       let ty_list = List.init arity (fun _ -> new_ty_unknown ()) in
       assert (0 <= pos && pos <= arity);
@@ -562,18 +667,18 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
       List.nth ty_list pos,d1
   | E_const (Op op) -> 
       let t = ty_op ~genv ~loc op in
-      t,Dur_zero
+      t,Dur_int 0
   | E_const(Inj x) -> (* Prelude.Errors.warning ~loc (fun fmt -> ()); *)
       let tyB_arg,tyB = sum_instance ~loc ctors x in
-      (Ty_fun(Ty_base tyB_arg,Dur_zero, tyB), Dur_zero)
+      (Ty_fun(Ty_base tyB_arg,Dur_int 0, tyB), Dur_int 0)
   | E_const (C_size sz) -> 
-      (Ty_size sz, Dur_zero)
+      (Ty_size sz, Dur_int 0)
   | E_const c ->
-      (Ty_base (typ_const ~loc ~ctors c), Dur_zero)
+      (Ty_base (typ_const ~loc ~ctors c), Dur_int 0)
   | E_var(x) ->
       (* lookup *)
       let tx = typ_ident ~loc g x in
-      (tx,Dur_zero)
+      (tx,Dur_int 0)
   | E_deco(e1,loc) ->
       typ_exp ~collect_sig ~statics ~genv ~ctors ~toplevel ~loc g e1
   | E_if(e1,e2,e3) ->
@@ -587,7 +692,7 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
       let vTyB = new_tyB_unknown () in
       unify_ty ~loc:(loc_of e2) t2 (Ty_base vTyB);
       unify_ty ~loc:(loc_of e3) t3 (Ty_base vTyB);
-      t2,Dur_max(d1,Dur_max(d2,d3))
+      t2,Dur_add(d1,Dur_xor(d2,d3))
   | E_case(e1,hs,e_els) ->
       let ty1,d1 = typ_exp ~collect_sig ~statics ~genv ~ctors
                            ~toplevel:false ~loc:(loc_of e1) g e1 in
@@ -603,14 +708,14 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
                              ~toplevel:false ~loc:(loc_of ei) g ei in
           unify_ty ~loc:(loc_of ei) ty_els ty; d) hs
       in
-      let d = List.fold_left (fun d1 d2 -> Dur_max(d1,d2)) d_els d_list in
-      ty_els,Dur_max(d,d1)
+      let d = List.fold_left (fun d1 d2 -> Dur_xor(d1,d2)) d_els d_list in
+      ty_els,Dur_add(d,d1)
   | E_letIn(p,typ,e1,e2) ->
       (* Format.fprintf Format.std_formatter "--->(%a : %a)\n" Ast_pprint.pp_exp (Pattern.pat2exp p) Types.pp_ty  typ;*)
       let ty1,d1 = typ_exp ~collect_sig ~statics ~genv ~ctors
                            ~toplevel:false ~loc:(loc_of e1) g e1 in
       unify_ty ~loc:(loc_of e1) typ ty1;
-      let gen = evaluated e1 (* && match un_deco e1 with E_fix _ -> false | _ -> true *) in
+      let gen = evaluated e1 (* && match un_annot e1 with E_fun _ | E_fix _ -> true | _ -> false *) in
       let g' = env_extend ~loc:(loc_of e1) ~gen g p typ in (* todo: loc of pattern *)
       (if toplevel && !print_signature_flag then (
          let open Prelude.Errors in
@@ -630,62 +735,85 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
          fprintf std_formatter "@[<v>";
          SMap.iter (fun x _ ->
              Prelude.Errors.(emph bold std_formatter "val");
+             let d1' = simpl_dur_wcet_with_rebase ~keep_sharing:true d1 in
              fprintf std_formatter " %s : " x;
              let (Forall(vs,tyx)) = SMap.find x g' in
              pp_scheme std_formatter @@ Forall(vs,tyx);
              fprintf std_formatter " | %a"
-               pp_dur (canon_dur d1)
+               pp_dur (canon_dur d1')
            ) xs;
            fprintf std_formatter "@]@."
       ));
       let ty2,d2 = typ_exp ~collect_sig ~statics 
                             ~genv ~(ctors:(x SMap.t)) 
                             ~toplevel ~loc:(loc_of e2) g' e2 in
-      (ty2, Dur_max(d1,d2))
+      (* let d2' = match canon_ty ty1 with
+                | Ty_array(_,_,Label_name y) -> hide (SMap.singleton y ()) d2
+                | _ -> d2 in *)
+      (* let d2' = if is_tyB ty2 then d2 else hide (vars_of_p p) (*simpl_dur_wcet ~keep_sharing:true*) d2 in
+      *)
+      let d2' = d2 in (ty2, Dur_add(d1,d2'))
   | E_tuple(es) ->
       let ts,ds = List.split @@ List.map (fun ei ->
         typ_exp ~collect_sig ~statics ~genv ~ctors
           ~toplevel:false ~loc:(loc_of ei) g ei) es in
-      let d = List.fold_left (fun d1 d2 -> Dur_max(d1,d2)) Dur_zero ds in
+      let d = List.fold_left (fun d1 d2 -> Dur_add(d1,d2)) (Dur_int 0) ds in
       Ty_tuple ts,d
   | E_fun(p,(ty,tyB),e1) ->
       let g' = env_extend ~loc g p ty in (* todo: loc of pattern *)
       let ty1,dur = typ_exp ~collect_sig ~statics ~genv ~ctors 
                             ~toplevel:false ~loc:(loc_of e1) g' e1 in
       unify_ty ~loc:(loc_of e1) ty1 (Ty_base tyB);
-      (Ty_fun(ty,canon_dur dur,tyB), Dur_zero)
+      (* Format.(fprintf std_formatter "~~~~~~>%a\n" pp_dur dur); *)
+      (* let dur' = if is_tyB ty then dur else hide (vars_of_p p) dur in*)
+      let dur' = dur in
+      let dur' = simpl_dur_wcet_with_rebase ~keep_sharing:false dur' in   (* todo: à remettre, simpl_dur_wcet et hide *)
+      (Ty_fun(ty,(*canon_dur *)dur',tyB), Dur_int 0)
   | E_fix(f,(p,(ty,tyB),e1)) ->
-      let tf = Ty_fun(ty,Dur_one,tyB) in
+      let vd = new_dur_unknown () in
+      let tf = Ty_fun(ty,Dur_top,tyB) in
       let g' = env_extend ~loc g (P_var f) tf in
       let g' = env_extend ~loc g' p ty in (* todo: precise loc *)
       let ty1,d = typ_exp ~collect_sig ~statics ~genv ~ctors 
                           ~toplevel:false ~loc:(loc_of e1) g' e1 in
+              (* Format.(fprintf std_formatter "=========>%a\n" pp_dur d);*)
+      unify_dur ~loc:(loc_of e1) d vd;
       unify_ty ~loc:(loc_of e1) ty1 (Ty_base tyB);
-      (tf, Dur_zero)
+      let vd' = simpl_dur_wcet_with_rebase ~keep_sharing:false vd in
+      (Ty_fun(ty,Dur_add(vd',Dur_int 1),tyB), (Dur_int 0))
   | E_app(e1,e2) ->
       (match un_deco e1 with
        | E_const (Op (TyConstr ty)) ->
            let ty2,d2 = typ_exp ~collect_sig ~statics ~genv ~ctors 
                                 ~toplevel g ~loc:(loc_of e2) e2 in
+           (* Format.(fprintf std_formatter "---------~~~~~~>%a|%a\n" pp_ty ty2 pp_ty ty); *)
            unify_ty ~loc:(loc_of e2) ty2 ty;
            ty,d2 (* ty is more precise, e.g.: [type t = int; let x = (5:t);; ~> val x : t] *)
        | _ ->
          let ty1,d1 = typ_exp ~collect_sig ~statics ~genv ~ctors 
                               ~toplevel:false g ~loc:(loc_of e1) e1 in
+         
          let ty2,d2 = typ_exp ~collect_sig ~statics ~genv ~ctors 
                               ~toplevel:false g ~loc:(loc_of e2) e2 in
          let tyB = new_tyB_unknown () in
          let d = new_dur_unknown () in
-         unify_ty ~loc:(loc_of e1) (Ty_fun(ty2,d,tyB)) ty1;
-         Ty_base tyB, canon_dur (Dur_max(Dur_max(d1,d2),d)))
+          
+         unify_ty ~loc:(loc_of e1) ty1 (Ty_fun(ty2,d,tyB));
+(* Format.(fprintf std_formatter "$$$$$$$$$$$$---------~~~~~~>%a | %a\n" pp_dur d pp_dur (simpl_dur_wcet ~keep_sharing:false d));
+   *)      Ty_base tyB, canon_dur (Dur_add(Dur_add(d1,d2),d)))
   | E_par(es) ->
       let ts,ds = List.split @@ List.map (fun ei ->
                                 typ_exp ~collect_sig
                                         ~statics ~genv
                                         ~ctors ~toplevel:false
                                         ~loc:(loc_of ei) g ei) es in
-      let d = List.fold_left (fun d1 d2 -> Dur_max(d1,d2)) Dur_zero ds in
-      Ty_tuple ts,canon_dur d
+      (* let d = match List.rev ds with
+              | d::ds' -> List.fold_left (fun d1 d2 -> Dur_max(d1,d2)) d (List.rev ds')
+              | [] -> Dur_int 0 *)
+      let d = match ds with
+              | d::ds' -> List.fold_left (fun d1 d2 -> Dur_max(d1,d2)) d ds'
+              | [] -> Dur_int 0
+      in Ty_tuple ts,canon_dur d
   | E_reg((p,tyB,e1),e0,_) ->
       let ty0,d0 = typ_exp ~collect_sig ~statics ~genv ~ctors
                            ~toplevel:false ~loc g e0 in
@@ -693,17 +821,17 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
       let ty1,d1 = typ_exp ~collect_sig ~statics ~genv ~ctors
                            ~toplevel:false ~loc g' e1 in
       unify_ty ~loc ty0 ty1;
-      unify_dur ~loc:(loc_of e0) d0 Dur_zero;
-      unify_dur ~loc:(loc_of e1) d1 Dur_zero;
+      unify_dur ~loc:(loc_of e0) d0 (Dur_int 0);
+      unify_dur ~loc:(loc_of e1) d1 (Dur_int 0);
       unify_ty ~loc:(loc_of e0) (Ty_base tyB) ty0;
-      (ty0, Dur_zero)
+      (ty0, Dur_int 0)
   | E_exec(e1,e2,eo,_) ->
       let ty1,_ = typ_exp ~collect_sig ~statics ~genv ~ctors
                           ~toplevel:false ~loc g e1 in
       let ty2,d2 = typ_exp ~collect_sig ~statics ~genv ~ctors
                            ~toplevel:false ~loc g e2 in
       unify_ty ~loc:(loc_of e1) ty1 ty2;
-      unify_dur ~loc:(loc_of e2) d2 Dur_zero;
+      unify_dur ~loc:(loc_of e2) d2 (Dur_int 0);
       let tyB = new_tyB_unknown () in
       unify_ty ~loc:(loc_of e1) (Ty_base tyB) ty1;
       Option.iter (fun e3 ->
@@ -711,8 +839,8 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
                                ~toplevel:false ~loc g e3 in
           let loc_e3 = loc_of e3 in
           unify_ty ~loc:loc_e3 ty3 (Ty_base (TyB_bool));
-          unify_dur ~loc:loc_e3 d3 Dur_zero) eo;
-      (Ty_base (TyB_tuple[tyB;TyB_bool]), Dur_zero)
+          unify_dur ~loc:loc_e3 d3 (Dur_int 0)) eo;
+      (Ty_base (TyB_tuple[tyB;TyB_bool]), Dur_int 0)
   | E_match(e1,hs,eo) ->
       let ty1,d1 = typ_exp ~collect_sig ~statics ~genv ~ctors
                            ~toplevel:false ~loc:(loc_of e1) g e1 in
@@ -736,7 +864,7 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
             | _ -> assert false
       in
       let ty_result = (Ty_base (new_tyB_unknown ())) in
-      let r = ref d1 in
+      let r = ref (Dur_int 0) in
       List.iter (fun (inj,(p,ei)) ->
           let loc_of_ie = loc_of ei in
           let typ_param = match SMap.find_opt inj ctors_2 with
@@ -747,20 +875,20 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
           let tyi,di = typ_exp ~collect_sig ~statics ~genv ~ctors
                                ~toplevel:false ~loc:(loc_of ei) g' ei in
           unify_ty ~loc:loc_of_ie tyi ty_result;
-          r := Dur_max(!r,di)) hs;
+          r := Dur_xor(!r,di)) hs;
 
       Option.iter (fun ew -> 
           (* wildcard clause *)
           let tyw,dw = typ_exp ~collect_sig ~statics ~genv ~ctors
                                ~toplevel:false ~loc:(loc_of ew) g ew in
           unify_ty ~loc:(loc_of ew) tyw ty_result;
-          r := Dur_max(!r,dw)) eo;
+          r := Dur_xor(!r,dw)) eo;
 
       if eo = None && List.length hs < (SMap.cardinal ctors_2) then (
         Prelude.Errors.error ~loc (fun fmt ->
             Format.fprintf fmt "This pattern matching is not exhaustive.")
       );
-      ty_result,!r
+      ty_result,Dur_add(d1,!r)
   | E_record(b_list) ->
       let bs,ns = List.split @@ List.map (fun (x,ei) ->
                     let (t,n) = typ_exp ~collect_sig ~statics ~genv ~ctors
@@ -769,7 +897,7 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
                     unify_ty ~loc:(loc_of ei) t (Ty_base tyB);
                     (x,tyB),n) b_list
       in
-      let n = List.fold_left (fun acc n -> Dur_max(acc,n)) Dur_zero ns in
+      let n = List.fold_left (fun acc n -> Dur_add(acc,n)) (Dur_int 0) ns in
       Ty_base(TyB_record{fields=smap_of_list bs;row=TyB_unit}),n
   | E_record_field(e1,x,t) ->
       let ty1,d1 = typ_exp ~collect_sig ~statics ~genv ~ctors
@@ -789,7 +917,7 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
       unify_ty ~loc:(loc_of e1) ty1 (Ty_base(TyB_record{fields=SMap.singleton x2 tyB2;row=tyB1}));
       unify_ty ~loc:(loc_of e2) ty2 (Ty_base tyB2);
       unify_ty ~loc:(loc_of e1) (Ty_base t) ty1;
-      ty1, Dur_max(d1,d2)
+      ty1, Dur_add(d1,d2)
   | E_ref(e1) ->
       let ty,d = typ_exp ~collect_sig ~statics ~genv ~ctors
                          ~toplevel:false ~loc:(loc_of e1) g e1 in
@@ -801,7 +929,7 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
                           ~toplevel:false ~loc:(loc_of e1) g e1 in
       let tyB = new_tyB_unknown () in
       unify_ty ~loc:(loc_of e1) (Ty_ref tyB) ty1;
-      (Ty_base tyB, Dur_max(d,Dur_one))
+      (Ty_base tyB, d) (* Dur_max(d,Dur_one)) *)
   | E_set (e1,e2) ->
       let ty1,d1 = typ_exp ~collect_sig ~statics ~genv ~ctors
                            ~toplevel:false ~loc:(loc_of e1) g e1 in
@@ -810,30 +938,35 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
       let tyB = new_tyB_unknown () in
       unify_ty ~loc:(loc_of e1) (Ty_ref tyB) ty1;
       unify_ty ~loc:(loc_of e2) (Ty_base tyB) ty2;
-      (Ty_base TyB_unit, Dur_max(Dur_max(d1,d2),Dur_one))
+      (Ty_base TyB_unit, Dur_add(d1,d2))
   | E_array_make(sz,e1,_) ->
       let tyB = new_tyB_unknown() in
+      let l = Ast.gensym ~prefix:"l" () in
       let ty1,d = typ_exp ~collect_sig ~statics ~genv ~ctors
                           ~toplevel:false ~loc:(loc_of e1) g e1 in
       unify_ty ~loc:(loc_of e1) ty1 (Ty_base tyB);
-      (Ty_array(sz,tyB)),Dur_one
-  | E_array_create(sz,_) ->
+      (Ty_array(sz,tyB,Label_name l)),Dur_int 1
+  | E_array_create(sz,(l,_)) ->
       let tyB = new_tyB_unknown() in
-      (Ty_array(sz,tyB)),Dur_zero
+      (* let l = Ast.gensym ~prefix:"l" () in *)
+      (Ty_array(sz,tyB,Label_name l)),Dur_int 0
   | E_array_length(x,loc_x) ->
       let tyx = typ_ident ~loc:loc_x g x in
       let sz = new_size_unknown () in
       let v = new_tyB_unknown () in
-      unify_ty ~loc:loc_x (Ty_array(sz,v)) tyx;
-      (Ty_base (TyB_int (new_size_unknown ())), Dur_zero)
+      let l = new_label_unknown() in
+      unify_ty ~loc:loc_x (Ty_array(sz,v,l)) tyx;
+      (Ty_base (TyB_int (new_size_unknown ())), Dur_int 0)
   | E_array_get((x,loc_x),e1) ->
       let ty1,d = typ_exp ~collect_sig ~statics ~genv ~ctors
                           ~toplevel:false ~loc g e1 in
       unify_ty ~loc:(loc_of e1) ty1 (Ty_base (TyB_int (new_size_unknown ())));
       let tyx = typ_ident ~loc:loc_x g x in
       let tyB = new_tyB_unknown () in
-      unify_ty ~loc:loc_x (Ty_array(new_size_unknown(),tyB)) tyx;
-      (Ty_base tyB,dur_add d Dur_one)
+      let l = new_label_unknown() in
+      unify_ty ~loc:loc_x (Ty_array(new_size_unknown(),tyB,l)) tyx; 
+      (* Format.fprintf Format.std_formatter "====>%a %a\n" pp_ty tyx pp_label l; *)
+      (Ty_base tyB,Dur_add(d,Dur_shared(l,Dur_int 1)))
   | E_array_set((x,loc_x),e1,e2) ->
       let ty1,d1 = typ_exp ~collect_sig ~statics ~genv ~ctors
                            ~toplevel:false ~loc:(loc_of e1) g e1 in
@@ -842,22 +975,25 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
       unify_ty ~loc:(loc_of e1) ty1 (Ty_base (TyB_int (new_size_unknown ())));
       let tyx = typ_ident ~loc:loc_x g x in
       let tyB = new_tyB_unknown () in
+      let l = new_label_unknown() in
       unify_ty ~loc:(loc_of e2) ty2 (Ty_base tyB);
-      unify_ty ~loc:loc_x (Ty_array(new_size_unknown(),tyB)) tyx;
-      (Ty_base TyB_unit, dur_add (Dur_max(d1,d2)) Dur_one)
+      unify_ty ~loc:loc_x (Ty_array(new_size_unknown(),tyB,l)) tyx;
+      (Ty_base TyB_unit, Dur_add(Dur_add(d1,d2),Dur_shared (canon_label l,Dur_int 1)))
   | E_array_get_start((x,loc_x),e1) ->
       let ty1,d = typ_exp ~collect_sig ~statics ~genv ~ctors
                           ~toplevel:false ~loc:(loc_of e1) g e1 in
       unify_ty ~loc ty1 (Ty_base (TyB_int (new_size_unknown ())));
       let tyx = typ_ident ~loc:loc_x g x in
       let tyB = new_tyB_unknown () in
-      unify_ty ~loc:loc_x (Ty_array(new_size_unknown(),tyB)) tyx;
+      let l = new_label_unknown() in
+      unify_ty ~loc:loc_x (Ty_array(new_size_unknown(),tyB,l)) tyx;
       (Ty_base TyB_unit, d)
   | E_array_get_end(x,loc_x) ->
       let tyx = typ_ident ~loc:loc_x g x in
       let tyB = new_tyB_unknown () in
-      unify_ty ~loc:loc_x (Ty_array(new_size_unknown(),tyB)) tyx;
-      (Ty_base tyB, Dur_zero)
+      let l = new_label_unknown() in
+      unify_ty ~loc:loc_x (Ty_array(new_size_unknown(),tyB,l)) tyx;
+      (Ty_base tyB, Dur_int 0)
   | E_array_set_immediate((x,loc_x),e1,e2) ->
       let ty1,d1 = typ_exp ~collect_sig ~statics ~genv ~ctors
                            ~toplevel:false ~loc:(loc_of e1) g e1 in
@@ -866,17 +1002,57 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
       unify_ty ~loc ty1 (Ty_base (TyB_int (new_size_unknown ())));
       let tyx = typ_ident ~loc:loc_x g x in
       let tyB = new_tyB_unknown () in
+      let l = new_label_unknown() in
       unify_ty ~loc:(loc_of e2) ty2 (Ty_base tyB);
-      unify_ty ~loc:loc_x (Ty_array(new_size_unknown(),tyB)) tyx;
+      unify_ty ~loc:loc_x (Ty_array(new_size_unknown(),tyB,l)) tyx;
       (Ty_base TyB_unit, (Dur_max(d1,d2)))
   | E_array_from_file(x,e1) ->
       let tyx = typ_ident ~loc g x in (* todo loc of x *)
       let ty1,_d1 = typ_exp ~collect_sig ~statics ~genv ~ctors
                             ~toplevel:false ~loc:(loc_of e1) g e1 in
+      let l = Ast.gensym ~prefix:"l" () in
       unify_ty ~loc:(loc_of e1) (Ty_base(TyB_string(new_size_unknown()))) ty1;
-      unify_ty ~loc (Ty_array(new_size_unknown(),new_tyB_unknown())) tyx; (* todo loc of x *)
-      (Ty_base TyB_unit, Dur_one)
-  | E_for(x,_,_,e3,_) ->
+      unify_ty ~loc (Ty_array(new_size_unknown(),new_tyB_unknown(),Label_name l)) tyx; (* todo loc of x *)
+      (Ty_base TyB_unit, Dur_int 1)
+  | E_for(x,e1,e2,e3,s,loc) ->
+      let s0 = new_size_unknown ?name:(match s with
+                                       | Sz_var{contents=Unknown{name=Some x}} -> Some (x^"'")
+                                       | _ -> None) () in
+      unify_size ~loc s (Sz_add(s0,1));
+      let vsize = new_size_unknown () in
+      let g' = env_extend ~loc g (P_var x) (Ty_base (TyB_int (Sz_add(vsize,1)))) in
+      let ty3,d3 = typ_exp ~collect_sig ~statics ~genv ~ctors
+                            ~toplevel:false ~loc:(loc_of e3) g' e3 in
+      unify_ty ~loc:(loc_of e3) ty3 (Ty_base TyB_unit);
+      let dopt = match un_deco e1, un_deco e2 with
+                 | E_const(Int(n,_)), E_const(Int(m,_)) ->
+                    let sz = Sz_lit (m-n+1) in
+                    let d = Dur_mulDiv(sz,Dur_add(d3,Dur_int 1),s) in
+                    (* Format.(fprintf std_formatter "---------->[%a]\n" pp_dur d); *)
+                    Some (d,sz)
+                 | E_const(Int(n,_)), E_const(C_size sz1) ->
+                    let sz = new_size_unknown () in
+                    unify_size ~loc (Sz_add(sz,n)) (Sz_add(sz1,1));
+                    Some (Dur_mulDiv(sz,Dur_add(d3,Dur_int 1),s),sz)
+                 | _ -> None in
+      let d',sz = (match dopt with        
+      | None -> (* todo *)
+          let ty1,d1 = typ_exp ~collect_sig ~statics ~genv ~ctors
+                            ~toplevel:false ~loc:(loc_of e1) g e1 in
+          let ty2,d2 = typ_exp ~collect_sig ~statics ~genv ~ctors
+                            ~toplevel:false ~loc:(loc_of e2) g e2 in
+          unify_ty ~loc:(loc_of e1) ty1 (Ty_base (TyB_int (Sz_add(vsize,1))));
+          unify_ty ~loc:(loc_of e2) ty2 (Ty_base (TyB_int (Sz_add(vsize,1))));
+          let sz = Sz_pow2(Sz_add(vsize,1)) in
+          (Dur_mulDiv(sz,d3,s),sz)
+      | Some (d,sz) -> (* Format.(fprintf std_formatter "=========>%a\n" pp_dur d);*) 
+               (d,sz)) in
+      let d'' = (* match Types.canon_size s with
+        | Sz_lit 1 -> d'
+        | _ -> *)
+         (*if s = Sz_lit 1 then d' else*) d' in
+      Ty_base TyB_unit, Dur_add(Dur_int 1,d'')
+  | E_parfor(x,_,_,e3,_) ->
       let g' = env_extend ~loc g (P_var x) (Ty_base (TyB_int (new_size_unknown()))) in (* todo loc of pattern *)
       let (ty3,d3) = typ_exp ~collect_sig ~statics ~genv ~ctors
                              ~toplevel:false ~loc:(loc_of e3) g' e3 in (* todo *)
@@ -900,7 +1076,7 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
           unify_ty ~loc:(loc_of ei) t (Ty_base v);
           n) es
       in
-      let n = List.fold_left (fun acc n -> Dur_max(acc,n)) Dur_zero ns in
+      let n = List.fold_left (fun acc n -> Dur_max(acc,n)) (Dur_int 0) ns in
       Ty_base(Operators.vect_ (Sz_lit(List.length es)) v),n
   | E_vector_mapi(_,(p,(tyB1,tyB2),e1),e2,size_vect) ->
       let vsize1 = new_size_unknown() in
@@ -923,7 +1099,7 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
                          ~toplevel ~loc:(loc_of e1) g e1 in (* TODO: force ty2 to be a base type *)
       (match List.assoc_opt i genv.externals with
       | Some (ty,shared,_) ->
-          let d2 = (if shared then Dur_one else Dur_zero) in
+          let d2 = Dur_int (if shared then 1 else 0) in
           let tyB = new_tyB_unknown () in
           let d3 = new_dur_unknown() in
           let ty2 = Ty_fun(ty1, d3, tyB) in
@@ -933,12 +1109,12 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
       | E_pause (_,e1) -> 
           let ty1,_ = typ_exp ~collect_sig ~statics ~genv ~ctors
                           ~toplevel ~loc:(loc_of e1) g e1 in
-          (ty1, Dur_one)
+          (ty1, Dur_int 1)
       | E_sig_get(x) ->
         let tyx = typ_ident ~loc g x in (* todo loc of x *)
         let v = new_tyB_unknown () in
         unify_ty ~loc (Ty_signal(v)) tyx; (* todo loc of x *)
-        (Ty_base v, Dur_zero)
+        (Ty_base v, Dur_int 0)
   | E_emit(x,e1) ->
       let tyx = typ_ident ~loc g x in
       let ty1,d1 = typ_exp ~collect_sig ~statics ~genv ~ctors
@@ -954,14 +1130,14 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
       unify_ty ~loc:(loc_of e1) ty1 (Ty_base v);
       (Ty_signal v, Dur_zero)*)
       let v = new_tyB_unknown () in
-      (Ty_signal v, Dur_zero)
+      (Ty_signal v, Dur_int 0)
   | E_loop(e1) ->
       let ty1,d1 = typ_exp ~collect_sig ~statics ~genv ~ctors
                            ~toplevel:false ~loc:(loc_of e1) g e1 in
       unify_ty ~loc:(loc_of e1) ty1 (Ty_base TyB_unit);
-      (Ty_base TyB_unit, Dur_one)
+      (Ty_base TyB_unit, Dur_int 1)
   | E_trap(tyB) ->
-      (Ty_trap tyB, Dur_zero)
+      (Ty_trap tyB, Dur_int 0)
   | E_exit(x,e1) ->
       let tyx = typ_ident ~loc g x in (* todo loc of x *)
       let ty1,d1 = typ_exp ~collect_sig ~statics ~genv ~ctors
@@ -1015,9 +1191,13 @@ let typing_handler ?(msg="") f () =
                 (emph_pp bold pp_size) (canon_size sz1)
                 (emph_pp bold pp_size) (canon_size sz2)
           | Dur(d1,d2) ->
-              fprintf fmt "response time %a should be %a"        
+              fprintf fmt "response time %a should be less than or equal to %a"        
                 (emph_pp bold pp_dur) (canon_dur d1)
                 (emph_pp bold pp_dur) (canon_dur d2)
+          | Label(l1,l2) ->
+              fprintf fmt "label %a should be %a"  
+                (emph_pp bold pp_label) (canon_label l1)
+                (emph_pp bold pp_label) (canon_label l2)
           | Imcompatible_length(ty1, ty2) ->
               fprintf fmt "wrong number of elements:@,this expression has type %a but was expected of type %a"
                 (emph_pp bold pp_ty) (canon_ty ty1)
@@ -1034,11 +1214,14 @@ let typing_handler ?(msg="") f () =
               fprintf fmt "%s@,This expression has a cyclic type %a"
                 msg (emph_pp bold pp_ty) (canon_ty t)
           | Cyclic_Dur(n,dur) ->
-              fprintf fmt "The type of response time %a is cyclic"
+              fprintf fmt "The function type of response time %a is cyclic"
               (emph_pp bold pp_dur) (canon_dur dur)
           | Cyclic_Size(n,sz) ->
-              fprintf fmt "The type of size %a is cyclic"
+              fprintf fmt "This expression contains a size %a is cyclic"
               (emph_pp bold pp_size) (canon_size sz)
+          | Cyclic_label(n,l) ->
+              fprintf fmt "This expression contains a location %a that is cyclic"
+              (emph_pp bold pp_label) (canon_label l)
           | Missing_record_field(x) ->
               fprintf fmt "Missing record field %a" (emph_pp blue pp_print_string) x
           | Record_field_mismatch(x,tyB1,tyB2) ->
@@ -1077,9 +1260,13 @@ let typing_handler ?(msg="") f () =
                 (emph_pp bold pp_size) (canon_size sz1)
                 (emph_pp bold pp_size) (canon_size sz2)
           | Dur(d1,d2) ->
-              fprintf fmt "response time %a should be %a"  
+              fprintf fmt "response time %a should be less than or equal to %a"  
                 (emph_pp bold pp_dur) (canon_dur d1)
                 (emph_pp bold pp_dur) (canon_dur d2)
+          | Label(l1,l2) ->
+              fprintf fmt "label %a should be %a"  
+                (emph_pp bold pp_label) (canon_label l1)
+                (emph_pp bold pp_label) (canon_label l2)
           | Imcompatible_length(ty1, ty2) ->
               fprintf fmt "wrong number of elements:@,an expression has type %a but was expected of type %a"
                 (emph_pp bold pp_ty) (canon_ty ty1)
@@ -1096,11 +1283,14 @@ let typing_handler ?(msg="") f () =
           fprintf fmt "%s@,An expression has a cyclic type %a\n"
             msg (emph_pp bold pp_ty) (canon_ty t)
        | Cyclic_Dur(n,dur) ->
-          fprintf fmt "The type of response time %a is cyclic\n"
+          fprintf fmt "An expression has response time %a that is cyclic\n"
           (emph_pp bold pp_dur) (canon_dur dur)
        | Cyclic_Size(n,sz) ->
-          fprintf fmt "The type of size %a is cyclic\n"
+          fprintf fmt "An expression has size %a is cyclic\n"
           (emph_pp bold pp_size) (canon_size sz)
+       | Cyclic_label(n,l) ->
+              fprintf fmt "An expression has location %a that is cyclic"
+              (emph_pp bold pp_label) (canon_label l)
        | Missing_record_field(x) ->
           fprintf fmt "Missing record field %a" (emph_pp blue pp_print_string) x
        | Record_field_mismatch(x,tyB1,tyB2) ->
@@ -1123,10 +1313,11 @@ let typing_static ~loc ~ctors g glob =
   | Static_array_of (t,_) ->
     (* Ty_array(new_size_unknown(),new_tyB_unknown())*) t (* todo: translate [t] *)
   | Static_array(c,n) ->
-    let elem = typ_const ~loc ~ctors c in  (*todo loc *)
-    Ty_array(Sz_lit n,elem)
+      let elem = typ_const ~loc ~ctors c in  (*todo loc *)
+      let l = Ast.gensym ~prefix:"l" () in
+      Ty_array(Sz_lit n,elem, Label_name l)
   | Static_const c ->
-    Ty_base (typ_const ~loc ~ctors c)
+      Ty_base (typ_const ~loc ~ctors c)
 
 
 let env_extend_statics ~ctors env statics =
@@ -1166,7 +1357,7 @@ let when_repl statics ~genv : bool -> ((p * e) * Prelude.loc) -> unit =
         let (ty,d) = typing ~env ~statics ~genv e in
         let ty_p = type_annotation_from_pat ~loc p in
         unify_ty ~loc ty ty_p;
-        r := typing_handler (fun () -> (env_extend ~loc:(loc_of e) ~gen:(evaluated e) !r p ty)) ();
+        r := typing_handler (fun () -> (env_extend ~loc:(loc_of e) ~gen:(evaluated e (* && match un_annot e with E_fun _ | E_fix _ |  E_const (Op (Runtime(External_fun(_)))) -> true | _ -> false*)) !r p ty)) ();
         if show_val then (
            let open Prelude.Errors in
            let open Format in
@@ -1177,8 +1368,9 @@ let when_repl statics ~genv : bool -> ((p * e) * Prelude.loc) -> unit =
              fprintf std_formatter " %s : " x;
              let (Forall(vs,tyx)) = SMap.find x !r in
              pp_scheme std_formatter @@ Forall(vs,tyx);
+             let d' = simpl_dur_wcet_with_rebase (* ~keep_sharing:true*) d in
              fprintf std_formatter " | %a@,"
-               pp_dur (canon_dur d)
+               pp_dur (canon_dur d')
            ) xs;
            fprintf std_formatter "@]@."
         )) ()
@@ -1209,7 +1401,7 @@ let typing_with_argument ?(get_vector_size=true) ?collect_sig ({genv;main} : pi)
        let t = canon_ty ty in
        match t with
        | Ty_fun(_,dur,_) ->
-          (try unify_dur ~loc:(loc_of e) dur Dur_zero
+          (try unify_dur ~loc:(loc_of e) dur (Dur_int 0)
            with CannotUnify _ -> 
              let open Prelude.Errors in
              error (fun fmt ->

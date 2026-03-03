@@ -21,6 +21,8 @@ type c =                (** constant [c] *)
   | Inj of x            (* non-applyed constructor (data type) *)
   | C_appInj of x * c * tyB (* constructor (data type) *)
   | Ref
+  | Get
+  | Set
 
 and op = (** primitives *)
        (* instantaneous primitives *)
@@ -64,7 +66,7 @@ type e =                      (** expression     [e]                       *)
   | E_record_update of e * x * e * tyB (** { e with xi = ei }, annotation (with the type of [e]) 
                                            is required for code generation *)
 
-  | E_array_create of size * deco   (** [create<sz>] *)
+  | E_array_create of size * (l * deco)   (** [create<sz>] *)
   | E_array_make of size * e * deco (** [make<sz> e] *)
   | E_array_get of (x * deco) * e    (** static array access        [x.(e)]      *)
   | E_array_length of x * deco      (** static array length access [x.length]   *)
@@ -81,7 +83,8 @@ type e =                      (** expression     [e]                       *)
   | E_vector_mapi of bool * (p * (tyB * tyB) * e) * e * size
 
   | E_generate of (p * (ty * tyB) * e) * e * e_static * e_static * deco
-  | E_for of x * e_static * e_static * e * deco
+  | E_parfor of x * e_static * e_static * e * deco
+  | E_for of x * e * e * e * size * deco
   | E_run of x * e * l   (* [f e] call external function [f] with argument [e] *)
   | E_pause of l * e     (* [pause e] starts [e] after one cycle *)
   | E_sig_get of x

@@ -75,9 +75,11 @@ let subst_e ?(warning=true) ?(when_var=(fun x -> x)) x ex e =
     | E_array_from_file(y,e1) ->
         let z = if x <> y then y else as_ident ex in
         E_array_from_file(z, ss e1)
-    | E_for(y, sz1, sz2, e3, loc) ->
-       E_for(y,sz1,sz2,
-             (if x = y then e3 else ss e3),loc)
+    | E_for(y, e1, e2, e3, sz, loc) ->
+        E_for(y,ss e1, ss e2, (if x = y then e3 else ss e3),  sz, loc)
+    | E_parfor(y, sz1, sz2, e3, loc) ->
+       E_parfor(y,sz1,sz2,
+                (if x = y then e3 else ss e3),loc)
     | E_generate((p, ty, e1), e2, sz3, sz4, loc) ->
         let e1' = if pat_mem x p then e1 else ss e1 in
         E_generate((p, ty, e1'), ss e2, sz3, sz4, loc)

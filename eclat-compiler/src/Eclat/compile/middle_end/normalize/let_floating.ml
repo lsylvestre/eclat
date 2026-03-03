@@ -122,8 +122,12 @@ let rec lfloat (e:e) : e =
       ds1,E_array_from_file(x,e1')
   | E_par(es) ->
       [],E_par(List.map lfloat es)
-  | E_for(x,sz1,sz2,e3,loc) ->
-      [],E_for(x,sz1,sz2,lfloat e3,loc)
+  | E_for(x,e1,e2,e3,sz,loc) ->
+      let ds1,e1' = glob e1 in
+      let ds2,e2' = glob e2 in
+      ds1@ds2,E_for(x,e1',e2',lfloat e3,sz,loc)
+  | E_parfor(x,sz1,sz2,e3,loc) ->
+      [],E_parfor(x,sz1,sz2,lfloat e3,loc)
       (* NB: [e_st1] and [e_st2] are *not* moved up with `plug` (ah ? from anf)  *)
   | E_generate((p,ty,e1),e2,sz3,sz4,loc) ->
       let ds2,e2' = glob e2 in

@@ -408,7 +408,7 @@ let rec red ~genv (e,r) =
       if evaluated e1' && evaluated e2' then E_const(Unit), set_buffer x e1' e2' r else
       E_array_set ((x,loc),e1',e2'),r2
   | E_generate _ 
-  | E_for _ -> assert false (* todo *)
+  | E_parfor _ -> assert false (* todo *)
   | E_pause (_,e) -> E_letIn(P_unit,Ty_base(TyB_unit),E_const(Unit),e),r
 
 

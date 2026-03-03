@@ -57,7 +57,12 @@ let fv_type_in ?(s=Types.Vs.empty) e =
         r := !r ++ free_vars_of_type (Vs.empty,Ty_base tyB);
         ss e1;
         ss e0
-    | E_for(_,sz1,sz2,e3,_) ->
+    | E_for(_,e1,e2,e3,sz,_) ->
+        r := !r ++ free_vars_of_type (Vs.empty,Ty_base(TyB_int sz));
+        ss e1;
+        ss e2;
+        ss e3
+    | E_parfor(_,sz1,sz2,e3,_) ->
         r := !r ++ free_vars_of_type (Vs.empty,Ty_base(TyB_int sz1));
         r := !r ++ free_vars_of_type (Vs.empty,Ty_base(TyB_int sz2));
         ss e3
@@ -91,7 +96,7 @@ let fv_type_in ?(s=Types.Vs.empty) e =
                          | External_fun (op,ty) -> r := !r ++ free_vars_of_type (Vs.empty,ty)
                          | _ -> ())
                       | op -> ())
-        | Ref -> assert false
+        | Ref | Get | Set -> assert false
         in ss_const c
     | E_record_field(e1,_,tyB) ->
         ss e1; r := !r ++ free_vars_of_type (Vs.empty,Ty_base tyB);
@@ -111,17 +116,22 @@ let instantiate_types_in_e e = (* todo: rename this function *)
   (* Ast_pprint.pp_exp Format.std_formatter e; *)
    Vs.iter (fun n _ -> Hashtbl.add unknowns n.id (new_unknown_generic ())) vs;
   
+  let rec ss_p = function
+  | P_var _ | P_unit as p -> p
+  | P_tuple ps -> P_tuple (List.map ss_p ps)
+  | P_tyConstr(p,ty) -> P_tyConstr(ss_p p, rename_ty unknowns ty)
+  in
   let rec ss e =
     let open Operators in
     match e with
     | E_letIn(p, ty, e1, e2) ->
-        E_letIn(p, rename_ty unknowns ty, ss e1, ss e2)
+        E_letIn(ss_p p, rename_ty unknowns ty, ss e1, ss e2)
     | E_fun(p, (ty,tyB), e1) ->
-       E_fun(p, (rename_ty unknowns ty,rename_tyB unknowns tyB), ss e1)
+       E_fun(ss_p p, (rename_ty unknowns ty,rename_tyB unknowns tyB), ss e1)
     | E_fix(f, (p, (ty, tyB), e1)) ->
-        E_fix(f, (p, (rename_ty unknowns ty, rename_tyB unknowns tyB), ss e1))
+        E_fix(f, (ss_p p, (rename_ty unknowns ty, rename_tyB unknowns tyB), ss e1))
     | E_reg((p,tyB, e1),e0,l) ->
-        E_reg((p, rename_tyB unknowns tyB, ss e1),ss e0,l) 
+        E_reg((ss_p p, rename_tyB unknowns tyB, ss e1),ss e0,l) 
     | E_array_create(sz,deco) -> E_array_create(rename_size unknowns sz,deco)
     | E_array_make(sz,c,deco) -> E_array_make(rename_size unknowns sz,c,deco)
     | E_const c ->
@@ -139,12 +149,14 @@ let instantiate_types_in_e e = (* todo: rename this function *)
                           | External_fun (op,ty) -> External_fun(op,(rename_ty unknowns ty))
                           | _ -> prim)
                         | op -> op)
-        | Ref -> assert false
+        | Get | Set | Ref -> assert false
         in E_const (ss_const c)
-    | E_for(x,sz1,sz2,e1,deco) -> 
-        E_for(x,rename_size unknowns sz1,rename_size unknowns sz2,ss e1,deco)
+    | E_parfor(x,sz1,sz2,e1,deco) -> 
+        E_parfor(x,rename_size unknowns sz1,rename_size unknowns sz2,ss e1,deco)
+    | E_for(x,e1,e2,e3,sz,deco) -> 
+        E_for(x,ss e1,ss e2,ss e3,rename_size unknowns sz,deco)
     | E_generate((p,(ty,tyB),e1),e2,sz1,sz2,deco) ->
-        E_generate((p,(rename_ty unknowns ty, rename_tyB unknowns tyB),ss e1),ss e2,
+        E_generate((ss_p p,(rename_ty unknowns ty, rename_tyB unknowns tyB),ss e1),ss e2,
                     rename_size unknowns sz1,rename_size unknowns sz2,deco)
     | E_record_update(e1,x2,e2,tyB) ->
        E_record_update(ss e1, x2, ss e2, rename_tyB unknowns tyB)
@@ -188,7 +200,7 @@ let inline_with_statics ~statics e =
           else init
          in loop 0
 
-    | E_for(x,e_st1,e_st2,e3,loc) ->
+    | E_parfor(x,e_st1,e_st2,e3,loc) ->
         has_changed := true;
         let (n,w) = eval_static_exp_int ~loc ~statics e_st1 in
         let (m,w') = eval_static_exp_int ~loc ~statics e_st2 in

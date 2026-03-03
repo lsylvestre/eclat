@@ -88,6 +88,10 @@ let rec pp_const (fmt:fmt) (c:c) : unit =
       fprintf fmt "%s(%a)" x pp_const c
   | Ref ->
       fprintf fmt "ref"
+  | Get ->
+      fprintf fmt "get"
+  | Set ->
+      fprintf fmt "set"
 
 (** pretty printer for patterns *)
 let rec pp_pat (fmt:fmt) (p:p) : unit =
@@ -242,8 +246,16 @@ let pp_exp (fmt:fmt) (e:e) : unit =
         ~pp_sep:(fun fmt () -> fprintf fmt " || ")
           (pp_e ~paren:false) fmt es;
       fprintf fmt ")"
-  | E_for(x,sz1,sz2,e3,_) ->
-      fprintf fmt "for %s = %a to %a do %a done" x 
+  | E_for(x,e1,e2,e3,sz,_) ->
+      fprintf fmt "for %s = %a to %a " x 
+        (pp_e ~paren:false) e1
+        (pp_e ~paren:false) e2;
+        (match sz with
+         | Sz_lit 1 -> ()
+         | _ -> fprintf fmt "by %a" pp_size sz);
+        fprintf fmt " do %a done" (pp_e ~paren:false) e3;
+  | E_parfor(x,sz1,sz2,e3,_) ->
+      fprintf fmt "parfor %s = %a to %a do %a done" x 
         pp_size sz1
         pp_size sz2
         (pp_e ~paren:false) e3

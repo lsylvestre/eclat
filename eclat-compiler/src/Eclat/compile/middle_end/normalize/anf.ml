@@ -200,8 +200,12 @@ let rec anf (e:e) : e =
       E_absLabel(l,anf e1)
   | E_appLabel(e1,l,lc) ->
       E_appLabel(anf e1,l,lc)*)
-  | E_for(x,sz1,sz2,e3,loc) ->
-      E_for(x,sz1,sz2,anf e3,loc)
+  | E_for(x,e1,e2,e3,sz,loc) ->
+      plug (glob e1) @@ fun xc1 ->
+      plug (glob e2) @@ fun xc2 ->
+      E_for(x,xc1,xc2,anf e3,sz,loc)
+  | E_parfor(x,sz1,sz2,e3,loc) ->
+      E_parfor(x,sz1,sz2,anf e3,loc)
       (* NB: [e_st1] and [e_st2] are *not* moved up with `plug` *)
   | E_generate((p,ty,e1),e2,sz3,sz4,loc) ->
       plug (anf e2) @@ fun xc ->

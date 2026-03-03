@@ -69,9 +69,12 @@ let rename_e ~statics e =
       let pz = rename_pat ~statics p in
       let e1' = ren_e (subst_p_e p (pat2exp pz) e1) in
      E_reg((pz, tyB, e1'), ren_e e0, l)
-  | E_for(x,sz1,sz2,e3,loc) ->
+  | E_for(x,e1,e2,e3,sz,loc) ->
       let x' = rename_ident ~statics x in
-      E_for(x',sz1,sz2,ren_e @@ subst_e x (E_var x') e3,loc)
+      E_for(x',ren_e e1,ren_e e2,ren_e @@ subst_e x (E_var x') e3,sz,loc)
+  | E_parfor(x,sz1,sz2,e3,loc) ->
+      let x' = rename_ident ~statics x in
+      E_parfor(x',sz1,sz2,ren_e @@ subst_e x (E_var x') e3,loc)
   | E_generate((p, ty, e1), e2, sz3, sz4, l) ->
       let pz = rename_pat ~statics p in
       let e1' = ren_e (subst_p_e p (pat2exp pz) e1) in

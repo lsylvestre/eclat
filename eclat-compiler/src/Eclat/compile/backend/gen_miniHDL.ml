@@ -156,7 +156,7 @@ let rec to_c ~genv = function
 | Ast.(Op op) ->
     Format.(fprintf std_formatter "-->%a" Ast_pprint.pp_op op);  assert false
 | Ast.V_loc _ -> assert false
-| Ast.Ref -> assert false
+| Ast.Get | Ast.Set | Ast.Ref -> assert false
 
 let to_op = function
 | Ast.TyConstr ty -> TyConstr (MiniHDL_typing.translate_ty ty)
@@ -602,7 +602,19 @@ let rec to_s ~endloop ~traps ~is_zero ~genv gs e x k =
                      (** todo: avoid duplication of the continuation 
                          of all the [es] are always non instantaneous **)
 
-  | E_for _ -> assert false (* already expanded *)
+  | E_for(y,e1,e2,e3,sz,loc) ->
+      (* let n = match sz with Sz_lit n -> n | _ -> assert false (* todo *) in*)
+      let q1 = Ast.gensym ~prefix:"forloop" () in
+      let s1 = seq_ (set_ y (to_a  ~genv e1)) @@ S_continue q1 in
+      let a2 = to_a ~genv e2 in
+      let w3,ts3,s3 = to_s ~endloop ~traps ~is_zero ~genv gs e3 x 
+                         (seq_ (set_ y (A_call(Runtime (External_fun("Int.add",Types.new_ty_unknown())),A_tuple[A_var y;A_const (Int {value=1;tsize=(new_tvar())})]))) @@
+                               (S_continue q1)) in
+      let s2 = let_plug_s (A_call(Runtime (External_fun("Int.le",Types.new_ty_unknown())),A_tuple[A_var y;a2])) @@ fun z ->
+                S_if(z,s3,Some k) in
+      w3,(SMap.add q1 s2 ts3),s1
+     
+  | E_parfor _ -> assert false (* already expanded *)
  
   | E_fun _ | E_fix _ -> 
      (* can occur in case of higher order function that does not use its argument,

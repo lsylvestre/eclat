@@ -374,7 +374,8 @@ let rec default_zero t =
       Printf.sprintf "(default_%s ())" x
   | TSize _ 
   | TSize_add _ 
-  | TSize_twice _ -> assert false (* already removed *)
+  | TSize_twice _
+  | TSize_pow _ -> assert false (* already removed *)
   | TVar _ -> 
        (** replace unknown by a dummy constant 
            of the given type unknown (no polymorphism). *)

@@ -23,6 +23,7 @@ let rec canon = function
   | TSize _ as t -> t
   | TSize_add(size,n) -> TSize_add(canon size,n)
   | TSize_twice(size) -> TSize_twice(canon size)
+  | TSize_pow(size) -> TSize_pow(canon size)
   | TAbstract(x,ns,ts) -> TAbstract(x,List.map canon ns,List.map canon ts)
   | TSig t -> TSig (canon t)
   | TRecord b_list -> TRecord (List.map (fun (x,t) -> x,canon t) b_list)
@@ -55,6 +56,7 @@ let rec size_ty =
     | TSize n -> n
     | TSize_add(sz,n) -> size_ty sz + n
     | TSize_twice(sz) -> 2 * size_ty sz
+    | TSize_pow(sz) -> 2 lsl (size_ty sz - 1) 
     | TAbstract(x,ns,tys) ->
         let prod_ns = List.fold_left ( * ) 1 (List.map size_ty ns) in
         let sum_ts = if tys = [] then 1 else List.fold_left (+) 0 (List.map size_ty tys) in
@@ -89,6 +91,7 @@ let rec string_of_ty = function
   | TSize n -> "size<"^string_of_int n^">"
   | TSize_add(sz,n) -> "("^string_of_ty sz^"+"^string_of_int n^")"
   | TSize_twice(sz) -> "(2*"^string_of_ty sz^")"
+  | TSize_pow(sz) -> "(2^"^string_of_ty sz^")"
   | TVector {elem ; size} -> string_of_ty elem ^ " vector<" ^ string_of_ty size ^ ">"
   | TStatic {elem ; size} -> string_of_ty elem ^ " static<" ^ string_of_ty size ^ ">"
   | TAbstract(x,ns,ts) ->  "("^(String.concat "," @@ List.map string_of_ty ts)^") " 
@@ -137,6 +140,8 @@ let rec unify t1 t2 =
       ) else (
         unify sz' (TSize_add(TSize_twice(sz2),1));
         unify sz (TSize_add(sz2,(n+1)/2)))
+  | TSize_pow(sz),TSize_pow(sz') -> unify sz sz'
+  | TSize_pow(sz),_ -> assert false (* todo *)
   | TBool,TBool -> ()
   | TUnit,TUnit -> ()
   | TTuple ts,TTuple ts' ->
@@ -228,7 +233,8 @@ let rec translate_tyB =
         Hashtbl.add hvar r t;
         t)
     | Sz_add(sz,n) -> TSize_add(translate_size sz,n) 
-    | Sz_twice(sz) -> TSize_twice(translate_size sz) 
+    | Sz_twice(sz) -> TSize_twice(translate_size sz)
+    | Sz_pow2(sz) -> TSize_pow(translate_size sz) 
     (* | _ -> assert false (* TSize 32 ? *)*)
 
 let rec translate_ty =
@@ -248,7 +254,7 @@ let rec translate_ty =
   (* | Types.T_static(t) -> translate_ty t
   *)
   | Ty_ref tyB -> translate_tyB tyB
-  | Ty_array(sz,tyB) -> TStatic{elem=translate_tyB tyB;size=translate_size sz}
+  | Ty_array(sz,tyB,_) -> TStatic{elem=translate_tyB tyB;size=translate_size sz}
   | Ty_signal(tyB) -> TSig(translate_tyB tyB)
   | Ty_trap _ -> assert false
   | Ty_fun _ -> assert false
@@ -290,7 +296,8 @@ let rec typing_op ~genv h t op =
               unify (translate_ty arg) t;
               translate_tyB ret
            | _ -> assert false)
-       | _ -> assert false)
+       | _ -> Prelude.Errors.raise_error ()
+                 ~msg:("unbound operator `"^x^"`. Hint: Stdlib should be required."))
   | Runtime p ->
       (match Operators.ty_op ~externals:Ast.(genv.operators) p with
        | Types.Ty_fun(arg,dur,ret) ->

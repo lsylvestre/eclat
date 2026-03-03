@@ -85,6 +85,8 @@
        "end",   END;
        "trap", TRAP;
        "exit",EXIT;
+       "by", BY;
+       "wcet", WCET
        (* "vect_of_tuple", VECT_OF_TUPLE*)
      ]
 

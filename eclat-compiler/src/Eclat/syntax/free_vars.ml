@@ -105,7 +105,11 @@ let fv ?(get_sig=true) ?(get_arrays=true) ?(xs=SMap.empty) e =
       else vs
   | E_par(es) ->
       fv_list xs es
-  | E_for(i,_,_,e,_) ->
+  | E_for(i,e1,e2,e3,_,_) ->
+      let vs = aux xs e1 ++ aux xs e2 in
+      let xs' = SMap.add i () @@ xs in
+      vs ++ aux xs' e3 
+  | E_parfor(i,_,_,e,_) ->
         (let xs' = SMap.add i () @@ xs in
         aux xs' e)
   | E_generate((p,_,e1),e2,_,_,_) ->
@@ -228,7 +232,11 @@ let fv_arrays ?(xs=SMap.empty) e =
       vs ++ fv_var xs x
   | E_par(es) ->
       fv_list xs es
-  | E_for(i,_,_,e,_) ->
+  | E_for(i,e1,e2,e3,_,_) ->
+      let vs = aux xs e1 ++ aux xs e2 in
+      let xs' = SMap.add i () @@ xs in
+      vs ++ aux xs' e3
+  | E_parfor(i,_,_,e,_) ->
       let xs' = SMap.add i () @@ xs in
       aux xs' e
   | E_generate((p,_,e1),e2,_,_,_) ->
