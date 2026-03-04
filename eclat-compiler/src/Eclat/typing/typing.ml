@@ -414,7 +414,10 @@ let rec unify_label ~loc l1 l2 =
   | Label_var {contents=Is l1},l2 ->
       unify_label ~loc l1 l2
   | Label_name x1, Label_name x2 ->
-      if x1 <> x2 then raise (CannotUnify(loc,[Label(l1,l2)]))
+      if !Prelude.Errors.no_warning && x1 <> x2 then 
+          Prelude.Errors.error ~loc (fun fmt ->
+            Format.fprintf fmt "loss of sharing in WCET analysis;\nthis may cause an underestimation of the execution time\n")
+      (* raise (CannotUnify(loc,[Label(l1,l2)])) *)
   
 
 (** unify actual type ty1 and expected type ty2;

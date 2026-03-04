@@ -145,9 +145,11 @@ let rec canon_dur = function
     | Dur_top,_ | _,Dur_top -> Dur_top
     | Dur_int n,Dur_int m -> Dur_int (max n m)
     | Dur_int 0,d | d,Dur_int 0 -> d
-    | Dur_var {contents=Unknown{id=n;name=_}},
-      Dur_var {contents=Unknown{id=m;name=_}} ->
-        if n = m then d1 else Dur_max(d1,d2)
+    | Dur_var {contents=Unknown{id=_n;name=_}},
+      Dur_var {contents=Unknown{id=_m;name=_}} ->
+        (** note: do not return [d1] (even if [_n = _m])
+            because of sharing in d1 **)
+        Dur_max(d1,d2)
     (*| _,Dur_max(d3,d4) -> Dur_max(Dur_max(d1,d3),d4)*) (** left associative **)
     | _ -> Dur_max(d1,d2))
 | Dur_xor(d1,d2) ->
@@ -1184,7 +1186,8 @@ let rec accesses = function
 let contains_label_variables d =
   let exception Find in
   let rec aux = function
-  | Dur_var {contents=Unknown _}
+  | Dur_var {contents=Unknown _} ->
+      raise Find (* conservative: this unknown may contain a label *)
   | Dur_int _ 
   | Dur_top -> ()
   | Dur_var {contents=Is d} -> aux d
