@@ -1043,8 +1043,8 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
                                     ~toplevel:false ~loc:(loc_of e2) g e2 in
                   unify_ty ~loc:(loc_of e1) ty1 (Ty_base (TyB_int (Sz_add(vsize,1))));
                   unify_ty ~loc:(loc_of e2) ty2 (Ty_base (TyB_int (Sz_add(vsize,1))));
-                  (match vsize with
-                   | Sz_lit n when n < 16 -> let sz = Sz_pow2(Sz_add(vsize,1)) in
+                  (match canon_size vsize with
+                   | Sz_lit n when n < 20 -> let sz = Sz_pow2(Sz_add(vsize,1)) in
                                              Dur_mulDiv(sz,Dur_add(d3,Dur_int 1),s)
                    | _ -> Dur_top)
                 | Some d -> d
