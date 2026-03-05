@@ -23,10 +23,6 @@ operator Print.print_value   : ~a => unit @impure ;;
 operator Print.print_string   : string => unit @impure ;;
 operator Print.print_ascii   : ~a => unit @impure ;;
 
-let print = Print.print_value ;;
-let print_string = Print.print_string ;;
-let print_ascii = Print.print_value ;;
-
 (*******************************)
 (************* int *************)
 (*******************************)
@@ -34,7 +30,6 @@ let print_ascii = Print.print_value ;;
 (* int<?n> *)
 
 operator Int.print : int<?n> => unit  @impure ;;
-let print_int = Int.print ;;
 
 operator Int.absv :    int<?n> => int<?n> ;;
 

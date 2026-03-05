@@ -126,6 +126,15 @@ let check_abstract_type ~loc x szs tyB_list =
   | Some(Abstract((_,szs',tyB_list',_),_)) ->
       check_when_present szs' tyB_list'
 
+
+  let special_operator_table = Prelude.hashtbl_of_list @@
+     [ "let"; "node"; "rec" ; "ref" ; "pause"; "abs"; "not"; "print";
+       "print_ascii"; "print_string" ; "print_newline"; "print_int";
+       "string_length"; "array_length"; "get"; "set"; "int"; 
+       "array_from_file" ]
+
+  
+
 %}
 
 %token LPAREN RPAREN LCUR RCUR LBRACKET RBRACKET COMMA PIPE_PIPE PIPE_COMMA_PIPE EQ EQ_EQ COL SEMI HAT STATIC
@@ -1035,24 +1044,16 @@ aexp_desc:
             | "get" -> mk @@ E_const Get (* let x = gensym () in let y = gensym () in
                        E_fun(P_tuple[P_var x;P_var y], (Types.new_ty_unknown(),Types.new_tyB_unknown()), 
                           mk @@ E_array_get((x,(with_file $loc)),mk @@ E_var y))*)
-            | "set" -> mk @@ E_const Set (*
-                let x = gensym () in
-                let idx = gensym () in
-                let y = gensym () in
-                E_fun(P_tuple[P_var x;P_var idx;P_var y], (Types.new_ty_unknown(),Types.new_tyB_unknown()),
-                   E_array_set((x,loc_x),(mk@@E_var idx),(mk@@E_var y)))
-            *)(* | "vect_size" -> E_const (Op(Runtime(Vector_length (Types.new_size_unknown()))))
-            | "vect_nth" -> E_const (Op(Runtime(Vector_get (Types.new_tyB_unknown()))))
-            | "vect_copy_with" -> E_const (Op(Runtime(Vector_update (Types.new_tyB_unknown(),Types.new_size_unknown()))))
-            *)
-
+            | "set" -> mk @@ E_const Set 
+            | "int" -> mk @@ E_const (Op(Int_of_size loc_x))
             | "array_from_file" -> let arr = gensym() in
                                    let name = gensym() in 
                                    E_fun(P_tuple[P_var arr;P_var name],(Types.new_ty_unknown(),Types.new_tyB_unknown()),
                                      mk@@E_array_from_file(arr,mk@@E_var name))
             | "_" -> Prelude.Errors.raise_error ~loc:(with_file $loc)
                          ~msg:"wildcard \"_\" not expected." ()
-            | _ -> E_var x }
+            | _ -> assert (not @@ Hashtbl.mem special_operator_table x);
+                   E_var x }
 
 | MATCH e=exp WITH
     PIPE? cases=match_case_const*
@@ -1065,9 +1066,12 @@ aexp_desc:
         E_match(e,List.rev hs,eo) }
 | FOR i=IDENT EQ e1=exp TO e2=exp sz=by_do e=exp DONE
       { match Ast_undecorated.remove_deco e2 with
-        | E_app(E_var "int", E_sig_get(n)) ->
-            E_for(i,e1,E_const (C_size(decl_size_var n)),e,sz, with_file $loc)
-        | _ -> E_for(i, e1,e2,e,sz, with_file $loc) (* let loop = gensym ~prefix:"loop" () in
+        | E_app(E_const(Op(Int_of_size loc_x)), E_sig_get(n)) ->
+            let mk e = mk_loc loc_x e in
+            E_for(i,e1,mk @@ E_app(mk @@ E_const(Op(Int_of_size loc_x)), 
+                                   mk @@ E_const(C_size(decl_size_var n))),e,sz, with_file $loc)
+        | _ -> E_for(i, e1,e2,e,sz, with_file $loc) 
+        (* let loop = gensym ~prefix:"loop" () in
         let n0 = gensym ~prefix:"n0" () in
         let n = gensym ~prefix:"n" () in
         E_letIn(P_var n0,Types.new_ty_unknown(), e1,
@@ -1126,7 +1130,13 @@ pat:
 apat:
 | LPAREN RPAREN { P_unit }
 | LPAREN p=pat RPAREN { p }
-| x=IDENT { P_var x }
+| x=IDENT { 
+    if Hashtbl.mem special_operator_table x then 
+          Prelude.Errors.error ~loc:(with_file @@ $loc)
+             (fun fmt -> Format.fprintf fmt 
+                            "special operator %s cannot be redefined" x);
+    P_var x 
+}
 | LPAREN p=apat COL ty=ty RPAREN { P_tyConstr(p,ty) }
 | LT_LT sz=size GT_GT            { P_tyConstr(P_var (Ast.gensym ()),Ty_size sz) }
 

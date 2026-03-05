@@ -117,3 +117,11 @@ let map_split4 f l =
   | [] -> (List.rev l1, List.rev l2, List.rev l3, List.rev l4)
   | x::xs -> let (x1,x2,x3,x4) = f x in aux (x1::l1) (x2::l2) (x3::l3) (x4::l4) xs
 in aux [] [] [] [] l
+
+let hashtbl_of_list_assoc l =
+    let h = Hashtbl.create (List.length l) in
+    List.iter (fun (k,v) -> Hashtbl.add h k v) l;
+    h
+
+let hashtbl_of_list l =
+  hashtbl_of_list_assoc @@ List.map (fun x -> (x,())) l

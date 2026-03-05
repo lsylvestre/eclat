@@ -1,16 +1,11 @@
 (* ./eclat -relax *)
 
-let f (x,y,z) =
-  [ set(x,0,42) || set(y,0,43) || set(z,0,44)  ] ;;
+type ~a matrix<?n,?size> = ~a array<?size> ;;
 
 
-let main () =
-   let x = create<5>() in
-   let y = create<5>() in
-   f (x,y,x) ;;
-
-(*
-   concurrent accesses to a same array are sequentialized:
-
-   val main : (unit -[2]-> unit) | 0 
-*)
+let reduce<<?n>>(f,(tab:~a array<?n>)) =
+  let s = ref 0 in
+  for i = 1 to int<<?n>> by 4 do
+    s := f(!s, get(tab,i-1))
+  done;
+  !s

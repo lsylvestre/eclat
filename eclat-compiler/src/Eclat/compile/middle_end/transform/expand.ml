@@ -18,6 +18,7 @@ let eval_size ~loc sz =
   let n = eval sz in
       (n,Types.new_size_unknown())
 
+
 let eval_static_exp_int ~loc ~statics e =
   let exception Cannot in 
   let rec eval e =
@@ -55,8 +56,10 @@ let eval_static_exp_int ~loc ~statics e =
 
 let rec expand ~statics e =
   match e with
-    | E_generate((p,(ty,tyB),e1),init,sz3,sz4,loc) ->
-        expand ~statics @@ (
+  | E_app(E_const(Op(Int_of_size loc)),E_const(C_size sz)) ->
+       E_const (Int(eval_size ~loc sz))
+  | E_generate((p,(ty,tyB),e1),init,sz3,sz4,loc) ->
+      expand ~statics @@ (
         Matching.matching @@ Anf.anf (
         has_changed := true;
         let (n0,w) = eval_size ~loc sz3 in
@@ -66,22 +69,7 @@ let rec expand ~statics e =
             E_letIn(p,Types.new_ty_unknown(),E_tuple[E_const (Int(i,w)); loop(i-1)],e1)
           else init
          in loop n))
-       (* let rec loop (i,acc) =
-          if i <= n then
-            E_letIn(p,Types.new_ty_unknown(),E_tuple[E_const (Int(i,w)); acc],
-                    loop(i+1,e1))
-          else let idx = gensym () in
-               let x = gensym () in
-               E_letIn(P_tuple[P_var idx;P_var x], ty, Pattern.pat2exp p, E_var x)
-         in loop (n0,init)))*)
-      | E_for(x,e1,e2,e3,sz,loc) ->
-         (* let e2' = match e2 with 
-                   | E_const(C_size sz) ->
-                       let (n,sz') = eval_size ~loc sz in
-                       E_const (Int(n,sz'))
-                   | _ -> e2 in
-          E_for(x,expand ~statics @@ e1,expand ~statics @@ e2',expand ~statics @@ e3,sz,loc)
-*)      
+  | E_for(x,e1,e2,e3,sz,loc) ->    
         let (c,w) = eval_size ~loc sz in
         expand ~statics @@
         let e2' = match e2 with 
@@ -100,11 +88,11 @@ let rec expand ~statics e =
         E_letIn(P_var n, Types.new_ty_unknown(), e2',
         E_letIn(P_var loop,Types.new_ty_unknown(),
                           E_fix(loop,(P_var i,(Types.new_ty_unknown(),Types.new_tyB_unknown()),
-                              E_if(E_app(E_const(Op(Runtime(External_fun("Int.gt",new_ty_unknown ())))),E_tuple[E_var i;e2']),
+                              E_if(E_app(E_const(Op(Runtime(External_fun("Int.gt",new_ty_unknown ())))),E_tuple[E_var i;E_var n]),
                                             E_const(Unit),
                               let e4 = E_letIn(P_var j,Types.new_ty_unknown(), 
                                                E_app(E_const(Op(Runtime(External_fun("Int.add",new_ty_unknown ())))),E_tuple[E_var i;E_var ii]),
-                                          E_if(E_app(E_const(Op(Runtime(External_fun("Int.gt",new_ty_unknown ())))),E_tuple[E_var j;e2']),
+                                          E_if(E_app(E_const(Op(Runtime(External_fun("Int.gt",new_ty_unknown ())))),E_tuple[E_var j;E_var n]),
                                             E_const(Unit),Ast_subst.subst_e x (E_var j) e3)) in
                               E_letIn(P_unit,Types.new_ty_unknown(), 
                                   E_parfor(ii,Sz_lit 0,Sz_lit(c-1),e4,loc),
@@ -126,31 +114,6 @@ let rec expand ~statics e =
                 E_par(es)),
                 E_const Unit)))
 
-  (*
-  | E_generate((p,e1),init,e_st3,loc) ->
-      has_changed := true;
-      let (n,w) = eval_static_exp_int ~loc ~statics e_st3 in
-      expand @@
-      let rec loop i =
-        if i < n then
-          E_letIn(p,E_tuple[E_const (Int(i,w)); loop(i+1)],e1)
-        else init
-       in loop 0
-
-  | E_for(x,e_st1,e_st2,e3,loc) ->
-      has_changed := true;
-      let (n,w) = eval_static_exp_int ~loc ~statics e_st1 in
-      let (m,w') = eval_static_exp_int ~loc ~statics e_st2 in
-      (* assert(w = w'); *)
-      expand @@
-      let ignore = gensym () in
-      E_letIn(P_var ignore,
-              (let es = List.init (m-n+1) (fun i -> 
-                 E_letIn(P_var x, E_const (Int(n+i,w)),e3)) in
-              E_par(es)),
-              E_const Unit)
-*)
-
   | E_vector_mapi(_is_par,(p,tyB,e1),e2,sz) ->
       expand ~statics @@ (
       has_changed := true;
@@ -170,7 +133,6 @@ let rec expand ~statics e =
                                   E_tuple[E_var y;ii]),
                               Ast_subst.subst_p_e p (E_tuple[ii;E_var z]) (Ast_rename.rename_e ~statics e1')),
             loop (x::xs) (i+1)) in loop [] 0)
-            (* Ast_pprint.pp_exp Format.std_formatter e0; *)
       | _ -> assert false (* todo error *)
       ))
 

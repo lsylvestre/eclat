@@ -109,12 +109,13 @@ let fv_type_in ?(s=Types.Vs.empty) e =
 
 (* instanciate type annotation in expression [e]
    while preserving sharing *)
-let instantiate_types_in_e e = (* todo: rename this function *)
+let instantiate_types_in_e e =
   let open Types in
   let vs = fv_type_in e in
   let unknowns = Hashtbl.create (Vs.cardinal vs) in
   (* Ast_pprint.pp_exp Format.std_formatter e; *)
-   Vs.iter (fun n _ -> Hashtbl.add unknowns n.id (new_unknown_generic ())) vs;
+   Vs.iter (fun {id;name} _ ->
+              Hashtbl.add unknowns id (new_unknown_generic ?name ())) vs;
   
   let rec ss_p = function
   | P_var _ | P_unit as p -> p
@@ -148,7 +149,7 @@ let instantiate_types_in_e e = (* todo: rename this function *)
                           Runtime(match prim with 
                           | External_fun (op,ty) -> External_fun(op,(rename_ty unknowns ty))
                           | _ -> prim)
-                        | op -> op)
+                       | op -> op)
         | Get | Set | Ref -> assert false
         in E_const (ss_const c)
     | E_parfor(x,sz1,sz2,e1,deco) -> 

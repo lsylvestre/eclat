@@ -2,13 +2,8 @@
   open Parser
   exception Eof
 
-  let hashtbl_of_list_assoc l =
-    let h = Hashtbl.create (List.length l) in
-    List.iter (fun (k,v) -> Hashtbl.add h k v) l;
-    h
-
   let keywords =
-    hashtbl_of_list_assoc @@
+    Prelude.hashtbl_of_list_assoc @@
      [ "let",   LET;
        "node",  NODE;
        "rec",   REC;

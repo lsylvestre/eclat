@@ -9,7 +9,7 @@ type l = string         (** location (i.e., pointer) [l] *)
 type c =                (** constant [c] *)
   | Unit                (** unit value [()] *)
   | Bool of bool        (** boolean [true | false] *)
-  | Int of int * size   (** integer literal [n] of given size *)
+  | Int of (int * size) (** integer literal [n] of given size *)
   | Char of char        (** char literal *)
   | String of string    (** string literal [s] *)
   | Op of op            (** primitive [op] *)
@@ -31,9 +31,9 @@ and op = (** primitives *)
             pos : int ;   (* indice of the projection to access *)
             arity : int   (* size (i.e. number of projections) of the tuple *)
          }
-       | Wait of int
        | TyConstr of ty   (** NB: type annotations are removed from expressions 
                                   after typing, before compiling *)
+       | Int_of_size of deco
 
 type p =                     (** pattern [p] *)
     P_unit                   (** constant unit [()] *)

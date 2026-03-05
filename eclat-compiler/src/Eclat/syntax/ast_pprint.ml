@@ -35,8 +35,6 @@ let pp_op (fmt:fmt) (op:op) : unit =
         fprintf fmt "[%a : %a]" Operators.pp_op p pp_ty ty
     | Runtime p ->
         Operators.pp_op fmt p
-    | Wait n ->
-        fprintf fmt "wait<%d>" n
     | GetTuple {pos=0;arity=2} ->
         pp_str "fst"
     | GetTuple {pos=1;arity=2} ->
@@ -45,6 +43,8 @@ let pp_op (fmt:fmt) (op:op) : unit =
         fprintf fmt "get_tuple<%d>" i
     | TyConstr ty ->
         fprintf fmt "(as_type %a)@,"  pp_ty ty
+    | Int_of_size _ ->
+        fprintf fmt "int"
 
 let pp_tuple (fmt:fmt) pp vs =
   fprintf fmt "(";

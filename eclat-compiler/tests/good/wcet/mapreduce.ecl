@@ -1,17 +1,17 @@
 let map<<?k>>(f,(src:~a array<?n+1>),(dst:~a array<?n+1>)) =
-  for i = 0 to int(?n) by ?k do
+  for i = 0 to length(src) - 1 by ?k do
     set(dst, i, f(get(src,i)))
   done ;;
 
 let reduce<<?k>>(f,(src:~a array<?n+1>),(v:~b)) : ~b =
   let acc = ref v in
-  for i = 0 to int(?n) by ?k do
+  for i = 0 to length(src) - 1 by ?k do
     acc := f(get(src,i),!acc)
   done;
   !acc ;;
 
 let wait <<?n+1>> = (* wait ?n+1 cycles *)
-  for i = 1 to int(?n) do () done ;;
+  for i = 1 to ??n do () done ;;
 
 let foo i =
   wait<<100>>; i+1;;
@@ -19,7 +19,7 @@ let foo i =
 let prog <<?n>> =
   let src = create<?n>() in
   let dst = create<?n>() in
-  for i = 1 to int(?n) do set(src,i-1,i) done;
+  for i = 1 to length(src) - 1 do set(src,i-1,i) done;
   map<<5>>(foo,src,dst);
   reduce<<2>>((+),dst,0);;
 

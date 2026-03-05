@@ -167,110 +167,50 @@ let unify_dur ~loc d1_0 d2_0 =
         (match d1,d2 with
          | Dur_int m,Dur_int n -> if m <= n then () else raise @@ CannotUnify(loc,[Dur(d1_0,d2_0)])
          | Dur_int 0,_ -> ()
+         | d,Dur_shared(_,dx) -> unify_d ~start d dx
          | Dur_int n,(Dur_add(Dur_int m,_)) when n <= m -> ()
          | Dur_int n,(Dur_add(_,Dur_int m)) when n <= m -> ()
-         (* | Dur_mul(dn,d1'), Dur_mul(dm,d2') when dn = dm -> unify_d d1' d2'*)
-         | _,_ -> 
+         | Dur_add(d1,Dur_int n), Dur_add(d2,Dur_int m) ->
+             if n = m then unify_d ~start d1 d2 else
+             if n < m then unify_d ~start (Dur_add(d1,Dur_int (m-n))) d2 else
+             unify_d ~start d1 (Dur_add(d2,Dur_int (n-m)))
+         | _,_ ->
             let po_to_be_proven () =
               Prelude.Errors.warning ~loc (fun fmt ->
                   Prelude.Errors.(emph bold fmt "(PO) you must prove: ");
                   Format.fprintf fmt "[%a <= %a]\n" pp_dur d1 pp_dur d2)
             in
-            if start then (
-                let f da db =
-                  try unify_d ~start:false da db with
-                  | _ -> Prelude.Errors.error ~loc (fun fmt ->
-                           Format.fprintf fmt "Expect %a <= %a.\nIt is not always true.\n" 
-                              pp_dur (rebase_duration d1) pp_dur (rebase_duration d2);
-                           Format.fprintf fmt "For example, %a > %a.\n" pp_dur da pp_dur db)
-                in 
-              let ok = Types.Check_durations.check f d1 d2 in
-              if ok then () else po_to_be_proven())
-            else (
-              po_to_be_proven()
-            )) 
+            let continue_check () =
+              if start then (
+                  let f da db =
+                    try unify_d ~start:false da db with
+                    | _ -> Prelude.Errors.error ~loc (fun fmt ->
+                             Format.fprintf fmt "Expect %a <= %a.\nIt is not always true.\n" 
+                                pp_dur (rebase_duration d1) pp_dur (rebase_duration d2);
+                             Format.fprintf fmt "For example, %a > %a.\n" pp_dur da pp_dur db)
+                  in 
+                let ok = Types.Check_durations.check f d1 d2 in
+                if ok then () else po_to_be_proven())
+              else (
+                po_to_be_proven()
+              )
+            in
+            (match copy_dur d1, copy_dur d2 with
+             | Dur_add(d1,d1'),Dur_add(d2,d2') ->
+                (try unify_d ~start d1 d2;
+                     unify_d ~start d1' d2'
+                 with CannotUnify _ | Prelude.Errors.Caml_error ->
+                    (try unify_d ~start d1 d2';
+                         unify_d ~start d1' d2
+                     with CannotUnify _ | Prelude.Errors.Caml_error -> continue_check ()))
+             | Dur_mulDiv(sz1,d1,sz1'),Dur_mulDiv(sz2,d2,sz2') ->
+               (try unify_size ~loc sz1 sz2;
+                    unify_size ~loc sz1' sz2';
+                    unify_d ~start d1 d2
+                with CannotUnify _ | Prelude.Errors.Caml_error -> continue_check ())
+             | _ -> continue_check ()))
   in
   unify_d ~start:true d1_0 d2_0
-(*
-  let warning_loss_of_precision d d' var =
-    Prelude.Errors.warning ~loc (fun fmt ->
-        Format.fprintf fmt "don't know how to unify durations %a and %a.\nVariable %a is set to 1 (this is safe, with loss of precision)\n"
-          pp_dur d pp_dur d' pp_dur (Dur_var var))
-  in
-  let warning_loss_of_precision' d d' =
-    Prelude.Errors.warning ~loc (fun fmt ->
-        Format.fprintf fmt "loss of precision: cannot unify %a with %a\n"
-          pp_dur d pp_dur d')
-  in
-  let d1,d2 = canon_dur d1, canon_dur d2 in
-    Format.fprintf Format.std_formatter "-- ====> %a | %a\n"  pp_dur  d1  pp_dur  d2;
-  flush stdout;
-  if d1 = d2 then () else
-  match d1,d2 with
-  | _,  let d1,d2 = canon_dur d1, canon_dur d2 in -> ()
-  | Dur_int m,Dur_int n -> if m > n then raise @@ CannotUnify(loc,[Dur(d1,d2)])
-  | d1,Dur_var {contents=Is d2}
-  | Dur_var {contents=Is d1},d2 ->
-      unify_dur ~loc d1 d2
-  | Dur_var ({contents=(Unknown{id=n;_})} as v),
-    Dur_var {contents=Unknown{id=m;_}} ->
-      if n = m then () else v := Is d2
-  | d1,Dur_var ({contents=Unknown{id=n;_}} as r2) ->
-      if test_occur (occur_dur n) d1 then raise (Cyclic_dur(n,d1,loc));
-      r2 := Is d1
-  | Dur_var ({contents=Unknown{id=n;_}} as r1),d2 ->
-      if test_occur (occur_dur n) d2 then raise (Cyclic_dur(n,d2,loc));
-      r1 := Is d2
-  | Dur_max(d1,d2),Dur_int 0
-  | Dur_int 0,Dur_max(d1,d2)
-  | Dur_xor(d1,d2),Dur_int 0
-  | Dur_int 0,Dur_xor(d1,d2)
-  | Dur_add(d1,d2),Dur_int 0
-  | Dur_int 0,Dur_add(d1,d2) ->
-      unify_dur ~loc d1 (Dur_int 0);
-      unify_dur ~loc d1 (Dur_int 0)
-  | Dur_add(d1,Dur_int n),Dur_int m
-  | Dur_int n,Dur_add(d1,Dur_int m) ->
-      if m < n then raise @@ CannotUnify(loc,[Dur(d1,d2)]) else
-      unify_dur ~loc d1 (Dur_int (m-n))
-  | Dur_add(Dur_int n,d1'),Dur_add(Dur_int m,d2') 
-  | Dur_add(Dur_int n,d1'),Dur_add(d2',Dur_int m) 
-  | Dur_add(d1',Dur_int n),Dur_add(d2',Dur_int m) 
-  | Dur_add(d1',Dur_int n),Dur_add(Dur_int m,d2') ->
-      if n = m then unify_dur ~loc d1' d2' else
-      if n < m then unify_dur ~loc d1' (Dur_add(Dur_int (m-n),d2')) else
-      unify_dur ~loc (Dur_add(Dur_int (n-m),d1')) d2'
-(*  | Dur_mul(Sz_lit n,d1),Dur_int 0 ->
-      if n = 0 then () else unify_dur ~loc d1 (Dur_int 0) *)
-  | Dur_mul(Sz_lit n,d1),Dur_int m ->
-      if m = 0 then 
-        (if n = 0 then () 
-         else unify_dur ~loc d1 (Dur_int 0)) else
-      if n = 0 then raise @@ CannotUnify(loc,[Dur(d1,d2)]) else
-      if m mod n == 0 then unify_dur ~loc d1 (Dur_int(m/n)) else
-      raise @@ CannotUnify(loc,[Dur(d1,d2)])
-  
-  | Dur_mul(Sz_lit m,d1'),Dur_mul(Sz_lit n,d2') ->
-      if m > n && m mod n = 0 
-      then (let k = m / n in 
-           let d = List.fold_left (fun acc _ -> Dur_add(d2',acc)) d2' (List.init (k-1) (fun i -> i)) in
-           unify_dur ~loc d1' d)
-      else if n < m && n mod m = 0
-           then (let k = n / m in
-                 let d = List.fold_left (fun acc _ -> Dur_add(d1',acc)) d1' (List.init (k-1) (fun i -> i)) 
-                 in unify_dur ~loc d d2') 
-           else raise @@ CannotUnify(loc,[Dur(d1,d2)])
-  | Dur_top,_ -> raise @@ CannotUnify(loc,[Dur(d1,d2)])
-  | _,Dur_int 0 ->
-      (match simpl_dur_wcet (rebase_dur2 d1) with
-       | Dur_int 0 -> ()
-       | d' ->  Format.fprintf Format.std_formatter "-- ====> %a\n"  pp_dur  d1; raise @@ CannotUnify(loc,[Dur(d',d2)]))
-  | _ -> Format.fprintf Format.std_formatter "|||-- ====> %a\n"  pp_dur  d1;
-      warning_loss_of_precision' d1 d2;
-      unify_dur ~loc Dur_top d1;
-      unify_dur ~loc Dur_top d2
-  *)
-
 
 let rec unify_tyB ~loc tyB1 tyB2 =
   let tyB1,tyB2 = canon_tyB tyB1, canon_tyB tyB2 in
@@ -580,9 +520,6 @@ let ty_op ~genv ~loc op =
     match op with
     | Runtime(p) ->
         Operators.ty_op ~externals:genv.operators p
-    | Wait n ->
-        let tyB = new_tyB_unknown () in
-        Ty_fun(Ty_base tyB,Dur_int 1,tyB)
     | TyConstr ty -> assert false 
         (* todo : put [(e:t)] in the expression language *)
     | GetTuple _ -> assert false (* {pos;arity} ->
@@ -593,6 +530,8 @@ let ty_op ~genv ~loc op =
       Ty_fun(Ty_tuple ty_list,
              Dur_zero,
              tyB) *)
+    | Int_of_size _ ->
+        Ty_fun(Ty_size (new_size_unknown ~name:"size" ()),Dur_int 0, TyB_int (new_size_unknown ~name:"int_size" ()))
   in
   let ty1 = new_ty_unknown () in
   let tyB2 = new_tyB_unknown () in
@@ -1018,34 +957,85 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
       unify_ty ~loc (Ty_array(new_size_unknown(),new_tyB_unknown(),Label_name l)) tyx; (* todo loc of x *)
       (Ty_base TyB_unit, Dur_int 1)
   | E_for(x,e1,e2,e3,s,loc) ->
-      let s0 = new_size_unknown ?name:(match s with
-                                       | Sz_var{contents=Unknown{name=Some x}} -> Some (x^"'")
-                                       | _ -> None) () in
-      unify_size ~loc s (Sz_add(s0,1));
       let vsize = new_size_unknown () in
+      let ty1,d1 = typ_exp ~collect_sig ~statics ~genv ~ctors
+                        ~toplevel:false ~loc:(loc_of e1) g e1 in
+      let ty2,d2 = typ_exp ~collect_sig ~statics ~genv ~ctors
+                        ~toplevel:false ~loc:(loc_of e2) g e2 in
+      unify_ty ~loc:(loc_of e1) ty1 (Ty_base (TyB_int (Sz_add(vsize,1))));
+      unify_ty ~loc:(loc_of e2) ty2 (Ty_base (TyB_int (Sz_add(vsize,1))));
       let g' = env_extend ~loc g (P_var x) (Ty_base (TyB_int (Sz_add(vsize,1)))) in
       let ty3,d3 = typ_exp ~collect_sig ~statics ~genv ~ctors
                             ~toplevel:false ~loc:(loc_of e3) g' e3 in
       unify_ty ~loc:(loc_of e3) ty3 (Ty_base TyB_unit);
-      let dopt = match un_deco e1, un_deco e2 with
-                 | E_const(Int(n,_)), E_const(Int(m,_)) ->
-                    let sz = Sz_lit (m-n+1) in
-                    let d = Dur_mulDiv(sz,Dur_add(d3,Dur_int 1),s) in
-                     (* Format.(fprintf std_formatter "---------->[%a]\n" pp_dur d); *)
-                    Some d
-                 | E_const(Int(n,_)), E_const(C_size sz1) ->
+      
+      let eval_static e =
+        let loc = loc_of e in
+        let exception Cannot_evaluate_size in
+        let rec aux e =
+          let add e1 e2 =
+            let sz1 = aux e1 in
+            let sz2 = aux e2 in
+            match sz2 with
+            | Sz_lit n -> Sz_add(sz1,n)
+            | _ -> raise Cannot_evaluate_size
+          in
+          let sub e1 e2 =
+            let sz1 = aux e1 in
+            let sz2 = aux e2 in
+            match sz2 with
+            | Sz_lit n ->
+                let sz1_minus_n = new_size_unknown() in
+                unify_size ~loc sz1 (Sz_add(sz1_minus_n,n));
+                sz1_minus_n
+            | _ -> raise Cannot_evaluate_size
+          in
+          let mul e1 e2 =
+            let sz1 = aux e1 in
+            let sz2 = aux e2 in
+            match sz1 with
+            | Sz_lit 0 -> sz1
+            | Sz_lit n -> let rec loop(n) = 
+                            if n = 1 then sz2 else
+                            if n mod 2 = 0 then Sz_twice(loop(n/2))
+                            else raise Cannot_evaluate_size
+                          in loop(n)
+            | _ -> raise Cannot_evaluate_size
+          in
+          match e with
+          | E_const(Int(n,_)) -> Sz_lit n
+          | E_app(E_const(Op(Int_of_size _)),E_const(C_size sz1)) -> sz1
+          | E_app(E_fun(p,_,e1),e') -> aux (Ast_subst.subst_p_e p e' e1)
+          | E_array_length(x,loc_c) ->
+               let tyx = typ_ident ~loc g x in
+               let size_array = new_size_unknown() in
+               unify_ty ~loc (Ty_array(size_array,new_tyB_unknown(),new_label_unknown())) tyx;
+               size_array
+          | E_app(E_const(Op(Runtime(External_fun("Int.add",_)))), E_tuple[e1;e2]) ->
+              (try add e1 e2 with Cannot_evaluate_size -> add e2 e1)
+          | E_app(E_const(Op(Runtime(External_fun("Int.sub",_)))), E_tuple[e1;e2]) ->
+              (try sub e1 e2 with Cannot_evaluate_size -> sub e2 e1)
+          | E_app(E_const(Op(Runtime(External_fun("Int.mul",_)))), E_tuple[e1;e2]) ->
+              (try mul e1 e2 with Cannot_evaluate_size -> mul e2 e1)
+          | _ -> raise Cannot_evaluate_size
+        in
+        try 
+          E_app(E_const(Op(Int_of_size loc)),E_const(C_size(canon_size @@ aux (Ast_undecorated.remove_deco e))))
+        with Cannot_evaluate_size -> e
+      in
+      let s0 = new_size_unknown ?name:(match s with
+                                       | Sz_var{contents=Unknown{name=Some x}} -> Some (x^"'")
+                                       | _ -> None) () in
+      unify_size ~loc s (Sz_add(s0,1));
+      let dopt = match eval_static e1, eval_static e2 with
+                 | E_app(E_const(Op(Int_of_size _)),E_const(C_size (Sz_lit n))), 
+                   E_app(E_const(Op(Int_of_size _)),E_const(C_size sz2)) ->
                     let sz = new_size_unknown () in
-                    unify_size ~loc (Sz_add(sz,n)) (Sz_add(sz1,1));
+                    unify_size ~loc (Sz_add(sz,n)) (Sz_add(sz2,1));
                     Some (Dur_mulDiv(sz,Dur_add(d3,Dur_int 1),s))
                  | _ -> None in
       let d' = match dopt with        
                | None ->
-                  let ty1,d1 = typ_exp ~collect_sig ~statics ~genv ~ctors
-                                    ~toplevel:false ~loc:(loc_of e1) g e1 in
-                  let ty2,d2 = typ_exp ~collect_sig ~statics ~genv ~ctors
-                                    ~toplevel:false ~loc:(loc_of e2) g e2 in
-                  unify_ty ~loc:(loc_of e1) ty1 (Ty_base (TyB_int (Sz_add(vsize,1))));
-                  unify_ty ~loc:(loc_of e2) ty2 (Ty_base (TyB_int (Sz_add(vsize,1))));
                   (match canon_size vsize with
                    | Sz_lit n when n < 20 -> let sz = Sz_pow2(Sz_add(vsize,1)) in
                                              Dur_mulDiv(sz,Dur_add(d3,Dur_int 1),s)
@@ -1053,7 +1043,8 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
                 | Some d -> d
       in
       Ty_base TyB_unit, Dur_add(Dur_int 1,d')
-  | E_parfor(x,_,_,e3,_) ->
+  | E_parfor(x,_,_,e3,_) -> 
+      (** variant of E_for with total unfolding and without initial pause **)
       let g' = env_extend ~loc g (P_var x) (Ty_base (TyB_int (new_size_unknown()))) in (* todo loc of pattern *)
       let (ty3,d3) = typ_exp ~collect_sig ~statics ~genv ~ctors
                              ~toplevel:false ~loc:(loc_of e3) g' e3 in (* todo *)

@@ -1,5 +1,5 @@
 let f <<?n>>(x,y) =
-  for i = 1 to int(?n) do
+  for i = 1 to int<<?n>> do
     pause();pause();print_int i
   done
 wcet (?n+?n+?n);;

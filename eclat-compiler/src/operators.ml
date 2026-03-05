@@ -9,7 +9,6 @@ type op =
   | Tuple_of_int of int (* macro converting tuple of booleans to int *)
   | Int_of_tuple of int (* macro converting int to tuple of booleans *)
   | Unroll of int (* experimental *)
-
   | External_fun of string * Types.ty
 
 let combinational ~externals p =

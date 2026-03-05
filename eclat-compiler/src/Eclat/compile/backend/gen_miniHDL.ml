@@ -163,8 +163,7 @@ let to_op = function
 | Ast.Runtime (External_fun(x,ty)) -> Runtime (External_fun(x,ty)) (* Types.new_ty_unknown())) *)
 | Ast.Runtime p -> Runtime p
 | Ast.GetTuple {pos=i;arity=n} -> GetTuple (i,n,new_tvar())
-| Ast.(Wait _) -> assert false
-
+| Ast.Int_of_size _ -> assert false
 
 
 let rec to_a ~genv (e:Ast.e) : a =

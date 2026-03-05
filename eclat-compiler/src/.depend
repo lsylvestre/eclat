@@ -560,12 +560,16 @@ src/Eclat/typing/typing.cmo : \
     src/Eclat/typing/types.cmo \
     src/prelude.cmo \
     src/operators.cmo \
+    src/Eclat/syntax/ast_undecorated.cmo \
+    src/Eclat/syntax/ast_subst.cmo \
     src/Eclat/syntax/ast_pprint.cmo \
     src/Eclat/syntax/ast.cmo
 src/Eclat/typing/typing.cmx : \
     src/Eclat/typing/types.cmx \
     src/prelude.cmx \
     src/operators.cmx \
+    src/Eclat/syntax/ast_undecorated.cmx \
+    src/Eclat/syntax/ast_subst.cmx \
     src/Eclat/syntax/ast_pprint.cmx \
     src/Eclat/syntax/ast.cmx
 src/main.cmo : \

@@ -213,10 +213,6 @@ let app_const e e2 r =
       | GetTuple{pos=i;arity=n}, E_const(C_tuple cs) ->
           check_bounds ~index:i ~size:n;
           E_const(List.nth cs i), r
-      | Wait 0,v ->
-          v, r
-      | Wait n,v ->
-          E_app(E_const(Op(Wait (n-1))),v), r
       | TyConstr _, v -> v, r
       | _ -> error_cannot_be_reduced (E_app(e,e2))
     end

@@ -115,13 +115,15 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ ~genv:_ _ _ -> ()))
                try
                  (let lexbuf = (Lexing.from_string l) in
                   caml_error_handler ~on_error:(fun _ ->
+                      (** given the declarations [ds],
+                          when parsing [ds'] new declarations,
+                          if one of the [ds'] is ill-typed, 
+                          the toplevel execution continue with [ds]. 
+
+                          note: because the Eclat typer relies on destructive unification,
+                          type error may be an effect on the remaining toplevel execution.
+                        **)
                       Format.print_flush ();
-                      let genv = {abstract_types=create_abstract_type_smap ();
-                                  statics=gs;
-                                  operators=smap_operators_of_list exts2;
-                                  externals=exts1;
-                                  sums=ts;
-                                  record_fields=SMap.empty} in
                       loop (i+1) (exts1,exts2) gs ts ds)
                   (fun () -> 
                      syntax_error_handler (fun lexbuf ->               

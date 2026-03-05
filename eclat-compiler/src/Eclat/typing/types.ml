@@ -945,6 +945,11 @@ let generalize ?(only_functions=true) r ty =
 let copy_ty ty =
   instance (generalize ~only_functions:false [] ty)
 
+let copy_dur d =
+  match canon_ty @@ copy_ty (Ty_fun(Ty_base TyB_unit,d,TyB_unit)) with
+  | Ty_fun(_,d',_) -> d'
+  | _ -> assert false
+
 let rebase scm = (* type variable renumbering from 1, 2, 3 ... *)
   let c = ref 0 in
   let new_unknown ?name () =
