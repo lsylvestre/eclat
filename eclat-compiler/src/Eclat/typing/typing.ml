@@ -1014,7 +1014,7 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
           | E_app(E_const(Op(Runtime(External_fun("Int.add",_)))), E_tuple[e1;e2]) ->
               (try add e1 e2 with Cannot_evaluate_size -> add e2 e1)
           | E_app(E_const(Op(Runtime(External_fun("Int.sub",_)))), E_tuple[e1;e2]) ->
-              (try sub e1 e2 with Cannot_evaluate_size -> sub e2 e1)
+              sub e1 e2
           | E_app(E_const(Op(Runtime(External_fun("Int.mul",_)))), E_tuple[e1;e2]) ->
               (try mul e1 e2 with Cannot_evaluate_size -> mul e2 e1)
           | _ -> raise Cannot_evaluate_size
