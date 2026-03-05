@@ -1349,10 +1349,12 @@ let typing ?collect_sig ?(env=SMap.empty) ?(msg="") ~statics ~genv e =
     canon_ty t, n) ()
 
 
-let when_repl statics ~genv : bool -> ((p * e) * Prelude.loc) -> unit =
-  let r = ref SMap.empty in
+let reset_repl, when_repl =
 
-  fun show_val ((p,e),loc) ->
+  let r = ref SMap.empty in (* the typing environment is updated at each call *)
+
+  (fun () -> r := SMap.empty),
+  (fun statics ~genv (show_val:bool) ((p,e),loc) ->
     typing_handler (fun () ->
         let env = !r in
         let (ty,d) = typing ~env ~statics ~genv e in
@@ -1374,7 +1376,7 @@ let when_repl statics ~genv : bool -> ((p * e) * Prelude.loc) -> unit =
                pp_dur (canon_dur d')
            ) xs;
            fprintf std_formatter "@]@."
-        )) ()
+        )) ())
 
 let get_vector_size_ref = ref true ;;
 

@@ -96,7 +96,6 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ ~genv:_ _ _ -> ()))
   in
   let (exts, gs, ts, ds) = 
          (if repl || List.length inputs < (if !no_stdlib_flag then 1 else 2) then
-            (* let () = List.iter (when_repl ([],[]) [] []) ds_from_files in *)
             (
              Printf.printf "=== eclat toploop ===.\nEnter phrases (separated by ';;') then compile (or run) with ``#q.''\n";
              flush stdout;
@@ -123,11 +122,10 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ ~genv:_ _ _ -> ()))
                                   externals=exts1;
                                   sums=ts;
                                   record_fields=SMap.empty} in
-                      let () = List.iter (when_repl gs ~genv false) ds in
                       loop (i+1) (exts1,exts2) gs ts ds)
                   (fun () -> 
-                       let (exts1',exts2'),gs',ts',ds' = syntax_error_handler (fun lexbuf ->
-                                                           Parser.pi Lexer.token lexbuf) lexbuf in
+                     syntax_error_handler (fun lexbuf ->               
+                       let (exts1',exts2'),gs',ts',ds' = Parser.pi Lexer.token lexbuf in
                        let exts1'' = exts1@exts1' in
                        let exts2'' = exts2@exts2' in
                        let gs'' = gs@gs' in
@@ -140,10 +138,8 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ ~genv:_ _ _ -> ()))
                                    externals=exts1'';
                                    sums=ts'';
                                    record_fields=SMap.empty} in
-                       let w = (when_repl gs'' ~genv) in
-                       List.iter (w false) ds;
-                       List.iter (w true) ds';
-                       loop (i+1) (exts1'', exts2'') gs'' ts'' ds'')
+                       List.iter (when_repl gs'' ~genv true) ds';
+                       loop (i+1) (exts1'', exts2'') gs'' ts'' ds'') lexbuf)
                   ())
                 with End_of_file -> (exts1,exts2),gs,ts,ds
              in
