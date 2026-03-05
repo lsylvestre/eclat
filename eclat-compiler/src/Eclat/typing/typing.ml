@@ -1004,6 +1004,11 @@ let rec typ_exp ?(collect_sig=false) ~statics ~genv ~ctors ?(toplevel=false) ~lo
           in
           match e with
           | E_const(Int(n,_)) -> Sz_lit n
+          | E_app(E_const(Op(Int_of_size _)),E_var z) ->
+              let tyx = typ_ident ~loc g z in
+              let sz = new_size_unknown() in
+               unify_ty ~loc (Ty_size(sz)) tyx;
+               sz
           | E_app(E_const(Op(Int_of_size _)),E_const(C_size sz1)) -> sz1
           | E_app(E_fun(p,_,e1),e') -> aux (Ast_subst.subst_p_e p e' e1)
           | E_array_length(x,loc_c) ->
