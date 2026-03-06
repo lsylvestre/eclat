@@ -292,9 +292,6 @@ decl_all:
     (let p',e = eqs in
         P_var f, E_fun(p,(Types.new_ty_unknown(),Types.new_tyB_unknown()),
      E_letIn(p',Types.new_ty_unknown(),e,Pattern.pat2exp p2))),(with_file $loc) }
-/*| NODE b=fun_decl(SEMI_SEMI)
-        { enforce_node b,(with_file $loc) }
-*/
 | e=exp SEMI_SEMI { ((P_var "_", e),(with_file $loc))  }
 
 after_missing_semi_semi:
@@ -396,16 +393,6 @@ fun_decl(In_kw):
                                 | Some ty -> P_tyConstr(p,ty),ty
                       ) p_ty_opt_list in
     let p_ty_opt = group_ps ps, Some (group_ts ts) in
-(*  let p_ty_opt = 
-    match szs,p_ty_opt with
-    | [],p_ty_opt -> p_ty_opt
-    | szs,(p,ty_opt) ->
-        let ps = List.map (fun _ -> P_var(Ast.gensym ())) szs in
-        (P_tuple(ps@[p]), 
-          Some (Ty_tuple(List.map (fun sz -> Ty_size sz) szs @ 
-                        [match ty_opt with
-                         | None -> new_ty_unknown ()
-                         | Some ty -> ty]))) in *)
     let ef = mk_let_fun ~loc:(with_file ($startpos(f),$endpos(e1)))
                                ~p_ty_opt ~ty_opt_ret e1 in
     (P_var f, match wo with 
@@ -728,16 +715,9 @@ lexp_desc:
 | LET b=after_let(IN) e2=exp
         { let (p,e1) = b in
           E_letIn(p,Types.new_ty_unknown(),e1,e2) }
-(*| NODE b=fun_decl(IN) e2=exp 
-    /* variant of LET enforcing the defined function to be instantaneous */
-        { let (p,e1) = enforce_node b in
-          E_letIn(p,e1,e2) }*)
 | LPAREN e1=lexp PIPE_PIPE 
          es=separated_nonempty_list(PIPE_PIPE,lexp) 
   RPAREN
-/*| LPAREN e1=lexp PIPE_COMMA_PIPE 
-         es=separated_nonempty_list(PIPE_COMMA_PIPE,lexp)
-  RPAREN*/
         {
             E_par(e1::es)
         }

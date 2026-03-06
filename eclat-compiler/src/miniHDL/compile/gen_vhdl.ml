@@ -259,7 +259,7 @@ let declare_variable ~argument ~statics typing_env fmt =
 
 
 (* code generator for the whole design *)
-let pp_component fmt ~vhdl_comment ~name ~genv ~state_var ~argument ~result ~idle ~rdy ~statics typing_env infos (ts,s) =
+let pp_component fmt ~registers ~vhdl_comment ~name ~genv ~state_var ~argument ~result ~idle ~rdy ~statics typing_env infos (ts,s) =
    
   let arty = List.fold_left (fun arty (_,g) ->
       match g with
@@ -363,9 +363,6 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
 
   List.iter (print_external fmt) Ast.(genv.externals);
 
-
-
-
   let variables = List.filter (fun (x,t) -> 
           (match t with TSig _ -> false | _ -> true) &&
           x <> argument && not (List.mem_assoc x statics) 
@@ -377,21 +374,12 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
   let others = List.of_seq (Hashtbl.to_seq typing_env) |> 
                List.filter (fun (x,t) -> (match t with TSig _ -> true | _ -> false)) in
 
-  declare_signals others variables fmt;
+  let variables_registers, variables_not_registers = 
+    List.partition (fun (x,_) -> Ast.SMap.mem x registers) variables in
 
-  let variables = List.filter (fun (x,t) -> 
-          (match t with TSig _ -> false | _ -> true) &&
-          x <> argument && not (List.mem_assoc x statics) 
-          && not (List.mem_assoc x Ast.(genv.externals))
-          && not (Ast.SMap.mem x Ast.(genv.operators))
-  )
-    @@ List.of_seq (Hashtbl.to_seq typing_env) in
-
-
-
+  declare_signals others variables_registers fmt;
 
   fprintf fmt "@,@[<v 2>begin@,";
-
 
   (* instantiate externals *)
   List.iter (instantiate_external fmt) Ast.(genv.externals);
@@ -436,7 +424,7 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
       fprintf fmt "%a <= %s;" pp_ident (x^"%now") (default_zero t);
     in
     pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "@,")
-       pp fmt variables
+       pp fmt variables_registers
   end;
      
   fprintf fmt "@,%a <= %a;" 
@@ -458,7 +446,7 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
          pp_ident (x^"%next")
     in
     pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "@,")
-       update fmt variables;
+       update fmt variables_registers;
   end;
 
   begin
@@ -502,7 +490,7 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
       fprintf fmt ", %a" pp_ident ("$"^x^"_write%pre")
   ) statics;
 
-  List.iter (fun (x,_) -> fprintf fmt ", %a" pp_ident (x^"%now")) variables;
+  List.iter (fun (x,_) -> fprintf fmt ", %a" pp_ident (x^"%now")) variables_registers;
 
   List.iter (fun (x,_) -> fprintf fmt ", %a" pp_ident x) others;
 
@@ -569,7 +557,7 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
 
   List.iter (fun (x,_) ->
      fprintf fmt "%a := %a;@," pp_ident x pp_ident (x^"%now");
-  ) variables;
+  ) variables_registers;
   
   fprintf fmt "%a := %a;@," pp_ident state_var pp_ident (state_var^"%now");
 
@@ -607,7 +595,7 @@ architecture rtl of %a is@,@[<v 2>@," pp_ident name;
 
   List.iter (fun (x,_) ->
      fprintf fmt "%a <= %a;@," pp_ident (x^"%next") pp_ident x;
-  ) variables;
+  ) variables_registers;
 
   fprintf fmt "@,@,result <= %a;@," pp_ident result;
   (* fprintf fmt "rdy <= %a;@," pp_ident rdy; *)

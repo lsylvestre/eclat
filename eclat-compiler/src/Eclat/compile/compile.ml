@@ -58,12 +58,10 @@ let compile ?(vhdl_comment="") ?(prop_fsm=true) arg_list name ty fmt pi =
   (* let fsm = Remove_assigned_but_not_read_vars.clean_fsm ~rdy ~result fsm _typing_env in *)
   let typing_env = MiniHDL_typing.typing_circuit ~statics ~genv:pi.genv ty (rdy,result,fsm) in
 
-  Collect_state_variables.collect_main fsm;
-  
-  ignore(MiniHDL_causality.check fsm);
+  let war = War_collection.collect_main ~rdy ~result fsm in
 
   let (argument,result) = 
-      Gen_vhdl.pp_component fmt ~vhdl_comment ~name 
+      Gen_vhdl.pp_component fmt ~registers:war ~vhdl_comment ~name 
                                   ~genv:pi.genv ~state_var
                                 ~argument ~result ~idle ~rdy ~statics 
                                 typing_env (let infos = SMap.empty in infos) fsm

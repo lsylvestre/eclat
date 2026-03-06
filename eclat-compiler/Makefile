@@ -79,7 +79,6 @@ OBJS= $(SRC_DIR)/prelude.cmx \
       $(SRC_DIR)/miniHDL/miniHDL_syntax.cmx \
       $(SRC_DIR)/Eclat/compile/inspect/display_target.cmx \
       $(SRC_DIR)/miniHDL/miniHDL_typing.cmx \
-      $(SRC_DIR)/miniHDL/miniHDL_causality.cmx \
       $(SRC_DIR)/Eclat/compile/backend/gen_miniHDL.cmx \
       $(SRC_DIR)/miniHDL/count_externals.cmx \
       \
@@ -88,7 +87,7 @@ OBJS= $(SRC_DIR)/prelude.cmx \
       \
       $(SRC_DIR)/miniHDL/optim/miniHDL_propagation.cmx \
       $(SRC_DIR)/miniHDL/optim/remove_assigned_but_not_read_vars.cmx \
-      $(SRC_DIR)/miniHDL/optim/collect_state_variables.cmx \
+      $(SRC_DIR)/miniHDL/optim/war_collection.cmx \
       \
       $(SRC_DIR)/miniHDL/compile/gen_vhdl_aux.cmx \
       $(SRC_DIR)/miniHDL/compile/gen_vhdl.cmx \

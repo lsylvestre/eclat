@@ -29,12 +29,12 @@ src/Eclat/compile/backend/gen_miniHDL.cmx : \
 src/Eclat/compile/backend/naming_convention.cmo :
 src/Eclat/compile/backend/naming_convention.cmx :
 src/Eclat/compile/compile.cmo : \
+    src/miniHDL/optim/war_collection.cmo \
     src/Eclat/typing/typing.cmo \
     src/Eclat/compile/middle_end/rename_main_arg.cmo \
     src/miniHDL/miniHDL_typing.cmo \
     src/miniHDL/miniHDL_syntax.cmo \
     src/miniHDL/optim/miniHDL_propagation.cmo \
-    src/miniHDL/miniHDL_causality.cmo \
     src/Eclat/compile/middle_end/middle_end.cmo \
     src/miniHDL/compile/list_machines.cmo \
     src/Eclat/compile/middle_end/transform/inline.cmo \
@@ -45,15 +45,14 @@ src/Eclat/compile/compile.cmo : \
     src/Eclat/compile/inspect/display_target.cmo \
     src/Eclat/compile/inspect/display_internal_steps.cmo \
     src/miniHDL/count_externals.cmo \
-    src/miniHDL/optim/collect_state_variables.cmo \
     src/Eclat/syntax/ast.cmo
 src/Eclat/compile/compile.cmx : \
+    src/miniHDL/optim/war_collection.cmx \
     src/Eclat/typing/typing.cmx \
     src/Eclat/compile/middle_end/rename_main_arg.cmx \
     src/miniHDL/miniHDL_typing.cmx \
     src/miniHDL/miniHDL_syntax.cmx \
     src/miniHDL/optim/miniHDL_propagation.cmx \
-    src/miniHDL/miniHDL_causality.cmx \
     src/Eclat/compile/middle_end/middle_end.cmx \
     src/miniHDL/compile/list_machines.cmx \
     src/Eclat/compile/middle_end/transform/inline.cmx \
@@ -64,7 +63,6 @@ src/Eclat/compile/compile.cmx : \
     src/Eclat/compile/inspect/display_target.cmx \
     src/Eclat/compile/inspect/display_internal_steps.cmx \
     src/miniHDL/count_externals.cmx \
-    src/miniHDL/optim/collect_state_variables.cmx \
     src/Eclat/syntax/ast.cmx
 src/Eclat/compile/inspect/display_internal_steps.cmo : \
     src/Eclat/syntax/ast_pprint.cmo
@@ -678,12 +676,6 @@ src/miniHDL/count_externals.cmo : \
     src/miniHDL/miniHDL_syntax.cmo
 src/miniHDL/count_externals.cmx : \
     src/miniHDL/miniHDL_syntax.cmx
-src/miniHDL/miniHDL_causality.cmo : \
-    src/miniHDL/miniHDL_syntax.cmo \
-    src/Eclat/syntax/ast.cmo
-src/miniHDL/miniHDL_causality.cmx : \
-    src/miniHDL/miniHDL_syntax.cmx \
-    src/Eclat/syntax/ast.cmx
 src/miniHDL/miniHDL_syntax.cmo : \
     src/prelude.cmo \
     src/operators.cmo \
@@ -708,8 +700,6 @@ src/miniHDL/miniHDL_typing.cmx : \
     src/miniHDL/miniHDL_syntax.cmx \
     src/Eclat/frontend/fix_int_lit_size.cmx \
     src/Eclat/syntax/ast.cmx
-src/miniHDL/optim/collect_state_variables.cmo :
-src/miniHDL/optim/collect_state_variables.cmx :
 src/miniHDL/optim/miniHDL_propagation.cmo : \
     src/miniHDL/miniHDL_syntax.cmo \
     src/Eclat/syntax/ast.cmo
@@ -720,6 +710,14 @@ src/miniHDL/optim/remove_assigned_but_not_read_vars.cmo : \
     src/miniHDL/miniHDL_syntax.cmo
 src/miniHDL/optim/remove_assigned_but_not_read_vars.cmx : \
     src/miniHDL/miniHDL_syntax.cmx
+src/miniHDL/optim/war_collection.cmo : \
+    src/miniHDL/miniHDL_typing.cmo \
+    src/miniHDL/miniHDL_syntax.cmo \
+    src/Eclat/syntax/ast.cmo
+src/miniHDL/optim/war_collection.cmx : \
+    src/miniHDL/miniHDL_typing.cmx \
+    src/miniHDL/miniHDL_syntax.cmx \
+    src/Eclat/syntax/ast.cmx
 src/miniHDL/simul/gen_ocaml.cmo : \
     src/Eclat/typing/types.cmo \
     src/prelude.cmo \
