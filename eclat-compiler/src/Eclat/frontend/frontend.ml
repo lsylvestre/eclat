@@ -145,11 +145,18 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ ~genv:_ _ _ -> ()))
                   ())
                 with End_of_file -> (exts1,exts2),gs,ts,ds
              in
+             let genv = {abstract_types=create_abstract_type_smap ();
+                         statics=List.rev @@ gs_from_files;
+                         operators=smap_operators_of_list (snd exts_from_files);
+                         externals=(fst exts_from_files);
+                         sums=List.rev @@ ts_from_files;
+                         record_fields=SMap.empty } in
+             List.iter (when_repl genv.statics ~genv false) ds_from_files;
              loop 1
-                  ((fun (ext1,ext2) -> List.rev ext1, List.rev ext2) exts_from_files)
-                  (List.rev @@ gs_from_files) 
-                  (List.rev @@ ts_from_files) 
-                  (ds_from_files))
+                  exts_from_files
+                  genv.statics
+                  genv.sums
+                  ds_from_files)
         else exts_from_files,gs_from_files,ts_from_files,ds_from_files) in
 
   let values_list =
