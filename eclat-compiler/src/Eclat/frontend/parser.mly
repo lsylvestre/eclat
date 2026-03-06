@@ -519,25 +519,29 @@ apty0:
         let open Prelude.Errors in 
         error ~loc:(with_file $loc) (fun fmt ->
           let open Format in
-          let b = List.compare_length_with tys 1 = 0 in
-          fprintf fmt "type int does not expect type parameter%s\n"
-              (if b then "" else "s");
-          emph_pp blue (fun fmt () -> 
-              if b then () else fprintf fmt "(";
-              pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt ", ") Types.pp_ty fmt tys;
-              if b then () else fprintf fmt ")") fmt ()
+          fprintf fmt "type `int` does not expect type parameters\n"
         )
+    | "ref" ->
+       (let open Prelude.Errors in
+        match tys,szs with
+        | [ty],[] -> Ty_ref(Types.as_tyB ~loc:(with_file $loc) ty)
+        | _,[] ->
+            Prelude.Errors.raise_error ~loc:(with_file $loc)
+              ~msg:"type `ref` expects one type parameter" ();
+        | _ ->
+            Prelude.Errors.raise_error ~loc:(with_file $loc)
+              ~msg:"type `ref` does not expect size parameters" ())
     | "array" ->
-       (let open Prelude.Errors in 
+       (let open Prelude.Errors in
         match tys,szs with
         | [ty],[sz] ->
             Ty_array(sz,Types.as_tyB ~loc:(with_file $loc) ty, new_label_unknown())
         | _,[_] ->
             Prelude.Errors.raise_error ~loc:(with_file $loc)
-              ~msg:"type array expects one type parameter" ();
+              ~msg:"type `array` expects one type parameter" ();
         | _ ->
             Prelude.Errors.raise_error ~loc:(with_file $loc)
-              ~msg:"type array expects one type parameter" ())
+              ~msg:"type `array` expects one size parameter" ())
     | _ ->
         make_x_ty x 
   }

@@ -4,7 +4,7 @@ let size_limit = 1 lsl nb_bits_limit ;;
 
 let err_size_overflow () =
   Prelude.Errors.error (fun fmt ->
-        Format.fprintf fmt "The program try to create a very huge data structure (more than 2^%d bits).\nThis is not representable in the generated code.\n" 
+        Format.fprintf fmt "The program try to create a very huge value (more than 2^%d bits).\nThis is not representable in the generated code.\n" 
             nb_bits_limit) 
 
 module Size_op = struct
