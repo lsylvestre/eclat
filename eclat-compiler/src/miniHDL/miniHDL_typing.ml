@@ -28,6 +28,8 @@ let rec canon = function
   | TSig t -> TSig (canon t)
   | TRecord b_list -> TRecord (List.map (fun (x,t) -> x,canon t) b_list)
 
+open Size_limits
+
 (** [size_ty t] returns the size (in number of bytes) of type [t]
   Unspecified size are fixe to 32 bits by default
   (customizable via argument [?when_tvar]) *)
@@ -39,7 +41,7 @@ let rec size_ty =
     | TInt n -> size_ty n
     | TBool -> 1
     | TUnit -> 1
-    | TTuple ts -> List.fold_left (+) 0 (List.map size_ty ts)
+    | TTuple ts -> List.fold_left (Size_op.add) 0 (List.map size_ty ts)
     | TVar{contents=T t} -> size_ty t
     | TVar{contents=V n} ->
           let open Prelude.Errors in
@@ -50,34 +52,34 @@ let rec size_ty =
                  Format.fprintf fmt "Unknown value size in the generated code replaced by %d-bit default size.\n" when_tvar)
             ));
           when_tvar
-    | TString tz -> (size_ty tz * 8)
-    | TStatic{elem;size} | TVector{elem;size} -> size_ty elem * size_ty size
+    | TString tz -> (Size_op.mul (size_ty tz) 8)
+    | TStatic{elem;size} | TVector{elem;size} -> Size_op.mul (size_ty elem) (size_ty size)
     | TVect n -> n
     | TSize n -> n
-    | TSize_add(sz,n) -> size_ty sz + n
+    | TSize_add(sz,n) -> Size_op.add (size_ty sz) n
     | TSize_twice(sz) -> 2 * size_ty sz
-    | TSize_pow(sz) -> 2 lsl (size_ty sz - 1) 
+    | TSize_pow(sz) -> Size_op.pow 2 (size_ty sz) 
     | TAbstract(x,ns,tys) ->
-        let prod_ns = List.fold_left ( * ) 1 (List.map size_ty ns) in
-        let sum_ts = if tys = [] then 1 else List.fold_left (+) 0 (List.map size_ty tys) in
+        let prod_ns = List.fold_left (Size_op.mul) 1 (List.map size_ty ns) in
+        let sum_ts = if tys = [] then 1 else List.fold_left Size_op.add 0 (List.map size_ty tys) in
         (match Hashtbl.find_opt Types.global_type_declarations x with
         | None ->
-            let k = prod_ns * sum_ts in
+            let k = Size_op.mul prod_ns sum_ts in
             if List.length tys > 1 then   
               Prelude.Errors.warning (fun fmt -> 
                 Format.fprintf fmt "unknown size for type %s is replaced by %d\n" x k
               );
             k
-        | Some (Types.Abstract(("only_size_sum",_,_,_),_)) -> List.fold_left (+) 0 (List.map size_ty ns)
-        | Some (Types.Abstract(("mul",_,_,_),_)) -> prod_ns * sum_ts
+        | Some (Types.Abstract(("only_size_sum",_,_,_),_)) -> List.fold_left (Size_op.add) 0 (List.map size_ty ns)
+        | Some (Types.Abstract(("mul",_,_,_),_)) -> Size_op.mul prod_ns sum_ts
         | Some (Types.Abstract(("only_size",_,_,_),_)) -> prod_ns
         | Some (Types.Abstract((degit,_,_,_),_)) -> 
                                 if ns=[] && tys=[] (* todo: better distinguish both *)
                                 then int_of_string degit else
-                                int_of_string degit * (List.fold_left (+) 0 (List.map size_ty ns))
+                                Size_op.mul (int_of_string degit) (List.fold_left (Size_op.add) 0 (List.map size_ty ns))
         | Some (Types.Alias _) -> assert false (* should not happen *))
    | TSig t -> size_ty t
-   | TRecord b_list -> List.fold_left (fun acc (_,t) -> acc + size_ty t) 0 b_list
+   | TRecord b_list -> List.fold_left (fun acc (_,t) -> Size_op.add acc (size_ty t)) 0 b_list
 
 let rec string_of_ty = function
   | TInt tz -> "int<"^string_of_ty tz^">"
@@ -117,11 +119,16 @@ let rec unify t1 t2 =
       unify tz1 tz2
   | TVect n, TVect m
   | TSize n, TSize m -> if n <> m then cannot_unify t1 t2
-  | TSize_add(sz,n), TSize_add(sz',m) ->
-      if n <> m then cannot_unify t1 t2;
-      unify sz sz'
-  | TSize_twice sz, TSize_twice sz' ->
-      unify sz sz'
+  (* ************************ *)
+  (** NB: must implement the same rules than in typing.ml *)
+  | TSize_add(sz,n), TSize_add(sz',n') ->
+      if n <= n' then
+        let m = n'-n in
+        if m = 0 then unify sz sz' else
+        unify sz (TSize_add(sz',m))
+      else
+        let m = n-n' in
+        unify (TSize_add(sz,m)) sz'
   | TSize n, TSize_add(sz,m)
   | TSize_add(sz,m), TSize n -> 
       let k = n-m in
@@ -131,6 +138,8 @@ let rec unify t1 t2 =
       if n mod 2 = 0 then
         unify (TSize (n/2)) sz
       else cannot_unify t1 t2
+  | TSize_twice sz, TSize_twice sz' ->
+      unify sz sz'
   | TSize_twice(sz), TSize_add(sz',n)
   | TSize_add(sz',n), TSize_twice(sz) ->
       let sz2 = new_tvar() in
@@ -139,9 +148,27 @@ let rec unify t1 t2 =
         unify sz (TSize_add(sz2,n/2))
       ) else (
         unify sz' (TSize_add(TSize_twice(sz2),1));
-        unify sz (TSize_add(sz2,(n+1)/2)))
-  | TSize_pow(sz),TSize_pow(sz') -> unify sz sz'
-  | TSize_pow(sz),_ -> assert false (* todo *)
+        unify sz (TSize_add(sz2,(Size_limits.Size_op.add n 1)/2)))
+  | TSize_pow(sz), TSize n ->
+      let k = int_of_float (Float.log2 (float n)) in
+      if (1 lsl k) == n then unify sz (TSize k)
+    else cannot_unify t1 t2
+  | TSize_pow(sz), TSize_pow(sz') ->
+      unify sz sz'
+  | TSize_twice(sz'), TSize_pow(sz)
+  | TSize_pow(sz), TSize_twice(sz') -> 
+      let sz2 = new_tvar() in
+      unify (TSize_add(sz2,1)) sz;
+      unify (TSize_pow(sz2)) sz'
+  | TSize_add(sz',n),TSize_pow(sz)
+  | TSize_pow(sz), TSize_add(sz',n) ->
+      if n = 0 then unify (TSize_pow(sz)) sz' else
+      if n mod 2 == 0 then (
+        let sz2 = new_tvar() in
+        unify (TSize_twice(sz2)) sz';
+        unify (TSize_pow(sz)) (TSize_twice (TSize_add(sz2,n/2))))
+      else (unify (TSize_add(TSize_pow(sz),-1)) (TSize_add(sz',n-1)))
+  (* ************************ *)
   | TBool,TBool -> ()
   | TUnit,TUnit -> ()
   | TTuple ts,TTuple ts' ->

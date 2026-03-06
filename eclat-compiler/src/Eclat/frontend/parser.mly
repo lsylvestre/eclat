@@ -494,6 +494,13 @@ apty0:
     | [t] -> t
     | _ -> assert false (* todo: err *) 
   }
+| tys=ty_list SIGNAL {
+    match tys with
+    | [ty] -> Ty_signal (Types.as_tyB ~loc:(with_file $loc) ty) 
+    | _ ->
+        Prelude.Errors.error ~loc:(with_file $loc) (fun fmt ->
+          Format.fprintf fmt "type constructor signal expect one basic type parameter\n")
+  }
 | tys=ty_list x=IDENT szs=size_list {
     let x = rename_from_defined_type x in
     let make_x_ty x =
@@ -613,6 +620,11 @@ size:
      if n = 2 then Sz_twice(sz) 
      else Prelude.Errors.raise_error ~loc:(with_file $loc)
             ~msg:"unsupported size multiplication: only multiplication by two is currently supported.@," ()
+  }
+| n=INT_LIT HAT sz=size { 
+     if n = 2 then Sz_pow2(sz) 
+     else Prelude.Errors.raise_error ~loc:(with_file $loc)
+            ~msg:"unsupported size exponentiation: only `2 to the power of a size` is currently supported.@," ()
   }
 
 size_unknown:

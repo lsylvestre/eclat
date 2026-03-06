@@ -7,8 +7,8 @@ let eval_size ~loc sz =
   let rec eval sz =
     match Types.canon_size sz with
     | Types.Sz_lit n -> n
-    | Types.Sz_add(sz',n) -> eval sz' + n
-    | Types.Sz_twice(sz') -> eval sz' * 2
+    | Types.Sz_add(sz',n) -> Size_limits.Size_op.add (eval sz') n
+    | Types.Sz_twice(sz') -> Size_limits.Size_op.mul 2 (eval sz')
     | _ -> let open Prelude.Errors in
            error ~loc (fun fmt ->
            Format.fprintf fmt
@@ -35,10 +35,10 @@ let eval_static_exp_int ~loc ~statics e =
           (f v1 v2, size)
         in
         (match op,e with 
-         | "Int.add",E_tuple [e1;e2] -> app_binop((+),e1,e2)
-         | "Int.sub",E_tuple [e1;e2] -> app_binop((-),e1,e2)
-         | "Int.mul",E_tuple [e1;e2] -> app_binop(( * ),e1,e2)
-         | "Int.div",E_tuple [e1;e2] -> app_binop((/),e1,e2)
+         | "Int.add",E_tuple [e1;e2] -> app_binop(Size_limits.Size_op.add,e1,e2)
+         | "Int.sub",E_tuple [e1;e2] -> app_binop(Size_limits.Size_op.sub,e1,e2)
+         | "Int.mul",E_tuple [e1;e2] -> app_binop(Size_limits.Size_op.mul,e1,e2)
+         | "Int.div",E_tuple [e1;e2] -> app_binop(Size_limits.Size_op.div,e1,e2)
          | _ -> raise Cannot)
     | E_array_length(x,_) ->
        (match List.assoc_opt x statics with

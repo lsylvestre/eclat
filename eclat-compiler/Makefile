@@ -32,6 +32,7 @@ OBJS= $(SRC_DIR)/prelude.cmx \
       $(SRC_DIR)/Eclat/frontend/current_filename.cmx \
       \
       $(SRC_DIR)/Eclat/typing/types.cmx \
+      $(SRC_DIR)/Eclat/typing/size_limits.cmx \
       $(SRC_DIR)/operators.cmx \
       $(SRC_DIR)/Eclat/syntax/ast.cmx \
       $(SRC_DIR)/Eclat/syntax/pattern.cmx \

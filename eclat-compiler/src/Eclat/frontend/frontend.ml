@@ -167,18 +167,24 @@ let frontend ~(inputs : string list) repl ?(when_repl=(fun _ ~genv:_ _ _ -> ()))
     lexbuf
   in
   
+
+  let main_loc = ref Prelude.dloc in
   (* check if the entry point is defined *)
-  if List.exists (fun ((p,_),loc) -> 
-                   SMap.mem main_name (vars_of_p p)) ds then () 
+  if List.exists (fun ((p,_),loc) ->
+                   if SMap.mem main_name (vars_of_p p) 
+                   then (main_loc := loc; true)
+                   else false) ds then () 
   else error (fun fmt -> main_function_undefined fmt main_name);
   
-  let entry_point = E_var main_name in
-  let main = List.fold_right (fun ((p,e1),_) e ->
-                              E_letIn(p,Types.new_ty_unknown(),e1,e)
+  let entry_point = mk_loc !main_loc @@ E_var main_name in
+  let main = List.fold_right (fun ((p,e1),loc) e ->
+                              mk_loc loc @@ E_letIn(p,Types.new_ty_unknown(),e1,e)
                         ) ds (let y = gensym () in 
+                              mk_loc ! main_loc @@
                               E_fun (P_var y,(Types.new_ty_unknown(),
                                               Types.new_tyB_unknown()), 
-                                       E_app(entry_point,E_var y))) 
+                                     mk_loc !main_loc @@
+                                     E_app(entry_point,mk_loc !main_loc @@ E_var y))) 
   in
   check_externals_nodup (fst exts);
 

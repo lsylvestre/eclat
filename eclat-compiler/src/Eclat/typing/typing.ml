@@ -76,6 +76,9 @@ let rec unify_size ~loc sz1 sz2 =
   | Sz_add(sz,n),Sz_lit n' | Sz_lit n',Sz_add(sz,n) -> 
       if n' >= n then unify_size ~loc sz (Sz_lit (n'-n))
       else raise @@ CannotUnify(loc,[Size(sz1,sz2)])
+  | Sz_twice(sz),Sz_lit n | Sz_lit n, Sz_twice(sz) -> 
+      if n mod 2 = 0 then unify_size ~loc sz (Sz_lit (n/2))
+      else raise @@ CannotUnify(loc,[Size(sz1,sz2)])
   | Sz_twice(sz),Sz_twice(sz') -> unify_size ~loc sz sz'
   | Sz_twice(sz),Sz_add(sz',n) | Sz_add(sz',n),Sz_twice(sz) ->  
       if n = 0 then unify_size ~loc (Sz_twice(sz)) sz' 
@@ -115,15 +118,12 @@ let rec unify_size ~loc sz1 sz2 =
           - A ~? C+M where M:=(N+1)/2
           ===================== *)
         unify_size ~loc sz' (Sz_add(Sz_twice(sz2),1));
-        unify_size ~loc sz (Sz_add(sz2,(n+1)/2)))
+        unify_size ~loc sz (Sz_add(sz2,(Size_limits.Size_op.add n 1)/2)))
     )
-  | Sz_twice(sz),Sz_lit n | Sz_lit n, Sz_twice(sz) -> 
-      if n mod 2 = 0 then unify_size ~loc sz (Sz_lit (n/2))
-      else raise @@ CannotUnify(loc,[Size(sz1,sz2)])
   | Sz_lit n, Sz_pow2(sz)
   | Sz_pow2(sz), Sz_lit n ->
       let k = int_of_float (Float.log2 (float n)) in
-      if (n mod k) == 0 then unify_size ~loc sz (Sz_lit k)
+      if (1 lsl k) == n then unify_size ~loc sz (Sz_lit k)
     else raise @@ CannotUnify(loc,[Size(sz1,sz2)])
   | Sz_pow2(sz), Sz_pow2(sz') ->
       unify_size ~loc sz sz'
@@ -134,14 +134,12 @@ let rec unify_size ~loc sz1 sz2 =
       unify_size ~loc (Sz_pow2(sz2)) sz'
   | Sz_add(sz',n),Sz_pow2(sz)
   | Sz_pow2(sz), Sz_add(sz',n) ->
+      if n = 0 then unify_size ~loc (Sz_pow2(sz)) sz' else
       if n mod 2 == 0 then (
         let sz2 = Types.new_size_unknown() in
         unify_size ~loc (Sz_twice(sz2)) sz';
-        unify_size ~loc (Sz_pow2(sz)) (Sz_twice(Sz_add(sz2,n/2))))
-      else (let sz3 = Types.new_size_unknown() in
-            unify_size ~loc (Sz_add(sz',n+1)) sz3;
-            unify_size ~loc (Sz_pow2(sz)) sz3)
-
+        unify_size ~loc (Sz_pow2(sz)) (Sz_twice (Sz_add(sz2,n/2))))
+      else (unify_size ~loc (Sz_add(Sz_pow2(sz),-1)) (Sz_add(sz',n-1)))
 
 let unify_dur ~loc d1_0 d2_0 =
   let rec unify_d ~start d1 d2 =
