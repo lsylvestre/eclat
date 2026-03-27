@@ -1,3 +1,8 @@
+*This repository contains an outdated version of the Eclat programming language and compiler developed at the [LIP6](https://www.lip6.fr) Laboratory as part of Loïc Sylestre's PhD research on [safe, expressive and efficient FPGA programming](https://theses.hal.science/tel-04991551).* 
+
+*Eclat is now being developed at [IRIT](https://www.irit.fr). See the new repository here: https://gitlab.irit.fr/traces-public/eclat*
+
+---
 
 ## Eclat
 
